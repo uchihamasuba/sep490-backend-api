@@ -1,8 +1,22 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Prisma schema — BNWEMS backend (Task 2.2: 24 bảng LÕI, ánh xạ từ docs/migrations/001_core.sql).
+// 4 bảng KHO VẬN (inventory, inventory_movements, collected_equipment_reports,
+// collected_equipment_report_items) thuộc migration 002 — sẽ thêm ở Task 4.1, KHÔNG có ở đây.
+//
+// Quy ước: model PascalCase singular, field camelCase + @map("snake_case") khớp cột thật, table
+// @@map("snake_case_plural") khớp docs/TABLES.md / 001_core.sql.
+//
+// 2 điểm KHÁC biệt có chủ đích so với DDL gốc (001_core.sql) — Prisma schema DSL không có cú pháp
+// khai báo trực tiếp cho:
+//  1. Cột GENERATED ALWAYS AS (...) STORED (quotation_items.line_total, order_items.subtotal,
+//     supplier_transaction_items.subtotal) — model là field Decimal ghi được bình thường; Repository
+//     (Task 3.x) PHẢI tự tính (quantity*price-discount / quantity*unit_price / quantity*unit_cost)
+//     trước khi insert, thay vì để DB tự sinh.
+//  2. CHECK constraint (quantity > 0, rating 0-5, guest_count >= 0, prepared_qty >= 0,
+//     received_quantity >= 0) — chuyển thành validate ở tầng Zod (modules/*/.validators.ts, Task 3.x)
+//     thay vì ràng buộc DB.
+// Lý do: dùng dbgenerated() cho DEFAULT không hợp lệ với MySQL khi biểu thức tham chiếu cột khác
+// trong cùng dòng; nếu patch tay migration.sql để có GENERATED/CHECK thật, các lần `prisma migrate
+// dev` sau (vd Task 4.1 thêm bảng Kho vận) sẽ phát hiện lệch (drift) giữa schema.prisma và DB thật.
 
 generator client {
   provider = "prisma-client-js"
@@ -11,4 +25,712 @@ generator client {
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  LEADER
+  TECHNICAL
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+/// Dùng chung cho customers.status và suppliers.status (cùng ENUM('ACTIVE','INACTIVE') trong DDL).
+enum ActiveStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PolicyType {
+  DEPOSIT
+  CANCELLATION
+  COMPENSATION
+  FEE
+}
+
+enum ItemStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum QuotationStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+/// Dùng chung cho orders.payment_status và supplier_transactions.payment_status (cùng
+/// ENUM('UNPAID','DEPOSITED','PAID') trong DDL).
+enum PaymentStatus {
+  UNPAID
+  DEPOSITED
+  PAID
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderItemSource {
+  INTERNAL
+  SUPPLIER
+}
+
+enum ScheduleStatus {
+  PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PlanMemberRole {
+  LEAD
+  TECHNICAL
+}
+
+enum SurveyStatus {
+  DRAFT
+  NEEDS_REVIEW
+  SUBMITTED
+  CONFIRMED
+}
+
+/// Giá trị lowercase — khớp đúng ENUM('add','remove','replace') trong DDL (khác case với các enum khác).
+enum ChangeRequestType {
+  add
+  remove
+  replace
+}
+
+/// Giá trị lowercase — khớp đúng ENUM('pending','approved','rejected') trong DDL.
+enum ChangeRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+/// Giá trị lowercase — khớp đúng ENUM('add','remove') trong DDL.
+enum ChangeRequestItemAction {
+  add
+  remove
+}
+
+enum SupplierTransactionType {
+  RENTAL
+  PURCHASE
+}
+
+enum SupplierTransactionStatus {
+  PENDING
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DepositStatus {
+  PENDING
+  SUCCESS
+  OVERDUE
+  CANCELLED
+}
+
+enum SettlementStatus {
+  DRAFT
+  AGREED
+  REQUESTED
+  PAID
+  CONFIRMED
+}
+
+enum NotificationType {
+  SYSTEM
+  ORDER
+  TASK
+  SCHEDULE
+  PAYMENT
+  SURVEY
+  INVENTORY
+  SUPPLIER
+  OTHER
+}
+
+// ============================================================================
+// NHÓM 1 — IDENTITY & MASTER DATA
+// ============================================================================
+
+model User {
+  userId       String     @id @default(dbgenerated("(uuid())")) @map("user_id") @db.VarChar(36)
+  username     String     @unique @db.VarChar(100)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  fullName     String     @map("full_name") @db.VarChar(255)
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+  email        String?    @db.VarChar(255)
+  phone        String?    @db.VarChar(30)
+  bio          String?    @db.Text
+  avatarUrl    String?    @map("avatar_url") @db.Text
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  evidencesUploaded      Evidence[]             @relation("EvidenceUploadedBy")
+  quotationsCreated      Quotation[]            @relation("QuotationCreatedBy")
+  ordersCreated          Order[]                @relation("OrderCreatedBy")
+  schedulePlansCreated   SchedulePlan[]         @relation("SchedulePlanCreatedBy")
+  scheduleAssignments    SchedulePlanAssignee[]
+  surveyReportsReported  SurveyReport[]         @relation("SurveyReportedBy")
+  surveyReportsConfirmed SurveyReport[]         @relation("SurveyConfirmedBy")
+  depositsRequested      Deposit[]              @relation("DepositRequestedBy")
+  depositsApproved       Deposit[]              @relation("DepositApprovedBy")
+  settlementsRequested   Settlement[]           @relation("SettlementRequestedBy")
+  settlementsConfirmed   Settlement[]           @relation("SettlementConfirmedBy")
+  notifications          Notification[]
+
+  @@map("users")
+}
+
+model Customer {
+  customerId   String       @id @default(dbgenerated("(uuid())")) @map("customer_id") @db.VarChar(36)
+  customerCode String       @unique @map("customer_code") @db.VarChar(50)
+  customerName String       @map("customer_name") @db.VarChar(255)
+  phone        String       @db.VarChar(30)
+  email        String?      @db.VarChar(255)
+  address      String?      @db.Text
+  notes        String?      @db.Text
+  status       ActiveStatus @default(ACTIVE)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt    DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  quotations Quotation[]
+  orders     Order[]
+
+  @@map("customers")
+}
+
+model Supplier {
+  supplierId    String       @id @default(dbgenerated("(uuid())")) @map("supplier_id") @db.VarChar(36)
+  supplierCode  String       @unique @map("supplier_code") @db.VarChar(50)
+  supplierName  String       @map("supplier_name") @db.VarChar(255)
+  serviceType   String       @map("service_type") @db.VarChar(255)
+  contactPerson String?      @map("contact_person") @db.VarChar(255)
+  phone         String?      @db.VarChar(30)
+  email         String?      @db.VarChar(255)
+  address       String?      @db.Text
+  /// CHECK (rating BETWEEN 0 AND 5) trong DDL — validate ở Zod, không ở DB (xem ghi chú đầu file).
+  rating        Decimal?     @db.Decimal(2, 1)
+  notes         String?      @db.Text
+  status        ActiveStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  supplierTransactions SupplierTransaction[]
+
+  @@map("suppliers")
+}
+
+model BusinessPolicy {
+  policyId    String     @id @default(dbgenerated("(uuid())")) @map("policy_id") @db.VarChar(36)
+  policyCode  String     @unique @map("policy_code") @db.VarChar(50)
+  policyName  String     @map("policy_name") @db.VarChar(255)
+  policyType  PolicyType @map("policy_type")
+  description String?    @db.Text
+  policyValue Decimal    @map("policy_value") @db.Decimal(14, 2)
+  unit        String     @db.VarChar(50)
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt   DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  orders Order[]
+
+  @@map("business_policies")
+}
+
+// ============================================================================
+// NHÓM 2 — CATALOG (Category > Type > Item)
+// ============================================================================
+
+model ItemCategory {
+  categoryId   String  @id @default(dbgenerated("(uuid())")) @map("category_id") @db.VarChar(36)
+  categoryCode String? @unique @map("category_code") @db.VarChar(50)
+  categoryName String  @map("category_name") @db.VarChar(255)
+  description  String? @db.Text
+
+  itemTypes ItemType[]
+
+  @@map("item_categories")
+}
+
+model ItemType {
+  typeId      String  @id @default(dbgenerated("(uuid())")) @map("type_id") @db.VarChar(36)
+  categoryId  String  @map("category_id") @db.VarChar(36)
+  typeCode    String? @map("type_code") @db.VarChar(50)
+  typeName    String  @map("type_name") @db.VarChar(255)
+  description String? @db.Text
+  imageUrl    String? @map("image_url") @db.Text
+  isActive    Boolean @default(true) @map("is_active")
+
+  category ItemCategory @relation(fields: [categoryId], references: [categoryId], onDelete: Restrict)
+  items    Item[]
+
+  @@index([categoryId], map: "idx_item_types_category")
+  @@map("item_types")
+}
+
+model Item {
+  itemId         String     @id @default(dbgenerated("(uuid())")) @map("item_id") @db.VarChar(36)
+  itemCode       String     @unique @map("item_code") @db.VarChar(50)
+  itemName       String     @map("item_name") @db.VarChar(255)
+  typeId         String     @map("type_id") @db.VarChar(36)
+  description    String?    @db.Text
+  unit           String     @db.VarChar(50)
+  rentalPrice    Decimal    @default(0) @map("rental_price") @db.Decimal(14, 2)
+  purchasePrice  Decimal?   @map("purchase_price") @db.Decimal(14, 2)
+  priceValidFrom DateTime?  @map("price_valid_from") @db.Date
+  priceValidTo   DateTime?  @map("price_valid_to") @db.Date
+  imageUrl       String?    @map("image_url") @db.Text
+  status         ItemStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  type                     ItemType                  @relation(fields: [typeId], references: [typeId], onDelete: Restrict)
+  quotationItems           QuotationItem[]
+  orderItems               OrderItem[]
+  changeRequestItems       ChangeRequestItem[]
+  supplierTransactionItems SupplierTransactionItem[]
+
+  @@index([typeId], map: "idx_items_type")
+  @@index([status], map: "idx_items_status")
+  @@map("items")
+}
+
+// ============================================================================
+// NHÓM 7 (SHARED) — EVIDENCE (đặt trước Sales vì được Quotation/Order/... tham chiếu)
+// ============================================================================
+
+model Evidence {
+  evidenceId  String   @id @default(dbgenerated("(uuid())")) @map("evidence_id") @db.VarChar(36)
+  fileUrl     String   @map("file_url") @db.Text
+  description String?  @db.Text
+  uploadedBy  String   @map("uploaded_by") @db.VarChar(36)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+
+  uploader      User           @relation("EvidenceUploadedBy", fields: [uploadedBy], references: [userId], onDelete: Restrict)
+  schedulePlans SchedulePlan[]
+  attendances   Attendance[]
+  surveyReports SurveyReport[]
+  deposits      Deposit[]
+  settlements   Settlement[]
+
+  @@map("evidences")
+}
+
+// ============================================================================
+// NHÓM 3 — SALES (Quotation thuộc Customer)
+// ============================================================================
+
+model Quotation {
+  quotationId   String          @id @default(dbgenerated("(uuid())")) @map("quotation_id") @db.VarChar(36)
+  quotationCode String          @unique @map("quotation_code") @db.VarChar(50)
+  customerId    String          @map("customer_id") @db.VarChar(36)
+  version       String          @db.VarChar(30)
+  subtotal      Decimal         @default(0) @db.Decimal(14, 2)
+  discountTotal Decimal         @default(0) @map("discount_total") @db.Decimal(14, 2)
+  totalAmount   Decimal         @default(0) @map("total_amount") @db.Decimal(14, 2)
+  status        QuotationStatus @default(DRAFT)
+  notes         String?         @db.Text
+  createdBy     String          @map("created_by") @db.VarChar(36)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  customer Customer        @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
+  creator  User            @relation("QuotationCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
+  items    QuotationItem[]
+  orders   Order[]
+
+  @@index([customerId], map: "idx_quotations_customer")
+  @@index([status], map: "idx_quotations_status")
+  @@map("quotations")
+}
+
+model QuotationItem {
+  quotationItemId String  @id @default(dbgenerated("(uuid())")) @map("quotation_item_id") @db.VarChar(36)
+  quotationId     String  @map("quotation_id") @db.VarChar(36)
+  itemId          String  @map("item_id") @db.VarChar(36)
+  /// Snapshot tên item lúc tạo — không đổi theo item.itemName về sau.
+  itemName        String  @map("item_name") @db.VarChar(255)
+  /// CHECK (quantity > 0) trong DDL — validate ở Zod.
+  quantity        Int
+  price           Decimal @db.Decimal(14, 2)
+  discount        Decimal @default(0) @db.Decimal(14, 2)
+  /// GENERATED ALWAYS AS (quantity*price-discount) STORED trong DDL — Repository (Task 3.x) tự tính
+  /// và truyền vào khi tạo dòng, xem ghi chú đầu file.
+  lineTotal       Decimal @map("line_total") @db.Decimal(14, 2)
+
+  quotation Quotation @relation(fields: [quotationId], references: [quotationId], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [itemId], onDelete: Restrict)
+
+  @@index([quotationId], map: "idx_quotation_items_quotation")
+  @@index([itemId], map: "idx_quotation_items_item")
+  @@map("quotation_items")
+}
+
+// ============================================================================
+// NHÓM 3 — ORDERS (vòng đời trung tâm)
+// ============================================================================
+
+model Order {
+  orderId       String        @id @default(dbgenerated("(uuid())")) @map("order_id") @db.VarChar(36)
+  orderCode     String        @unique @map("order_code") @db.VarChar(50)
+  customerId    String        @map("customer_id") @db.VarChar(36)
+  quotationId   String?       @map("quotation_id") @db.VarChar(36)
+  policyId      String?       @map("policy_id") @db.VarChar(36)
+  eventType     String        @map("event_type") @db.VarChar(100)
+  eventName     String?       @map("event_name") @db.VarChar(255)
+  eventDate     DateTime      @map("event_date") @db.Timestamp(0)
+  location      String        @db.Text
+  /// CHECK (guest_count >= 0) trong DDL — validate ở Zod.
+  guestCount    Int?          @map("guest_count")
+  totalAmount   Decimal       @default(0) @map("total_amount") @db.Decimal(14, 2)
+  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
+  orderStatus   OrderStatus   @default(NEW) @map("order_status")
+  cancelReason  String?       @map("cancel_reason") @db.Text
+  notes         String?       @db.Text
+  createdBy     String        @map("created_by") @db.VarChar(36)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  customer             Customer              @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
+  quotation            Quotation?            @relation(fields: [quotationId], references: [quotationId], onDelete: SetNull)
+  policy               BusinessPolicy?       @relation(fields: [policyId], references: [policyId], onDelete: SetNull)
+  creator              User                  @relation("OrderCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
+  orderItems           OrderItem[]
+  schedulePlans        SchedulePlan[]
+  surveyReports        SurveyReport[]
+  changeRequests       ChangeRequest[]
+  supplierTransactions SupplierTransaction[]
+  deposits             Deposit[]
+  settlements          Settlement[]
+
+  @@index([customerId], map: "idx_orders_customer")
+  @@index([quotationId], map: "idx_orders_quotation")
+  @@index([orderStatus], map: "idx_orders_status")
+  @@index([paymentStatus], map: "idx_orders_payment_status")
+  @@index([eventDate], map: "idx_orders_event_date")
+  @@index([createdBy], map: "idx_orders_created_by")
+  @@map("orders")
+}
+
+model OrderItem {
+  orderItemId String          @id @default(dbgenerated("(uuid())")) @map("order_item_id") @db.VarChar(36)
+  orderId     String          @map("order_id") @db.VarChar(36)
+  itemId      String          @map("item_id") @db.VarChar(36)
+  /// CHECK (quantity > 0) trong DDL — validate ở Zod.
+  quantity    Int
+  unitPrice   Decimal         @map("unit_price") @db.Decimal(14, 2)
+  /// GENERATED ALWAYS AS (quantity*unit_price) STORED trong DDL — Repository tự tính, xem ghi chú đầu file.
+  subtotal    Decimal         @db.Decimal(14, 2)
+  source      OrderItemSource @default(INTERNAL)
+  /// CHECK (prepared_qty >= 0) trong DDL — validate ở Zod.
+  preparedQty Int             @default(0) @map("prepared_qty")
+  notes       String?         @db.Text
+
+  order Order @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  item  Item  @relation(fields: [itemId], references: [itemId], onDelete: Restrict)
+
+  @@index([orderId], map: "idx_order_items_order")
+  @@index([itemId], map: "idx_order_items_item")
+  @@map("order_items")
+}
+
+// ============================================================================
+// NHÓM 4 — OPERATIONS (điều phối & hiện trường)
+// ============================================================================
+
+model WorkTask {
+  taskId      String  @id @default(dbgenerated("(uuid())")) @map("task_id") @db.VarChar(36)
+  taskCode    String  @unique @map("task_code") @db.VarChar(50)
+  taskName    String  @map("task_name") @db.VarChar(255)
+  description String? @db.Text
+  isActive    Boolean @default(true) @map("is_active")
+
+  schedulePlans SchedulePlan[]
+
+  @@map("work_tasks")
+}
+
+model SchedulePlan {
+  planId     String         @id @default(dbgenerated("(uuid())")) @map("plan_id") @db.VarChar(36)
+  planCode   String         @unique @map("plan_code") @db.VarChar(50)
+  orderId    String         @map("order_id") @db.VarChar(36)
+  taskId     String         @map("task_id") @db.VarChar(36)
+  startTime  DateTime       @map("start_time") @db.Timestamp(0)
+  endTime    DateTime?      @map("end_time") @db.Timestamp(0)
+  location   String?        @db.Text
+  status     ScheduleStatus @default(PENDING)
+  evidenceId String?        @map("evidence_id") @db.VarChar(36)
+  notes      String?        @db.Text
+  createdBy  String         @map("created_by") @db.VarChar(36)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order         Order                  @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  task          WorkTask               @relation(fields: [taskId], references: [taskId], onDelete: Restrict)
+  evidence      Evidence?              @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
+  creator       User                   @relation("SchedulePlanCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
+  assignees     SchedulePlanAssignee[]
+  surveyReports SurveyReport[]
+
+  @@index([orderId], map: "idx_schedule_plans_order")
+  @@index([taskId], map: "idx_schedule_plans_task")
+  @@index([status], map: "idx_schedule_plans_status")
+  @@index([startTime], map: "idx_schedule_plans_start")
+  @@map("schedule_plans")
+}
+
+model SchedulePlanAssignee {
+  assigneeId String         @id @default(dbgenerated("(uuid())")) @map("assignee_id") @db.VarChar(36)
+  planId     String         @map("plan_id") @db.VarChar(36)
+  userId     String         @map("user_id") @db.VarChar(36)
+  role       PlanMemberRole @default(TECHNICAL)
+  notes      String?        @db.Text
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
+
+  plan       SchedulePlan @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [userId], onDelete: Restrict)
+  attendance Attendance?
+
+  @@unique([planId, userId])
+  @@index([planId], map: "idx_spa_plan")
+  @@index([userId], map: "idx_spa_user")
+  @@map("schedule_plan_assignees")
+}
+
+model Attendance {
+  attendanceId      String    @id @default(dbgenerated("(uuid())")) @map("attendance_id") @db.VarChar(36)
+  assigneeId        String    @unique @map("assignee_id") @db.VarChar(36)
+  checkInAt         DateTime? @map("check_in_at") @db.Timestamp(0)
+  checkInEvidenceId String?   @map("check_in_evidence_id") @db.VarChar(36)
+  checkOutAt        DateTime? @map("check_out_at") @db.Timestamp(0)
+  note              String?   @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  assignee        SchedulePlanAssignee @relation(fields: [assigneeId], references: [assigneeId], onDelete: Cascade)
+  checkInEvidence Evidence?            @relation(fields: [checkInEvidenceId], references: [evidenceId], onDelete: SetNull)
+
+  @@map("attendances")
+}
+
+model SurveyReport {
+  surveyId           String       @id @default(dbgenerated("(uuid())")) @map("survey_id") @db.VarChar(36)
+  reportCode         String       @unique @map("report_code") @db.VarChar(50)
+  orderId            String       @map("order_id") @db.VarChar(36)
+  planId             String?      @map("plan_id") @db.VarChar(36)
+  evidenceId         String?      @map("evidence_id") @db.VarChar(36)
+  surveyDate         DateTime     @map("survey_date") @db.Timestamp(0)
+  location           String       @db.Text
+  area               Decimal?     @db.Decimal(10, 2)
+  length             Decimal?     @db.Decimal(10, 2)
+  width              Decimal?     @db.Decimal(10, 2)
+  entrance           String?      @db.Text
+  siteConstraints    String?      @map("site_constraints") @db.Text
+  additionalRequests String?      @map("additional_requests") @db.Text
+  proposedItems      String?      @map("proposed_items") @db.Text
+  notes              String?      @db.Text
+  status             SurveyStatus @default(DRAFT)
+  reportedBy         String       @map("reported_by") @db.VarChar(36)
+  confirmedBy        String?      @map("confirmed_by") @db.VarChar(36)
+  confirmedAt        DateTime?    @map("confirmed_at") @db.Timestamp(0)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order     Order         @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  plan      SchedulePlan? @relation(fields: [planId], references: [planId], onDelete: SetNull)
+  evidence  Evidence?     @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
+  reporter  User          @relation("SurveyReportedBy", fields: [reportedBy], references: [userId], onDelete: Restrict)
+  confirmer User?         @relation("SurveyConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
+
+  @@index([orderId], map: "idx_survey_reports_order")
+  @@index([status], map: "idx_survey_reports_status")
+  @@map("survey_reports")
+}
+
+model ChangeRequest {
+  changeRequestId String              @id @default(dbgenerated("(uuid())")) @map("change_request_id") @db.VarChar(36)
+  orderId         String              @map("order_id") @db.VarChar(36)
+  type            ChangeRequestType
+  status          ChangeRequestStatus @default(pending)
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamp(0)
+
+  order Order               @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  items ChangeRequestItem[]
+
+  @@index([orderId], map: "idx_change_requests_order")
+  @@map("change_requests")
+}
+
+model ChangeRequestItem {
+  changeRequestItemId String                  @id @default(dbgenerated("(uuid())")) @map("change_request_item_id") @db.VarChar(36)
+  changeRequestId     String                  @map("change_request_id") @db.VarChar(36)
+  catalogItemId       String                  @map("catalog_item_id") @db.VarChar(36)
+  /// CHECK (quantity > 0) trong DDL — validate ở Zod.
+  quantity            Int
+  action              ChangeRequestItemAction
+
+  changeRequest ChangeRequest @relation(fields: [changeRequestId], references: [changeRequestId], onDelete: Cascade)
+  catalogItem   Item          @relation(fields: [catalogItemId], references: [itemId], onDelete: Restrict)
+
+  @@index([changeRequestId], map: "idx_cr_items_request")
+  @@index([catalogItemId], map: "idx_cr_items_item")
+  @@map("change_request_items")
+}
+
+// ============================================================================
+// NHÓM 5 — SUPPLIER TRANSACTIONS
+// ============================================================================
+
+model SupplierTransaction {
+  transactionId   String                    @id @default(dbgenerated("(uuid())")) @map("transaction_id") @db.VarChar(36)
+  transactionCode String                    @unique @map("transaction_code") @db.VarChar(50)
+  supplierId      String                    @map("supplier_id") @db.VarChar(36)
+  orderId         String                    @map("order_id") @db.VarChar(36)
+  transactionType SupplierTransactionType   @map("transaction_type")
+  serviceTitle    String                    @map("service_title") @db.VarChar(255)
+  estimatedCost   Decimal                   @default(0) @map("estimated_cost") @db.Decimal(14, 2)
+  depositAmount   Decimal                   @default(0) @map("deposit_amount") @db.Decimal(14, 2)
+  paymentStatus   PaymentStatus             @default(UNPAID) @map("payment_status")
+  status          SupplierTransactionStatus @default(PENDING)
+  createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt       DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  supplier Supplier                  @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
+  order    Order                     @relation(fields: [orderId], references: [orderId], onDelete: Restrict)
+  items    SupplierTransactionItem[]
+
+  @@index([supplierId], map: "idx_sup_txn_supplier")
+  @@index([orderId], map: "idx_sup_txn_order")
+  @@index([status], map: "idx_sup_txn_status")
+  @@map("supplier_transactions")
+}
+
+model SupplierTransactionItem {
+  stItemId         String  @id @default(dbgenerated("(uuid())")) @map("st_item_id") @db.VarChar(36)
+  transactionId    String  @map("transaction_id") @db.VarChar(36)
+  itemId           String? @map("item_id") @db.VarChar(36)
+  itemName         String  @map("item_name") @db.VarChar(255)
+  /// CHECK (quantity > 0) trong DDL — validate ở Zod.
+  quantity         Int
+  unitCost         Decimal @map("unit_cost") @db.Decimal(14, 2)
+  /// GENERATED ALWAYS AS (quantity*unit_cost) STORED trong DDL — Repository tự tính, xem ghi chú đầu file.
+  subtotal         Decimal @db.Decimal(14, 2)
+  /// CHECK (received_quantity >= 0) trong DDL — validate ở Zod.
+  receivedQuantity Int     @default(0) @map("received_quantity")
+  notes            String? @db.Text
+
+  transaction SupplierTransaction @relation(fields: [transactionId], references: [transactionId], onDelete: Cascade)
+  item        Item?               @relation(fields: [itemId], references: [itemId], onDelete: SetNull)
+
+  @@index([transactionId], map: "idx_sup_txn_items_txn")
+  @@map("supplier_transaction_items")
+}
+
+// ============================================================================
+// NHÓM 6 — FINANCE (cọc & quyết toán theo Order)
+// ============================================================================
+
+model Deposit {
+  depositId     String        @id @default(dbgenerated("(uuid())")) @map("deposit_id") @db.VarChar(36)
+  depositCode   String        @unique @map("deposit_code") @db.VarChar(50)
+  orderId       String        @map("order_id") @db.VarChar(36)
+  amount        Decimal       @db.Decimal(14, 2)
+  dueDate       DateTime?     @map("due_date") @db.Timestamp(0)
+  paymentDate   DateTime?     @map("payment_date") @db.Timestamp(0)
+  paymentMethod String?       @map("payment_method") @db.VarChar(100)
+  qrCodeUrl     String?       @map("qr_code_url") @db.Text
+  status        DepositStatus @default(PENDING)
+  evidenceId    String?       @map("evidence_id") @db.VarChar(36)
+  requestedBy   String        @map("requested_by") @db.VarChar(36)
+  approvedBy    String?       @map("approved_by") @db.VarChar(36)
+  approvedAt    DateTime?     @map("approved_at") @db.Timestamp(0)
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order     Order     @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  evidence  Evidence? @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
+  requester User      @relation("DepositRequestedBy", fields: [requestedBy], references: [userId], onDelete: Restrict)
+  approver  User?     @relation("DepositApprovedBy", fields: [approvedBy], references: [userId], onDelete: SetNull)
+
+  @@index([orderId], map: "idx_deposits_order")
+  @@index([status], map: "idx_deposits_status")
+  @@map("deposits")
+}
+
+model Settlement {
+  settlementId  String           @id @default(dbgenerated("(uuid())")) @map("settlement_id") @db.VarChar(36)
+  orderId       String           @map("order_id") @db.VarChar(36)
+  additionalFee Decimal          @default(0) @map("additional_fee") @db.Decimal(14, 2)
+  compensation  Decimal          @default(0) @db.Decimal(14, 2)
+  discount      Decimal          @default(0) @db.Decimal(14, 2)
+  finalAmount   Decimal          @default(0) @map("final_amount") @db.Decimal(14, 2)
+  paymentMethod String?          @map("payment_method") @db.VarChar(100)
+  qrCodeUrl     String?          @map("qr_code_url") @db.Text
+  paidAt        DateTime?        @map("paid_at") @db.Timestamp(0)
+  evidenceId    String?          @map("evidence_id") @db.VarChar(36)
+  status        SettlementStatus @default(DRAFT)
+  requestedBy   String?          @map("requested_by") @db.VarChar(36)
+  requestedAt   DateTime?        @map("requested_at") @db.Timestamp(0)
+  confirmedBy   String?          @map("confirmed_by") @db.VarChar(36)
+  confirmedAt   DateTime?        @map("confirmed_at") @db.Timestamp(0)
+  notes         String?          @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  order     Order     @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  evidence  Evidence? @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
+  requester User?     @relation("SettlementRequestedBy", fields: [requestedBy], references: [userId], onDelete: SetNull)
+  confirmer User?     @relation("SettlementConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
+
+  @@index([orderId], map: "idx_settlements_order")
+  @@index([status], map: "idx_settlements_status")
+  @@map("settlements")
+}
+
+// ============================================================================
+// NHÓM 7 — NOTIFICATIONS
+// ============================================================================
+
+model Notification {
+  notificationId   String           @id @default(dbgenerated("(uuid())")) @map("notification_id") @db.VarChar(36)
+  userId           String           @map("user_id") @db.VarChar(36)
+  title            String           @db.VarChar(255)
+  content          String?          @db.Text
+  notificationType NotificationType @default(SYSTEM) @map("notification_type")
+  /// Liên kết đa hình (polymorphic) tới nhiều loại entity — KHÔNG có FK cứng, khớp đúng DDL.
+  refType          String?          @map("ref_type") @db.VarChar(100)
+  refId            String?          @map("ref_id") @db.VarChar(36)
+  isRead           Boolean          @default(false) @map("is_read")
+  readAt           DateTime?        @map("read_at") @db.Timestamp(0)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId], map: "idx_notifications_user")
+  @@index([isRead], map: "idx_notifications_is_read")
+  @@map("notifications")
 }

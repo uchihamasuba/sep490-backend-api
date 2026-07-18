@@ -63,11 +63,11 @@ Các module chia theo 2 giai đoạn Migration:
   - Quản lý linh hoạt biến `NEXT_PUBLIC_MOCK_MODE` hoặc chỉnh `mockAdapter.ts`: những chức năng đã làm xong và khớp thì trỏ tới backend thật, chức năng nào chưa làm hoặc làm bị vỡ UI thì bắt buộc phải giữ nguyên để chạy giả lập mock data.
 
 ### Phase 2: Khởi Tạo Database & Seed Data
-- [ ] **Task 2.1: Đồng bộ dữ liệu Mock từ Frontend sang Backend Seed**
+- [x] **Task 2.1: Đồng bộ dữ liệu Mock từ Frontend sang Backend Seed**
   - Trích xuất dữ liệu từ `sep490-web-frontend/src/mocks/db/*` và `sep490-web-frontend/src/mocks/apiFixtures.ts`.
   - Tạo file `prisma/seed.ts` để nạp các dữ liệu này vào DB backend (Users, Categories, Types, Items, Customers, Orders...).
   - Bổ sung cấu hình chạy seed vào `package.json`: `"prisma": { "seed": "ts-node prisma/seed.ts" }`.
-- [ ] **Task 2.2: Định nghĩa Prisma Schema (Core)**
+- [x] **Task 2.2: Định nghĩa Prisma Schema (Core)**
   - Ánh xạ 24 bảng lõi từ `001_core.sql` vào `schema.prisma`. Bỏ 4 bảng Kho vận.
   - Chạy `npx prisma migrate dev --name init_core` và `npx prisma db seed`.
 
