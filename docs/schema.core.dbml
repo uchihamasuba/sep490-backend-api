@@ -1,0 +1,480 @@
+�// ============================================================================
+//  BNWEMS — Binh Nguyen Wedding & Event Management System
+//  DBML — VERSION 1 / CORE (23 bảng, KHÔNG gồm kho vận).
+//  Dán vào https://dbdiagram.io để xem ERD phần lõi — dùng khi build dự án từ đầu.
+//
+//  Tương ứng: migrations/001_core.sql.
+//  Bản đầy đủ (thêm 4 bảng kho vận): xem schema.full.dbml.
+//  (Phần LƯƠNG/WAGE đã loại trừ.)
+// ============================================================================
+
+Project bnwems {
+  database_type: 'MySQL'
+  Note: 'Hệ thống quản lý cưới hỏi/sự kiện & cho thuê thiết bị nội bộ. 4 role: Admin, Manager, Leader, Technical.'
+}
+
+// ─────────────────────────── ENUMS ───────────────────────────
+Enum user_role { ADMIN
+  MANAGER
+  LEADER
+  TECHNICAL }
+Enum user_status { ACTIVE
+  INACTIVE
+  SUSPENDED }
+Enum customer_status { ACTIVE
+  INACTIVE }
+Enum supplier_status { ACTIVE
+  INACTIVE }
+Enum policy_type { DEPOSIT
+  CANCELLATION
+  COMPENSATION
+  FEE }
+Enum item_status { ACTIVE
+  INACTIVE
+  MAINTENANCE }
+Enum quotation_status { DRAFT
+  APPROVED
+  REJECTED }
+Enum order_status { NEW
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED }
+Enum order_payment_status { UNPAID
+  DEPOSITED
+  PAID }
+Enum order_item_source { INTERNAL
+  SUPPLIER }
+Enum survey_status { DRAFT
+  NEEDS_REVIEW
+  SUBMITTED
+  CONFIRMED }
+Enum schedule_status { PENDING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED }
+Enum plan_member_role { LEAD
+  TECHNICAL }
+Enum change_request_type { add
+  remove
+  replace }
+Enum change_request_status { pending
+  approved
+  rejected }
+Enum change_request_item_action { add
+  remove }
+Enum supplier_transaction_type { RENTAL
+  PURCHASE }
+Enum supplier_transaction_status { PENDING
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED }
+Enum supplier_transaction_pay_status { UNPAID
+  DEPOSITED
+  PAID }
+Enum deposit_status { PENDING
+  SUCCESS
+  OVERDUE
+  CANCELLED }
+Enum settlement_status { DRAFT
+  AGREED
+  REQUESTED
+  PAID
+  CONFIRMED }
+Enum notification_type { SYSTEM
+  ORDER
+  TASK
+  SCHEDULE
+  PAYMENT
+  SURVEY
+  INVENTORY
+  SUPPLIER
+  OTHER }
+
+// ─────────────────────── IDENTITY & MASTER DATA ───────────────────────
+Table users {
+  user_id varchar(36) [pk]
+  username varchar(100) [not null, unique]
+  password_hash varchar(255) [not null]
+  full_name varchar(255) [not null]
+  role user_role [not null, note: 'RBAC enum cố định (không có bảng roles)']
+  status user_status [not null, default: 'ACTIVE']
+  email varchar(255) [null]
+  phone varchar(30) [null]
+  bio text [null]
+  avatar_url text [null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table customers {
+  customer_id varchar(36) [pk]
+  customer_code varchar(50) [not null, unique]
+  customer_name varchar(255) [not null]
+  phone varchar(30) [not null]
+  email varchar(255) [null]
+  address text [null]
+  notes text [null]
+  status customer_status [not null, default: 'ACTIVE']
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  Note: 'Không có tài khoản đăng nhập — chỉ là dữ liệu.'
+}
+
+Table suppliers {
+  supplier_id varchar(36) [pk]
+  supplier_code varchar(50) [not null, unique]
+  supplier_name varchar(255) [not null]
+  service_type varchar(255) [not null]
+  contact_person varchar(255) [null]
+  phone varchar(30) [null]
+  email varchar(255) [null]
+  address text [null]
+  rating decimal(2,1) [null, note: '0..5']
+  notes text [null]
+  status supplier_status [not null, default: 'ACTIVE']
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table business_policies {
+  policy_id varchar(36) [pk]
+  policy_code varchar(50) [not null, unique]
+  policy_name varchar(255) [not null]
+  policy_type policy_type [not null]
+  description text [null]
+  policy_value decimal(14,2) [not null]
+  unit varchar(50) [not null, note: 'Ngày | % | VNĐ']
+  is_active boolean [not null, default: true]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// ─────────────────────── CATALOG & INVENTORY (Category > Type > Item) ───────────────────────
+Table item_categories {
+  category_id varchar(36) [pk]
+  category_code varchar(50) [null, unique]
+  category_name varchar(255) [not null]
+  description text [null]
+}
+
+Table item_types {
+  type_id varchar(36) [pk]
+  category_id varchar(36) [not null, ref: > item_categories.category_id]
+  type_code varchar(50) [null]
+  type_name varchar(255) [not null]
+  description text [null]
+  image_url text [null]
+  is_active boolean [not null, default: true]
+}
+
+Table items {
+  item_id varchar(36) [pk]
+  item_code varchar(50) [not null, unique]
+  item_name varchar(255) [not null]
+  type_id varchar(36) [not null, ref: > item_types.type_id]
+  description text [null]
+  unit varchar(50) [not null]
+  rental_price decimal(14,2) [not null, default: 0]
+  purchase_price decimal(14,2) [null, note: 'dùng tính bồi thường hỏng/mất']
+  price_valid_from date [null]
+  price_valid_to date [null]
+  image_url text [null]
+  status item_status [not null, default: 'ACTIVE']
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// ─────────────────────── SHARED ───────────────────────
+Table evidences {
+  evidence_id varchar(36) [pk]
+  file_url text [not null]
+  description text [null]
+  uploaded_by varchar(36) [not null, ref: > users.user_id]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// ─────────────────────── SALES: QUOTATIONS ───────────────────────
+Table quotations {
+  quotation_id varchar(36) [pk]
+  quotation_code varchar(50) [not null, unique]
+  customer_id varchar(36) [not null, ref: > customers.customer_id]
+  version varchar(30) [not null, note: 'chuỗi tự do "v1.0"']
+  subtotal decimal(14,2) [not null, default: 0]
+  discount_total decimal(14,2) [not null, default: 0]
+  total_amount decimal(14,2) [not null, default: 0]
+  status quotation_status [not null, default: 'DRAFT']
+  notes text [null]
+  created_by varchar(36) [not null, ref: > users.user_id]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table quotation_items {
+  quotation_item_id varchar(36) [pk]
+  quotation_id varchar(36) [not null, ref: > quotations.quotation_id]
+  item_id varchar(36) [not null, ref: > items.item_id]
+  item_name varchar(255) [not null, note: 'snapshot lúc tạo']
+  quantity integer [not null]
+  price decimal(14,2) [not null]
+  discount decimal(14,2) [not null, default: 0]
+  line_total decimal(14,2) [note: 'GENERATED = quantity*price - discount']
+}
+
+// ─────────────────────── ORDERS (trung tâm) ───────────────────────
+Table orders {
+  order_id varchar(36) [pk]
+  order_code varchar(50) [not null, unique]
+  customer_id varchar(36) [not null, ref: > customers.customer_id]
+  quotation_id varchar(36) [null, ref: > quotations.quotation_id, note: 'lưu vết, không copy item']
+  policy_id varchar(36) [null, ref: > business_policies.policy_id]
+  event_type varchar(100) [not null]
+  event_name varchar(255) [null]
+  event_date timestamp [not null]
+  location text [not null]
+  guest_count integer [null]
+  total_amount decimal(14,2) [not null, default: 0]
+  payment_status order_payment_status [not null, default: 'UNPAID']
+  order_status order_status [not null, default: 'NEW']
+  cancel_reason text [null]
+  notes text [null]
+  created_by varchar(36) [not null, ref: > users.user_id]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table order_items {
+  order_item_id varchar(36) [pk]
+  order_id varchar(36) [not null, ref: > orders.order_id]
+  item_id varchar(36) [not null, ref: > items.item_id]
+  quantity integer [not null]
+  unit_price decimal(14,2) [not null]
+  subtotal decimal(14,2) [note: 'GENERATED = quantity*unit_price']
+  source order_item_source [not null, default: 'INTERNAL']
+  prepared_qty integer [not null, default: 0]
+  notes text [null]
+}
+
+// ─────────────────────── OPERATIONS ───────────────────────
+Table work_tasks {
+  task_id varchar(36) [pk]
+  task_code varchar(50) [not null, unique]
+  task_name varchar(255) [not null]
+  description text [null]
+  is_active boolean [not null, default: true]
+  Note: 'Danh mục loại việc tĩnh (Khảo sát, Lắp đặt, Thu hồi...)'
+}
+
+Table schedule_plans {
+  plan_id varchar(36) [pk]
+  plan_code varchar(50) [not null, unique]
+  order_id varchar(36) [not null, ref: > orders.order_id]
+  task_id varchar(36) [not null, ref: > work_tasks.task_id]
+  start_time timestamp [not null]
+  end_time timestamp [null]
+  location text [null]
+  status schedule_status [not null, default: 'PENDING']
+  evidence_id varchar(36) [null, ref: > evidences.evidence_id]
+  notes text [null]
+  created_by varchar(36) [not null, ref: > users.user_id]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  Note: '1 plan = 1 đầu mục công việc (order + loại việc + khung giờ); người tham gia ở schedule_plan_assignees'
+}
+
+Table schedule_plan_assignees {
+  assignee_id varchar(36) [pk]
+  plan_id varchar(36) [not null, ref: > schedule_plans.plan_id]
+  user_id varchar(36) [not null, ref: > users.user_id]
+  role plan_member_role [not null, default: 'TECHNICAL', note: 'LEAD (giám sát) | TECHNICAL']
+  notes text [null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  Note: 'Bảng nối nhiều-nhiều plan↔user. unique(plan_id,user_id); tối đa 1 LEAD/plan'
+}
+
+Table attendances {
+  attendance_id varchar(36) [pk]
+  assignee_id varchar(36) [not null, unique, ref: - schedule_plan_assignees.assignee_id]
+  check_in_at timestamp [null]
+  check_in_evidence_id varchar(36) [null, ref: > evidences.evidence_id]
+  check_out_at timestamp [null]
+  note text [null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  Note: 'Chấm công 1-1 theo phân công (assignee)'
+}
+
+Table survey_reports {
+  survey_id varchar(36) [pk]
+  report_code varchar(50) [not null, unique]
+  order_id varchar(36) [not null, ref: > orders.order_id]
+  plan_id varchar(36) [null, ref: > schedule_plans.plan_id]
+  evidence_id varchar(36) [null, ref: > evidences.evidence_id]
+  survey_date timestamp [not null]
+  location text [not null]
+  area decimal(10,2) [null]
+  length decimal(10,2) [null]
+  width decimal(10,2) [null]
+  entrance text [null]
+  site_constraints text [null]
+  additional_requests text [null]
+  proposed_items text [null]
+  notes text [null]
+  status survey_status [not null, default: 'DRAFT']
+  reported_by varchar(36) [not null, ref: > users.user_id]
+  confirmed_by varchar(36) [null, ref: > users.user_id]
+  confirmed_at timestamp [null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table change_requests {
+  change_request_id varchar(36) [pk]
+  order_id varchar(36) [not null, ref: > orders.order_id]
+  type change_request_type [not null]
+  status change_request_status [not null, default: 'pending']
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table change_request_items {
+  change_request_item_id varchar(36) [pk]
+  change_request_id varchar(36) [not null, ref: > change_requests.change_request_id]
+  catalog_item_id varchar(36) [not null, ref: > items.item_id]
+  quantity integer [not null]
+  action change_request_item_action [not null]
+}
+
+// ─────────────────────── SUPPLIER TRANSACTIONS ───────────────────────
+Table supplier_transactions {
+  transaction_id varchar(36) [pk]
+  transaction_code varchar(50) [not null, unique]
+  supplier_id varchar(36) [not null, ref: > suppliers.supplier_id]
+  order_id varchar(36) [not null, ref: > orders.order_id]
+  transaction_type supplier_transaction_type [not null]
+  service_title varchar(255) [not null]
+  estimated_cost decimal(14,2) [not null, default: 0]
+  deposit_amount decimal(14,2) [not null, default: 0]
+  payment_status supplier_transaction_pay_status [not null, default: 'UNPAID']
+  status supplier_transaction_status [not null, default: 'PENDING']
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table supplier_transaction_items {
+  st_item_id varchar(36) [pk]
+  transaction_id varchar(36) [not null, ref: > supplier_transactions.transaction_id]
+  item_id varchar(36) [null, ref: > items.item_id]
+  item_name varchar(255) [not null]
+  quantity integer [not null]
+  unit_cost decimal(14,2) [not null]
+  subtotal decimal(14,2) [note: 'GENERATED = quantity*unit_cost']
+  received_quantity integer [not null, default: 0]
+  notes text [null]
+}
+
+// (Module KHO VẬN: inventory, inventory_movements, collected_equipment_reports,
+//  collected_equipment_report_items — nằm ở schema.full.dbml / migration 002.)
+
+// ─────────────────────── FINANCE ───────────────────────
+Table deposits {
+  deposit_id varchar(36) [pk]
+  deposit_code varchar(50) [not null, unique]
+  order_id varchar(36) [not null, ref: > orders.order_id]
+  amount decimal(14,2) [not null]
+  due_date timestamp [null]
+  payment_date timestamp [null]
+  payment_method varchar(100) [null]
+  qr_code_url text [null]
+  status deposit_status [not null, default: 'PENDING']
+  evidence_id varchar(36) [null, ref: > evidences.evidence_id]
+  requested_by varchar(36) [not null, ref: > users.user_id]
+  approved_by varchar(36) [null, ref: > users.user_id]
+  approved_at timestamp [null]
+  notes text [null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+Table settlements {
+  settlement_id varchar(36) [pk]
+  order_id varchar(36) [not null, ref: > orders.order_id]
+  additional_fee decimal(14,2) [not null, default: 0]
+  compensation decimal(14,2) [not null, default: 0]
+  discount decimal(14,2) [not null, default: 0]
+  final_amount decimal(14,2) [not null, default: 0, note: 'server tính: total + fee + comp - cọc - discount']
+  payment_method varchar(100) [null]
+  qr_code_url text [null]
+  paid_at timestamp [null]
+  evidence_id varchar(36) [null, ref: > evidences.evidence_id]
+  status settlement_status [not null, default: 'DRAFT']
+  requested_by varchar(36) [null, ref: > users.user_id]
+  requested_at timestamp [null]
+  confirmed_by varchar(36) [null, ref: > users.user_id]
+  confirmed_at timestamp [null]
+  notes text [null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// ─────────────────────── NOTIFICATIONS ───────────────────────
+Table notifications {
+  notification_id varchar(36) [pk]
+  user_id varchar(36) [not null, ref: > users.user_id, note: 'người nhận']
+  title varchar(255) [not null]
+  content text [null]
+  notification_type notification_type [not null, default: 'SYSTEM']
+  ref_type varchar(100) [null, note: 'polymorphic (không FK)']
+  ref_id varchar(36) [null]
+  is_read boolean [not null, default: false]
+  read_at timestamp [null]
+  created_at timestamp [not null, default: `CURRENT_TIMESTAMP`]
+}
+
+// ─────────────────────── TABLE GROUPS (bố cục ERD) ───────────────────────
+TableGroup identity_master [color: #2563EB] {
+  users
+  customers
+  suppliers
+  business_policies
+}
+
+TableGroup catalog [color: #059669] {
+  item_categories
+  item_types
+  items
+}
+
+TableGroup sales_orders [color: #7C3AED] {
+  quotations
+  quotation_items
+  orders
+  order_items
+}
+
+TableGroup operations [color: #D97706] {
+  work_tasks
+  schedule_plans
+  schedule_plan_assignees
+  attendances
+  survey_reports
+  change_requests
+  change_request_items
+}
+
+TableGroup suppliers_procurement [color: #DC2626] {
+  supplier_transactions
+  supplier_transaction_items
+}
+
+TableGroup finance [color: #0891B2] {
+  deposits
+  settlements
+}
+
+TableGroup shared [color: #64748B] {
+  evidences
+  notifications
+}
+
