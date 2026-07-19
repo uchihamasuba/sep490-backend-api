@@ -240,7 +240,21 @@ async function main() {
     }
   });
 
-  // 15. Notification
+  // 15. Settlement
+  await prisma.settlement.create({
+    data: {
+      settlementId: genId(),
+      orderId: order1Id,
+      additionalFee: 0,
+      compensation: 0,
+      discount: 0,
+      finalAmount: 800000,
+      status: 'DRAFT',
+      requestedBy: managerId
+    }
+  });
+
+  // 16. Notification
   await prisma.notification.createMany({
     data: [
       { userId: managerId, title: 'Đơn hàng mới', content: 'Có đơn hàng mới cần xác nhận.', notificationType: 'ORDER' },
