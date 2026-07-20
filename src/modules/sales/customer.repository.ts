@@ -92,6 +92,12 @@ export const customerRepository = {
     return prisma.customer.findUnique({ where: { customerId } });
   },
 
+  // Không có UNIQUE INDEX thật trên cột phone ở DB hiện tại (docs/api/taokhachhang_api.md mục 3) —
+  // service dùng hàm này để tự kiểm tra trùng trước khi insert (chưa chặn được race condition ở tầng DB).
+  findByPhone(phone: string) {
+    return prisma.customer.findFirst({ where: { phone } });
+  },
+
   create(data: Prisma.CustomerCreateInput) {
     return prisma.customer.create({ data });
   },

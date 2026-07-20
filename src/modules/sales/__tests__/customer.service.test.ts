@@ -10,6 +10,7 @@ jest.mock('../customer.repository', () => ({
     getOrderStatsByCustomerIds: jest.fn(),
     getOrderStatsForCustomer: jest.fn(),
     findById: jest.fn(),
+    findByPhone: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -74,19 +75,22 @@ describe('customerService.listCustomers', () => {
 
 describe('customerService.createCustomer', () => {
   it('converts empty-string email to null when writing to the DB', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(null);
     mockedRepo.create.mockResolvedValue(baseCustomer({ email: null }) as never);
 
-    await customerService.createCustomer({ customerName: 'A', phone: '0910000000', email: '', status: 'active' } as CreateCustomerBody);
+    await customerService.createCustomer({ customerName: 'A', phone: '0910000000', address: 'Addr', email: '', status: 'active' } as CreateCustomerBody);
 
     expect(mockedRepo.create).toHaveBeenCalledWith(expect.objectContaining({ email: null }));
   });
 
   it('keeps a real email untouched round-trip', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(null);
     mockedRepo.create.mockResolvedValue(baseCustomer({ email: 'a@b.com' }) as never);
 
     const result = await customerService.createCustomer({
       customerName: 'A',
       phone: '0910000000',
+      address: 'Addr',
       email: 'a@b.com',
       status: 'active',
     } as CreateCustomerBody);
@@ -96,16 +100,33 @@ describe('customerService.createCustomer', () => {
   });
 
   it('maps lowercase API status to the uppercase DB enum', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(null);
     mockedRepo.create.mockResolvedValue(baseCustomer({ status: 'INACTIVE' }) as never);
 
     const result = await customerService.createCustomer({
       customerName: 'A',
       phone: '0910000000',
+      address: 'Addr',
       status: 'inactive',
     } as CreateCustomerBody);
 
     expect(mockedRepo.create).toHaveBeenCalledWith(expect.objectContaining({ status: 'INACTIVE' }));
     expect(result.status).toBe('inactive');
+  });
+
+  it('throws 409 PHONE_ALREADY_EXISTS when another customer already has this phone, without inserting', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(baseCustomer({ customerId: 'other-customer' }) as never);
+
+    await expect(
+      customerService.createCustomer({
+        customerName: 'A',
+        phone: '0910000000',
+        address: 'Addr',
+        status: 'active',
+      } as CreateCustomerBody),
+    ).rejects.toMatchObject({ status: 409, code: 'PHONE_ALREADY_EXISTS' });
+
+    expect(mockedRepo.create).not.toHaveBeenCalled();
   });
 });
 

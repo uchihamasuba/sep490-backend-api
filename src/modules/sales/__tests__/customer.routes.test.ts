@@ -12,6 +12,7 @@ jest.mock('../customer.repository', () => ({
     getOrderStatsByCustomerIds: jest.fn(),
     getOrderStatsForCustomer: jest.fn(),
     findById: jest.fn(),
+    findByPhone: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -87,30 +88,77 @@ describe('GET /api/v1/customers', () => {
 });
 
 describe('POST /api/v1/customers', () => {
-  it('creates a customer, normalizing "" email to null and defaulting status to active', async () => {
+  it('creates a customer and returns 201 with the full customer object, normalizing "" email to null and defaulting status to active', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(null);
     mockedRepo.create.mockResolvedValue(baseCustomer({ email: null }) as never);
 
     const res = await request(app)
       .post('/api/v1/customers')
       .set('Authorization', authHeader())
-      .send({ customerName: 'Nguyen Van A', phone: '0910000000', email: '' });
+      .send({ customerName: 'Nguyen Van A', phone: '0910000000', address: '123 Nguyen Hue', email: '' });
 
     expect(res.status).toBe(201);
-    expect(res.body.data.email).toBe('');
+    expect(res.body.data).toMatchObject({
+      customerId: 'c1',
+      customerName: 'Nguyen Van A',
+      phone: '0910000000',
+      email: '',
+      status: 'active',
+      totalBookings: 0,
+      totalSpent: 0,
+    });
     expect(mockedRepo.create).toHaveBeenCalledWith(expect.objectContaining({ email: null, status: 'ACTIVE' }));
   });
 
-  it('rejects payloads missing required fields with 400', async () => {
-    const res = await request(app).post('/api/v1/customers').set('Authorization', authHeader()).send({ phone: '0910000000' });
+  it('rejects a payload missing customerName/phone with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', authHeader())
+      .send({ address: '123 Nguyen Hue' });
+
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a payload missing the required address with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', authHeader())
+      .send({ customerName: 'Nguyen Van A', phone: '0910000000' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a phone number that is not 10 digits starting with 0', async () => {
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', authHeader())
+      .send({ customerName: 'Nguyen Van A', phone: '191000000', address: '123 Nguyen Hue' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('returns 409 PHONE_ALREADY_EXISTS when the phone is already registered to another customer', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(baseCustomer({ customerId: 'existing-customer' }) as never);
+
+    const res = await request(app)
+      .post('/api/v1/customers')
+      .set('Authorization', authHeader())
+      .send({ customerName: 'Nguyen Van A', phone: '0910000000', address: '123 Nguyen Hue' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('PHONE_ALREADY_EXISTS');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
   });
 
   it('is forbidden for non-manager roles', async () => {
     const res = await request(app)
       .post('/api/v1/customers')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ customerName: 'A', phone: '0910000000' });
+      .send({ customerName: 'A', phone: '0910000000', address: '123 Nguyen Hue' });
     expect(res.status).toBe(403);
   });
 });

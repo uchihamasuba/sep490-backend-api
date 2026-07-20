@@ -170,6 +170,22 @@ enum NotificationType {
   OTHER
 }
 
+enum InventoryMovementType {
+  OUTBOUND
+  INBOUND
+  ADJUSTMENT
+}
+
+enum CollectedEquipmentReportType {
+  INTERNAL
+  SUPPLIER
+}
+
+enum CollectedEquipmentReportStatus {
+  SUBMITTED
+  CONFIRMED
+}
+
 // ============================================================================
 // NHÓM 1 — IDENTITY & MASTER DATA
 // ============================================================================
@@ -188,18 +204,21 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  evidencesUploaded      Evidence[]             @relation("EvidenceUploadedBy")
-  quotationsCreated      Quotation[]            @relation("QuotationCreatedBy")
-  ordersCreated          Order[]                @relation("OrderCreatedBy")
-  schedulePlansCreated   SchedulePlan[]         @relation("SchedulePlanCreatedBy")
-  scheduleAssignments    SchedulePlanAssignee[]
-  surveyReportsReported  SurveyReport[]         @relation("SurveyReportedBy")
-  surveyReportsConfirmed SurveyReport[]         @relation("SurveyConfirmedBy")
-  depositsRequested      Deposit[]              @relation("DepositRequestedBy")
-  depositsApproved       Deposit[]              @relation("DepositApprovedBy")
-  settlementsRequested   Settlement[]           @relation("SettlementRequestedBy")
-  settlementsConfirmed   Settlement[]           @relation("SettlementConfirmedBy")
-  notifications          Notification[]
+  evidencesUploaded                  Evidence[]                 @relation("EvidenceUploadedBy")
+  quotationsCreated                  Quotation[]                @relation("QuotationCreatedBy")
+  ordersCreated                      Order[]                    @relation("OrderCreatedBy")
+  schedulePlansCreated               SchedulePlan[]             @relation("SchedulePlanCreatedBy")
+  scheduleAssignments                SchedulePlanAssignee[]
+  surveyReportsReported              SurveyReport[]             @relation("SurveyReportedBy")
+  surveyReportsConfirmed             SurveyReport[]             @relation("SurveyConfirmedBy")
+  depositsRequested                  Deposit[]                  @relation("DepositRequestedBy")
+  depositsApproved                   Deposit[]                  @relation("DepositApprovedBy")
+  settlementsRequested               Settlement[]               @relation("SettlementRequestedBy")
+  settlementsConfirmed               Settlement[]               @relation("SettlementConfirmedBy")
+  notifications                      Notification[]
+  inventoryMovementsPerformed        InventoryMovement[]        @relation("InventoryMovementPerformedBy")
+  collectedEquipmentReportsReported  CollectedEquipmentReport[] @relation("CollectedEquipmentReportedBy")
+  collectedEquipmentReportsConfirmed CollectedEquipmentReport[] @relation("CollectedEquipmentConfirmedBy")
 
   @@map("users")
 }
@@ -307,11 +326,14 @@ model Item {
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  type                     ItemType                  @relation(fields: [typeId], references: [typeId], onDelete: Restrict)
-  quotationItems           QuotationItem[]
-  orderItems               OrderItem[]
-  changeRequestItems       ChangeRequestItem[]
-  supplierTransactionItems SupplierTransactionItem[]
+  type                          ItemType                       @relation(fields: [typeId], references: [typeId], onDelete: Restrict)
+  quotationItems                QuotationItem[]
+  orderItems                    OrderItem[]
+  changeRequestItems            ChangeRequestItem[]
+  supplierTransactionItems      SupplierTransactionItem[]
+  inventory                     Inventory?
+  inventoryMovements            InventoryMovement[]
+  collectedEquipmentReportItems CollectedEquipmentReportItem[]
 
   @@index([typeId], map: "idx_items_type")
   @@index([status], map: "idx_items_status")
@@ -414,17 +436,19 @@ model Order {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  customer             Customer              @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
-  quotation            Quotation?            @relation(fields: [quotationId], references: [quotationId], onDelete: SetNull)
-  policy               BusinessPolicy?       @relation(fields: [policyId], references: [policyId], onDelete: SetNull)
-  creator              User                  @relation("OrderCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
-  orderItems           OrderItem[]
-  schedulePlans        SchedulePlan[]
-  surveyReports        SurveyReport[]
-  changeRequests       ChangeRequest[]
-  supplierTransactions SupplierTransaction[]
-  deposits             Deposit[]
-  settlements          Settlement[]
+  customer                  Customer                   @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
+  quotation                 Quotation?                 @relation(fields: [quotationId], references: [quotationId], onDelete: SetNull)
+  policy                    BusinessPolicy?            @relation(fields: [policyId], references: [policyId], onDelete: SetNull)
+  creator                   User                       @relation("OrderCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
+  orderItems                OrderItem[]
+  schedulePlans             SchedulePlan[]
+  surveyReports             SurveyReport[]
+  changeRequests            ChangeRequest[]
+  supplierTransactions      SupplierTransaction[]
+  deposits                  Deposit[]
+  settlements               Settlement[]
+  collectedEquipmentReports CollectedEquipmentReport[]
+  inventoryMovements        InventoryMovement[]
 
   @@index([customerId], map: "idx_orders_customer")
   @@index([quotationId], map: "idx_orders_quotation")
@@ -618,9 +642,10 @@ model SupplierTransaction {
   createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  supplier Supplier                  @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
-  order    Order                     @relation(fields: [orderId], references: [orderId], onDelete: Restrict)
-  items    SupplierTransactionItem[]
+  supplier                  Supplier                   @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
+  order                     Order                      @relation(fields: [orderId], references: [orderId], onDelete: Restrict)
+  items                     SupplierTransactionItem[]
+  collectedEquipmentReports CollectedEquipmentReport[]
 
   @@index([supplierId], map: "idx_sup_txn_supplier")
   @@index([orderId], map: "idx_sup_txn_order")
@@ -733,4 +758,89 @@ model Notification {
   @@index([userId], map: "idx_notifications_user")
   @@index([isRead], map: "idx_notifications_is_read")
   @@map("notifications")
+}
+
+// ============================================================================
+// NHÓM 8 — KHO VẬN (Warehouse & Logistics) — docs/migrations/002_warehouse_logistics.sql
+// Phụ thuộc NHÓM 1 (items, orders, users) và NHÓM 5 (supplier_transactions) — không có chiều ngược lại.
+// 4 cột quantity_* trên Inventory và 3 cột *_quantity trên CollectedEquipmentReportItem có CHECK (>= 0)
+// trong DDL gốc — validate ở Zod/service (Repository/Service Task, không phải constraint DB), giống quy
+// ước đã áp dụng cho toàn bộ NHÓM 1-7 ở đầu file này.
+// ============================================================================
+
+model Inventory {
+  inventoryId       String   @id @default(dbgenerated("(uuid())")) @map("inventory_id") @db.VarChar(36)
+  itemId            String   @unique @map("item_id") @db.VarChar(36)
+  quantityTotal     Int      @default(0) @map("quantity_total")
+  quantityDamaged   Int      @default(0) @map("quantity_damaged")
+  quantityReserved  Int      @default(0) @map("quantity_reserved")
+  quantityAvailable Int      @default(0) @map("quantity_available")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  item Item @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+
+  @@map("inventory")
+}
+
+model InventoryMovement {
+  movementId   String                @id @default(dbgenerated("(uuid())")) @map("movement_id") @db.VarChar(36)
+  itemId       String                @map("item_id") @db.VarChar(36)
+  orderId      String?               @map("order_id") @db.VarChar(36)
+  reportId     String?               @map("report_id") @db.VarChar(36)
+  movementType InventoryMovementType @map("movement_type")
+  quantity     Int
+  performedBy  String                @map("performed_by") @db.VarChar(36)
+  notes        String?               @db.Text
+  createdAt    DateTime              @default(now()) @map("created_at") @db.Timestamp(0)
+
+  item      Item                      @relation(fields: [itemId], references: [itemId], onDelete: Restrict)
+  order     Order?                    @relation(fields: [orderId], references: [orderId], onDelete: SetNull)
+  report    CollectedEquipmentReport? @relation(fields: [reportId], references: [reportId], onDelete: SetNull)
+  performer User                      @relation("InventoryMovementPerformedBy", fields: [performedBy], references: [userId], onDelete: Restrict)
+
+  @@index([itemId], map: "idx_inv_mov_item")
+  @@index([orderId], map: "idx_inv_mov_order")
+  @@index([reportId], map: "idx_inv_mov_report")
+  @@map("inventory_movements")
+}
+
+model CollectedEquipmentReport {
+  reportId      String                         @id @default(dbgenerated("(uuid())")) @map("report_id") @db.VarChar(36)
+  orderId       String                         @map("order_id") @db.VarChar(36)
+  reportType    CollectedEquipmentReportType   @map("report_type")
+  transactionId String?                        @map("transaction_id") @db.VarChar(36)
+  status        CollectedEquipmentReportStatus @default(SUBMITTED)
+  reportedBy    String                         @map("reported_by") @db.VarChar(36)
+  confirmedBy   String?                        @map("confirmed_by") @db.VarChar(36)
+  confirmedAt   DateTime?                      @map("confirmed_at") @db.Timestamp(0)
+  notes         String?                        @db.Text
+  createdAt     DateTime                       @default(now()) @map("created_at") @db.Timestamp(0)
+
+  order       Order                          @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  transaction SupplierTransaction?           @relation(fields: [transactionId], references: [transactionId], onDelete: SetNull)
+  reporter    User                           @relation("CollectedEquipmentReportedBy", fields: [reportedBy], references: [userId], onDelete: Restrict)
+  confirmer   User?                          @relation("CollectedEquipmentConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
+  items       CollectedEquipmentReportItem[]
+  movements   InventoryMovement[]
+
+  @@index([orderId], map: "idx_cer_order")
+  @@index([transactionId], map: "idx_cer_transaction")
+  @@map("collected_equipment_reports")
+}
+
+model CollectedEquipmentReportItem {
+  cerItemId       String  @id @default(dbgenerated("(uuid())")) @map("cer_item_id") @db.VarChar(36)
+  reportId        String  @map("report_id") @db.VarChar(36)
+  itemId          String  @map("item_id") @db.VarChar(36)
+  goodQuantity    Int     @default(0) @map("good_quantity")
+  damagedQuantity Int     @default(0) @map("damaged_quantity")
+  lostQuantity    Int     @default(0) @map("lost_quantity")
+  notes           String? @db.Text
+
+  report CollectedEquipmentReport @relation(fields: [reportId], references: [reportId], onDelete: Cascade)
+  item   Item                     @relation(fields: [itemId], references: [itemId], onDelete: Restrict)
+
+  @@index([reportId], map: "idx_cer_items_report")
+  @@index([itemId], map: "idx_cer_items_item")
+  @@map("collected_equipment_report_items")
 }

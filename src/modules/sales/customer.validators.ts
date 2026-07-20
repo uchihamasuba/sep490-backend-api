@@ -1,7 +1,8 @@
 import { z } from 'zod';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_RE = /^[0-9+\-\s()]{8,20}$/;
+// Đúng 10 chữ số, bắt buộc số đầu là 0 — đã chốt ở docs/api/taokhachhang_api.md mục 4, quyết định 3.
+const PHONE_RE = /^0\d{9}$/;
 
 const emailField = z
   .string()
@@ -22,16 +23,25 @@ export const listCustomersQuerySchema = z.object({
 
 export const createCustomerBodySchema = z.object({
   customerName: z.string().trim().min(1, 'customerName is required'),
-  phone: z.string().trim().min(1, 'phone is required').regex(PHONE_RE, 'Invalid phone number'),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'phone is required')
+    .regex(PHONE_RE, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.'),
   email: emailField,
-  address: z.string().trim().min(1).optional(),
+  // Bắt buộc ở modal "Thêm khách hàng" (docs/api/taokhachhang_api.md mục 1) — khác PUT (vẫn nullable).
+  address: z.string().trim().min(1, 'address is required'),
   notes: z.string().trim().min(1).optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
 export const updateCustomerBodySchema = z.object({
   customerName: z.string().trim().min(1, 'customerName is required'),
-  phone: z.string().trim().min(1, 'phone is required').regex(PHONE_RE, 'Invalid phone number'),
+  phone: z
+    .string()
+    .trim()
+    .min(1, 'phone is required')
+    .regex(PHONE_RE, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.'),
   email: emailField,
   address: z.string().trim().min(1).optional(),
   notes: z.string().trim().min(1).optional(),

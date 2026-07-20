@@ -136,6 +136,15 @@ async function listCustomers(query: ListCustomersQuery): Promise<CustomerListRes
 }
 
 async function createCustomer(body: CreateCustomerBody): Promise<CustomerDTO> {
+  // Đã chốt ở docs/api/taokhachhang_api.md mục 4, quyết định 2: không cho phép trùng số điện thoại.
+  // DB thật chưa có UNIQUE INDEX trên cột phone nên đây là chốt chặn duy nhất hiện có (còn race condition
+  // giữa 2 request đồng thời — cần bổ sung UNIQUE INDEX ở migration để chặn tận gốc, ngoài phạm vi sửa đổi
+  // ở tầng service này).
+  const existingByPhone = await customerRepository.findByPhone(body.phone);
+  if (existingByPhone) {
+    throw new AppError(409, 'PHONE_ALREADY_EXISTS', 'Số điện thoại đã tồn tại trong hệ thống');
+  }
+
   const customerId = randomUUID();
   const created = await customerRepository.create({
     customerId,
