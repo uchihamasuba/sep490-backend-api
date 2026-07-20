@@ -56,7 +56,7 @@ quotationRouter.delete(
 );
 
 // Mounted at /api/v1/customers/:customerId/quotations
-export const customerQuotationRouter = Router();
+export const customerQuotationRouter = Router({ mergeParams: true });
 
 customerQuotationRouter.use(requireAuth);
 
