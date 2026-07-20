@@ -1,5 +1,19 @@
-import type { Item, OrderItemSource, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
+import type { DepositStatus, Item, OrderItemSource, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+
+export interface LiveShowChecklist {
+  backdrop: boolean;
+  soundTest: boolean;
+  powerBackup: boolean;
+  operatorReady: boolean;
+}
+
+export const DEFAULT_LIVE_SHOW_CHECKLIST: LiveShowChecklist = {
+  backdrop: false,
+  soundTest: false,
+  powerBackup: false,
+  operatorReady: false,
+};
 
 export interface OrderLineInput {
   itemId: string;
@@ -191,6 +205,158 @@ export const orderRepository = {
           })),
         },
       },
+      include: detailInclude,
+    });
+  },
+
+  delete(orderId: string) {
+    return prisma.order.delete({ where: { orderId } });
+  },
+
+  findLatestSurvey(orderId: string) {
+    return prisma.surveyReport.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+      include: { reporter: { select: { fullName: true } }, confirmer: { select: { fullName: true } } },
+    });
+  },
+
+  findDeposits(orderId: string) {
+    return prisma.deposit.findMany({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+  },
+
+  createDeposit(data: {
+    depositCode: string;
+    orderId: string;
+    amount: number;
+    dueDate: Date | null;
+    paymentMethod: string | null;
+    qrCodeUrl: string | null;
+    notes: string | null;
+    requestedBy: string;
+  }) {
+    return prisma.deposit.create({ data });
+  },
+
+  async generateNextDepositCode(): Promise<string> {
+    const count = await prisma.deposit.count();
+    return `DEP-${String(count + 1).padStart(3, '0')}`;
+  },
+
+  sumDepositsByStatus(orderId: string, status: DepositStatus) {
+    return prisma.deposit.aggregate({ where: { orderId, status }, _sum: { amount: true } });
+  },
+
+  findLatestSettlement(orderId: string) {
+    return prisma.settlement.findFirst({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+  },
+
+  createSettlement(data: {
+    orderId: string;
+    additionalFee: number;
+    compensation: number;
+    discount: number;
+    finalAmount: number;
+    paymentMethod: string | null;
+    qrCodeUrl: string | null;
+    notes: string | null;
+    requestedBy: string;
+  }) {
+    return prisma.settlement.create({
+      data: { ...data, status: 'DRAFT', requestedAt: new Date() },
+    });
+  },
+
+  updateSettlementDraft(
+    settlementId: string,
+    data: {
+      additionalFee: number;
+      compensation: number;
+      discount: number;
+      finalAmount: number;
+      paymentMethod: string | null;
+      qrCodeUrl: string | null;
+      notes: string | null;
+      requestedBy: string;
+    },
+  ) {
+    return prisma.settlement.update({
+      where: { settlementId },
+      data: { ...data, requestedAt: new Date() },
+    });
+  },
+
+  findOrderItem(orderId: string, orderItemId: string) {
+    return prisma.orderItem.findFirst({ where: { orderId, orderItemId } });
+  },
+
+  // Cập nhật 1 dòng order_item rồi tính lại orders.total_amount từ TOÀN BỘ dòng trong cùng transaction —
+  // subtotal không phải cột generated trong DB thật (xem ghi chú đầu file), nên total_amount có thể lệch
+  // nếu chỉ update dòng đơn lẻ mà không tính lại tổng.
+  async updateItem(
+    orderId: string,
+    orderItemId: string,
+    data: { quantity?: number; unitPrice?: number; source?: OrderItemSource; preparedQty?: number; notes?: string },
+  ): Promise<OrderWithDetails> {
+    const current = await prisma.orderItem.findUniqueOrThrow({ where: { orderItemId } });
+    const quantity = data.quantity ?? current.quantity;
+    const unitPrice = data.unitPrice ?? Number(current.unitPrice);
+    const newSubtotal = quantity * unitPrice;
+
+    const otherItems = await prisma.orderItem.findMany({
+      where: { orderId, orderItemId: { not: orderItemId } },
+      select: { subtotal: true },
+    });
+    const totalAmount = otherItems.reduce((sum, item) => sum + Number(item.subtotal), newSubtotal);
+
+    const [, order] = await prisma.$transaction([
+      prisma.orderItem.update({
+        where: { orderItemId },
+        data: {
+          quantity,
+          unitPrice,
+          subtotal: newSubtotal,
+          ...(data.source !== undefined ? { source: data.source } : {}),
+          ...(data.preparedQty !== undefined ? { preparedQty: data.preparedQty } : {}),
+          ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        },
+      }),
+      prisma.order.update({ where: { orderId }, data: { totalAmount }, include: detailInclude }),
+    ]);
+
+    return order;
+  },
+
+  async confirmPreparedQty(
+    orderId: string,
+    items: { orderItemId: string; preparedQty: number }[],
+  ): Promise<OrderWithDetails> {
+    await prisma.$transaction(
+      items.map((line) =>
+        prisma.orderItem.update({ where: { orderItemId: line.orderItemId }, data: { preparedQty: line.preparedQty } }),
+      ),
+    );
+    const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
+    if (!order) throw new Error('Order not found after confirm-prepared — should be unreachable');
+    return order;
+  },
+
+  updateLiveChecklist(orderId: string, checklist: LiveShowChecklist): Promise<OrderWithDetails> {
+    return prisma.order.update({
+      where: { orderId },
+      data: { liveShowChecklist: checklist as unknown as Prisma.InputJsonValue },
+      include: detailInclude,
+    });
+  },
+
+  updateQuotationId(orderId: string, quotationId: string | null): Promise<OrderWithDetails> {
+    return prisma.order.update({ where: { orderId }, data: { quotationId }, include: detailInclude });
+  },
+
+  close(orderId: string, closedBy: string): Promise<OrderWithDetails> {
+    return prisma.order.update({
+      where: { orderId },
+      data: { closedAt: new Date(), closedBy },
       include: detailInclude,
     });
   },

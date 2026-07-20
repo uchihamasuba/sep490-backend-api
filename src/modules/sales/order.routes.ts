@@ -4,10 +4,18 @@ import { validate } from '../../middleware/validate';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { orderController } from './order.controller';
 import {
+  closeOrderBodySchema,
+  confirmPreparedItemsBodySchema,
+  createDepositBodySchema,
   createOrderBodySchema,
+  createSettlementBodySchema,
   listOrdersQuerySchema,
   orderIdParamSchema,
+  orderItemIdParamSchema,
+  updateLiveChecklistBodySchema,
+  updateOrderItemBodySchema,
   updateOrderItemsBodySchema,
+  updateOrderQuotationBodySchema,
   updateOrderStatusBodySchema,
 } from './order.validators';
 
@@ -29,11 +37,22 @@ router.post(
   asyncHandler(orderController.create),
 );
 
+// Đăng ký TRƯỚC `/:orderId` — Express khớp theo thứ tự đăng ký, không theo độ cụ thể (cùng lưu ý ở
+// inventory.routes.ts), nếu không "stats" sẽ bị nuốt làm giá trị orderId.
+router.get('/stats', requireRole('MANAGER', 'ADMIN'), asyncHandler(orderController.stats));
+
 router.get(
   '/:orderId',
   requireRole('MANAGER', 'ADMIN'),
   validate(orderIdParamSchema, 'params'),
   asyncHandler(orderController.getById),
+);
+
+router.delete(
+  '/:orderId',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  asyncHandler(orderController.remove),
 );
 
 router.put(
@@ -50,6 +69,83 @@ router.put(
   validate(orderIdParamSchema, 'params'),
   validate(updateOrderItemsBodySchema, 'body'),
   asyncHandler(orderController.updateItems),
+);
+
+router.put(
+  '/:orderId/items/confirm-prepared',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(confirmPreparedItemsBodySchema, 'body'),
+  asyncHandler(orderController.confirmPreparedItems),
+);
+
+router.patch(
+  '/:orderId/items/:orderItemId',
+  requireRole('MANAGER'),
+  validate(orderItemIdParamSchema, 'params'),
+  validate(updateOrderItemBodySchema, 'body'),
+  asyncHandler(orderController.updateItem),
+);
+
+router.get(
+  '/:orderId/survey',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(orderIdParamSchema, 'params'),
+  asyncHandler(orderController.survey),
+);
+
+router.get(
+  '/:orderId/deposits',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(orderIdParamSchema, 'params'),
+  asyncHandler(orderController.deposits),
+);
+
+router.post(
+  '/:orderId/deposits',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(createDepositBodySchema, 'body'),
+  asyncHandler(orderController.createDeposit),
+);
+
+router.get(
+  '/:orderId/settlement',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(orderIdParamSchema, 'params'),
+  asyncHandler(orderController.settlement),
+);
+
+router.post(
+  '/:orderId/settlement',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(createSettlementBodySchema, 'body'),
+  asyncHandler(orderController.createSettlement),
+);
+
+router.patch(
+  '/:orderId/live-checklist',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(updateLiveChecklistBodySchema, 'body'),
+  asyncHandler(orderController.updateLiveChecklist),
+);
+
+router.patch(
+  '/:orderId/quotation',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(updateOrderQuotationBodySchema, 'body'),
+  asyncHandler(orderController.updateQuotation),
+);
+
+router.put(
+  '/:orderId/close',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(closeOrderBodySchema, 'body'),
+  asyncHandler(orderController.close),
 );
 
 export default router;

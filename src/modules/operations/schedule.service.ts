@@ -4,6 +4,7 @@ import { scheduleRepository, type SchedulePlanWithDetails } from './schedule.rep
 import type {
   AddAssigneeBody,
   CreateSchedulePlanBody,
+  CreateSchedulePlansBatchBody,
   ListSchedulePlansQuery,
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
@@ -292,6 +293,50 @@ async function listWorkTasks(): Promise<WorkTaskDTO[]> {
   return rows.map((t) => ({ taskId: t.taskId, taskCode: t.taskCode, taskName: t.taskName, description: t.description }));
 }
 
+// Không có DELETE thật trong đặc tả gốc (docs/api/kehoachvaphancong_api.md mục 11.1 khuyến nghị dùng
+// PATCH .../status CANCELLED) — cung cấp thêm endpoint xóa cứng theo yêu cầu, nhưng chỉ cho phép khi
+// kế hoạch CHƯA từng CONFIRMED/thi công (PENDING) hoặc ĐÃ hủy (CANCELLED), để không mất dấu vết của kế
+// hoạch đang/đã triển khai thật.
+const DELETABLE_STATUSES: ScheduleStatus[] = ['PENDING', 'CANCELLED'];
+
+async function deleteSchedulePlan(planId: string): Promise<void> {
+  const existing = await findPlanOrThrow(planId);
+  if (!DELETABLE_STATUSES.includes(existing.status)) {
+    throw AppError.badRequest(
+      `Không thể xóa kế hoạch đang ở trạng thái ${existing.status} — chỉ xóa được PENDING hoặc CANCELLED, các trạng thái khác hãy hủy qua PATCH /schedule-plans/:id/status`,
+    );
+  }
+  await scheduleRepository.delete(planId);
+}
+
+// POST /schedule-plans/batch (docs/api/kehoachvaphancong_api.md mục 8.5 điểm 2) — tạo nhiều dòng cùng
+// order_id trong 1 transaction, tránh trạng thái lưu dở dang nếu gọi POST tuần tự bị lỗi giữa chừng.
+async function createSchedulePlansBatch(body: CreateSchedulePlansBatchBody, createdBy: string): Promise<SchedulePlanDTO[]> {
+  const order = await scheduleRepository.orderExists(body.orderId);
+  if (!order) throw AppError.notFound('Order not found');
+
+  for (const plan of body.plans) {
+    const task = await scheduleRepository.taskExists(plan.taskId);
+    if (!task) throw AppError.notFound(`Work task not found: ${plan.taskId}`, { taskId: plan.taskId });
+    await validateAssigneeInputs(plan.assignees);
+  }
+
+  const created = await scheduleRepository.createBatch(
+    body.orderId,
+    createdBy,
+    body.plans.map((plan) => ({
+      taskId: plan.taskId,
+      startTime: plan.startTime,
+      endTime: plan.endTime ?? null,
+      location: plan.location ?? null,
+      notes: plan.notes ?? null,
+      assignees: plan.assignees,
+    })),
+  );
+
+  return created.map(mapPlan);
+}
+
 export type AggregateScheduleStatus = 'CANCELLED' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CONFIRMED';
 
 // Thuật toán tổng hợp trạng thái nhiều dòng schedule_plans cùng order_id thành 1 badge — đề xuất ở
@@ -322,4 +367,6 @@ export const scheduleService = {
   checkIn,
   checkOut,
   listWorkTasks,
+  deleteSchedulePlan,
+  createSchedulePlansBatch,
 };

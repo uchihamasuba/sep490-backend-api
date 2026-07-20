@@ -238,8 +238,14 @@ async function getCustomerOrders(
   };
 }
 
+async function getNextCustomerCode(): Promise<{ nextCustomerCode: string }> {
+  const nextCustomerCode = await customerRepository.generateNextCustomerCode();
+  return { nextCustomerCode };
+}
+
 export const customerService = {
   listCustomers,
+  getNextCustomerCode,
   createCustomer,
   getCustomerById,
   updateCustomer,

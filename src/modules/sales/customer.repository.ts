@@ -50,6 +50,14 @@ function buildOrderWhere(customerId: string, filter: CustomerOrderListFilter): P
 }
 
 export const customerRepository = {
+  // Chỉ dùng để hiển thị placeholder "Mã khách hàng dự kiến" trên modal Thêm khách hàng (docs/api/
+  // taokhachhang_api.md mục 3, hướng A) — KHÔNG dùng giá trị này khi tạo thật (customerCode thật hiện
+  // được set = customerId UUID, xem customer.service.ts#createCustomer).
+  async generateNextCustomerCode(): Promise<string> {
+    const count = await prisma.customer.count();
+    return `CUS-${String(count + 1).padStart(3, '0')}`;
+  },
+
   async findMany(params: CustomerListParams) {
     const where = buildCustomerWhere(params);
     const [rows, totalItems] = await Promise.all([

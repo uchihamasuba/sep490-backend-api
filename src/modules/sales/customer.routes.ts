@@ -29,6 +29,10 @@ router.post(
   asyncHandler(customerController.create),
 );
 
+// Đăng ký TRƯỚC `/:customerId` — nếu không "next-code" sẽ bị nuốt làm giá trị customerId (Express khớp
+// theo thứ tự đăng ký).
+router.get('/next-code', requireRole('MANAGER', 'ADMIN'), asyncHandler(customerController.nextCode));
+
 router.get(
   '/:customerId',
   requireRole('MANAGER', 'ADMIN'),

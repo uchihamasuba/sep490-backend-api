@@ -125,6 +125,12 @@ export const quotationRepository = {
     return prisma.order.findFirst({ where: { quotationId }, select: { orderId: true } });
   },
 
+  // Dùng cho điều kiện "hủy liên kết báo giá" ở docs/api/baogiavahopdong_api.md mục 1.2/2 #4 — khách
+  // hàng phải còn > 1 báo giá APPROVED thì Manager mới được gỡ liên kết quotationId khỏi 1 đơn.
+  countByCustomerAndStatus(customerId: string, status: QuotationStatus) {
+    return prisma.quotation.count({ where: { customerId, status } });
+  },
+
   async create(params: {
     customerId: string;
     version: string;

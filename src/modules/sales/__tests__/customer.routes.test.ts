@@ -8,6 +8,7 @@ import { customerRepository } from '../customer.repository';
 jest.mock('../customer.repository', () => ({
   customerRepository: {
     findMany: jest.fn(),
+    generateNextCustomerCode: jest.fn(),
     countByStatus: jest.fn(),
     getOrderStatsByCustomerIds: jest.fn(),
     getOrderStatsForCustomer: jest.fn(),
@@ -83,6 +84,30 @@ describe('GET /api/v1/customers', () => {
 
   it('rejects roles outside manager/admin with 403', async () => {
     const res = await request(app).get('/api/v1/customers').set('Authorization', authHeader('TECHNICAL'));
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/v1/customers/next-code', () => {
+  it('returns the next preview customer code', async () => {
+    mockedRepo.generateNextCustomerCode.mockResolvedValue('CUS-003');
+
+    const res = await request(app).get('/api/v1/customers/next-code').set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ nextCustomerCode: 'CUS-003' });
+  });
+
+  it('is not swallowed by the /:customerId route (never treats "next-code" as an id lookup)', async () => {
+    mockedRepo.generateNextCustomerCode.mockResolvedValue('CUS-004');
+
+    await request(app).get('/api/v1/customers/next-code').set('Authorization', authHeader());
+
+    expect(mockedRepo.findById).not.toHaveBeenCalled();
+  });
+
+  it('rejects roles outside manager/admin with 403', async () => {
+    const res = await request(app).get('/api/v1/customers/next-code').set('Authorization', authHeader('TECHNICAL'));
     expect(res.status).toBe(403);
   });
 });

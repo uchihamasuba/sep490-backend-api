@@ -175,4 +175,44 @@ export const scheduleRepository = {
   listWorkTasks() {
     return prisma.workTask.findMany({ where: { isActive: true }, orderBy: { taskName: 'asc' } });
   },
+
+  delete(planId: string) {
+    return prisma.schedulePlan.delete({ where: { planId } });
+  },
+
+  // Tạo nhiều dòng schedule_plans cùng orderId trong 1 transaction (docs/api/kehoachvaphancong_api.md
+  // mục 8.5 điểm 2) — mã planCode sinh tuần tự TRƯỚC khi vào transaction vì mỗi create() độc lập, không
+  // đọc được kết quả của create() khác trong cùng mảng $transaction.
+  async createBatch(
+    orderId: string,
+    createdBy: string,
+    plans: {
+      taskId: string;
+      startTime: Date;
+      endTime: Date | null;
+      location: string | null;
+      notes: string | null;
+      assignees: { userId: string; role: PlanMemberRole }[];
+    }[],
+  ): Promise<SchedulePlanWithDetails[]> {
+    const startCount = await prisma.schedulePlan.count();
+    return prisma.$transaction(
+      plans.map((plan, index) =>
+        prisma.schedulePlan.create({
+          data: {
+            planCode: `PLN-${String(startCount + index + 1).padStart(3, '0')}`,
+            orderId,
+            taskId: plan.taskId,
+            startTime: plan.startTime,
+            endTime: plan.endTime,
+            location: plan.location,
+            notes: plan.notes,
+            createdBy,
+            assignees: { create: plan.assignees.map((a) => ({ userId: a.userId, role: a.role })) },
+          },
+          include: detailInclude,
+        }),
+      ),
+    );
+  },
 };

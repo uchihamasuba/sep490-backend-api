@@ -15,6 +15,11 @@ async function list(req: Request, res: Response) {
   ok(res, result.data, { ...result.meta });
 }
 
+async function nextCode(_req: Request, res: Response) {
+  const result = await customerService.getNextCustomerCode();
+  ok(res, result);
+}
+
 async function create(req: Request, res: Response) {
   const body = req.body as CreateCustomerBody;
   const customer = await customerService.createCustomer(body);
@@ -55,6 +60,7 @@ async function orders(req: Request, res: Response) {
 
 export const customerController = {
   list,
+  nextCode,
   create,
   getById,
   update,

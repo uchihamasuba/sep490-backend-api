@@ -6,6 +6,7 @@ import type {
   AddAssigneeBody,
   AssigneeParam,
   CreateSchedulePlanBody,
+  CreateSchedulePlansBatchBody,
   ListSchedulePlansQuery,
   PlanIdParam,
   UpdateSchedulePlanBody,
@@ -83,6 +84,19 @@ async function listWorkTasks(_req: Request, res: Response) {
   ok(res, tasks);
 }
 
+async function remove(req: Request, res: Response) {
+  const { planId } = req.params as unknown as PlanIdParam;
+  await scheduleService.deleteSchedulePlan(planId);
+  ok(res, { planId });
+}
+
+async function createBatch(req: Request, res: Response) {
+  const actor = requireActor(req);
+  const body = req.body as CreateSchedulePlansBatchBody;
+  const plans = await scheduleService.createSchedulePlansBatch(body, actor.id);
+  created(res, plans);
+}
+
 export const scheduleController = {
   list,
   getById,
@@ -94,4 +108,6 @@ export const scheduleController = {
   checkIn,
   checkOut,
   listWorkTasks,
+  remove,
+  createBatch,
 };

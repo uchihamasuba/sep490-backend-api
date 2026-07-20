@@ -7,6 +7,7 @@ import {
   addAssigneeBodySchema,
   assigneeParamSchema,
   createSchedulePlanBodySchema,
+  createSchedulePlansBatchBodySchema,
   listSchedulePlansQuerySchema,
   planIdParamSchema,
   updateSchedulePlanBodySchema,
@@ -31,6 +32,22 @@ scheduleRouter.post(
   requireRole('MANAGER'),
   validate(createSchedulePlanBodySchema, 'body'),
   asyncHandler(scheduleController.create),
+);
+
+scheduleRouter.post(
+  '/batch',
+  requireRole('MANAGER'),
+  validate(createSchedulePlansBatchBodySchema, 'body'),
+  asyncHandler(scheduleController.createBatch),
+);
+
+// Không có trong đặc tả gốc (docs/api/kehoachvaphancong_api.md khuyến nghị PATCH .../status CANCELLED
+// thay vì xóa cứng) — thêm theo yêu cầu, guard trạng thái xử lý ở service (chỉ PENDING/CANCELLED).
+scheduleRouter.delete(
+  '/:planId',
+  requireRole('MANAGER'),
+  validate(planIdParamSchema, 'params'),
+  asyncHandler(scheduleController.remove),
 );
 
 scheduleRouter.put(

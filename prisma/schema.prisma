@@ -207,6 +207,7 @@ model User {
   evidencesUploaded                  Evidence[]                 @relation("EvidenceUploadedBy")
   quotationsCreated                  Quotation[]                @relation("QuotationCreatedBy")
   ordersCreated                      Order[]                    @relation("OrderCreatedBy")
+  ordersClosed                       Order[]                    @relation("OrderClosedBy")
   schedulePlansCreated               SchedulePlan[]             @relation("SchedulePlanCreatedBy")
   scheduleAssignments                SchedulePlanAssignee[]
   surveyReportsReported              SurveyReport[]             @relation("SurveyReportedBy")
@@ -435,11 +436,19 @@ model Order {
   createdBy     String        @map("created_by") @db.VarChar(36)
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  /// Mốc 4 "Live Show" (docs/api/tiendosukien_api.md mục 5, đã chốt hướng A) — checklist thao tác nhanh
+  /// { backdrop, soundTest, powerBackup, operatorReady }, không có audit ai/lúc nào tick từng mục.
+  liveShowChecklist Json?     @map("live_show_checklist")
+  /// Mốc 6 "Đóng đơn hàng" (docs/api/tiendosukien_api.md mục 7, đã chốt hướng A) — cờ độc lập lớp trên
+  /// OrderStatus.COMPLETED, không thêm giá trị enum mới.
+  closedAt      DateTime?     @map("closed_at") @db.Timestamp(0)
+  closedBy      String?       @map("closed_by") @db.VarChar(36)
 
   customer                  Customer                   @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
   quotation                 Quotation?                 @relation(fields: [quotationId], references: [quotationId], onDelete: SetNull)
   policy                    BusinessPolicy?            @relation(fields: [policyId], references: [policyId], onDelete: SetNull)
   creator                   User                       @relation("OrderCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
+  closer                    User?                      @relation("OrderClosedBy", fields: [closedBy], references: [userId], onDelete: SetNull)
   orderItems                OrderItem[]
   schedulePlans             SchedulePlan[]
   surveyReports             SurveyReport[]
@@ -456,6 +465,7 @@ model Order {
   @@index([paymentStatus], map: "idx_orders_payment_status")
   @@index([eventDate], map: "idx_orders_event_date")
   @@index([createdBy], map: "idx_orders_created_by")
+  @@index([closedBy], map: "idx_orders_closed_by")
   @@map("orders")
 }
 
