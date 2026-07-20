@@ -34,6 +34,8 @@ function fakeUser(overrides: Partial<User> = {}): User {
     phone: '0900000003',
     bio: null,
     avatarUrl: null,
+    employeeCode: null,
+    jobTitle: null,
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides,
@@ -82,5 +84,48 @@ describe('GET /api/v1/users/:userId', () => {
     const res = await request(app).get('/api/v1/users/ghost').set('Authorization', authHeader());
 
     expect(res.status).toBe(404);
+  });
+});
+
+describe('PATCH /api/v1/users/:userId/status', () => {
+  it('updates the status and returns the mapped profile', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    mockedRepo.update.mockResolvedValue(fakeUser({ status: 'SUSPENDED' }));
+
+    const res = await request(app)
+      .patch('/api/v1/users/leader-1/status')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ status: 'SUSPENDED' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('SUSPENDED');
+    expect(mockedRepo.update).toHaveBeenCalledWith('leader-1', { status: 'SUSPENDED' });
+  });
+
+  it('returns 404 when the user does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/users/ghost/status')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ status: 'INACTIVE' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an invalid status value with 400', async () => {
+    const res = await request(app)
+      .patch('/api/v1/users/leader-1/status')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ status: 'BANNED' });
+    expect(res.status).toBe(400);
+  });
+
+  it('is forbidden for non-admin roles', async () => {
+    const res = await request(app)
+      .patch('/api/v1/users/leader-1/status')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'INACTIVE' });
+    expect(res.status).toBe(403);
   });
 });

@@ -112,6 +112,16 @@ export const createSettlementBodySchema = z.object({
   notes: z.string().trim().min(1).optional(),
 });
 
+const exportStatusEnum = z.enum(['PENDING', 'EXPORTED']);
+
+export const listPicklistsQuerySchema = z.object({
+  search: z.string().trim().min(1).optional(),
+  exportStatus: exportStatusEnum.optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export type ListPicklistsQuery = z.infer<typeof listPicklistsQuerySchema>;
 export type OrderIdParam = z.infer<typeof orderIdParamSchema>;
 export type OrderItemIdParam = z.infer<typeof orderItemIdParamSchema>;
 export type ListOrdersQuery = z.infer<typeof listOrdersQuerySchema>;

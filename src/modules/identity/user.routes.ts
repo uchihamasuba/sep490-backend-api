@@ -3,7 +3,7 @@ import { requireAuth, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { userController } from './user.controller';
-import { listUsersQuerySchema, userIdParamSchema } from './user.validators';
+import { listUsersQuerySchema, updateUserStatusBodySchema, userIdParamSchema } from './user.validators';
 
 const router = Router();
 
@@ -23,6 +23,16 @@ router.get(
   requireRole('MANAGER', 'ADMIN'),
   validate(userIdParamSchema, 'params'),
   asyncHandler(userController.getById),
+);
+
+// Đổi trạng thái tài khoản (khóa/mở khóa) — chỉ Admin (docs/api/admin_danhsachnguoidung__api.md mục
+// 2.5 tham chiếu pattern userApiService.updateUserStatus đã có sẵn ở tầng FE).
+router.patch(
+  '/:userId/status',
+  requireRole('ADMIN'),
+  validate(userIdParamSchema, 'params'),
+  validate(updateUserStatusBodySchema, 'body'),
+  asyncHandler(userController.updateStatus),
 );
 
 export default router;

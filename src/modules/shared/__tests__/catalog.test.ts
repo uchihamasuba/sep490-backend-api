@@ -10,6 +10,9 @@ jest.mock('../catalog.repository', () => ({
     typeExists: jest.fn(),
     generateNextItemCode: jest.fn(),
     create: jest.fn(),
+    findById: jest.fn(),
+    update: jest.fn(),
+    updateStatus: jest.fn(),
   },
 }));
 
@@ -111,5 +114,78 @@ describe('POST /api/v1/catalog/items', () => {
       .send({ itemName: 'Đèn Beam 230', typeId: 'type-1', unit: 'Cái' });
 
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/v1/catalog/items/:itemId', () => {
+  it('returns the item detail', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+
+    const res = await request(app).get('/api/v1/catalog/items/item-1').set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ itemId: 'item-1', itemName: 'Loa JBL 1000W' });
+  });
+
+  it('returns 404 when the item does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/items/missing').set('Authorization', authHeader());
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('PUT /api/v1/catalog/items/:itemId', () => {
+  it('updates the item and returns the mapped result', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
+    mockedRepo.update.mockResolvedValue(fakeItem({ itemName: 'Loa JBL 2000W' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/catalog/items/item-1')
+      .set('Authorization', authHeader())
+      .send({ itemName: 'Loa JBL 2000W', typeId: 'type-1', unit: 'Cái', rentalPrice: 600000 });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ itemName: 'Loa JBL 2000W' });
+  });
+
+  it('returns 404 when the item does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app)
+      .put('/api/v1/catalog/items/missing')
+      .set('Authorization', authHeader())
+      .send({ itemName: 'X', typeId: 'type-1', unit: 'Cái', rentalPrice: 1 });
+    expect(res.status).toBe(404);
+  });
+
+  it('is forbidden for non-Manager roles', async () => {
+    const res = await request(app)
+      .put('/api/v1/catalog/items/item-1')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ itemName: 'X', typeId: 'type-1', unit: 'Cái', rentalPrice: 1 });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('PATCH /api/v1/catalog/items/:itemId/status', () => {
+  it('updates the status and returns the mapped result', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.updateStatus.mockResolvedValue(fakeItem({ status: 'INACTIVE' }) as never);
+
+    const res = await request(app)
+      .patch('/api/v1/catalog/items/item-1/status')
+      .set('Authorization', authHeader())
+      .send({ status: 'INACTIVE' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('INACTIVE');
+  });
+
+  it('rejects an invalid status with 400', async () => {
+    const res = await request(app)
+      .patch('/api/v1/catalog/items/item-1/status')
+      .set('Authorization', authHeader())
+      .send({ status: 'DELETED' });
+    expect(res.status).toBe(400);
   });
 });

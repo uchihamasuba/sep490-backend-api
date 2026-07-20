@@ -3,7 +3,13 @@ import { requireAuth, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { catalogController } from './catalog.controller';
-import { createCatalogItemBodySchema, listCatalogItemsQuerySchema } from './catalog.validators';
+import {
+  createCatalogItemBodySchema,
+  itemIdParamSchema,
+  listCatalogItemsQuerySchema,
+  updateCatalogItemBodySchema,
+  updateCatalogItemStatusBodySchema,
+} from './catalog.validators';
 
 // Mounted at /api/v1/catalog/items
 const router = Router();
@@ -20,6 +26,28 @@ router.post(
   requireRole('MANAGER'),
   validate(createCatalogItemBodySchema, 'body'),
   asyncHandler(catalogController.create),
+);
+
+router.get(
+  '/:itemId',
+  validate(itemIdParamSchema, 'params'),
+  asyncHandler(catalogController.getById),
+);
+
+router.put(
+  '/:itemId',
+  requireRole('MANAGER'),
+  validate(itemIdParamSchema, 'params'),
+  validate(updateCatalogItemBodySchema, 'body'),
+  asyncHandler(catalogController.update),
+);
+
+router.patch(
+  '/:itemId/status',
+  requireRole('MANAGER'),
+  validate(itemIdParamSchema, 'params'),
+  validate(updateCatalogItemStatusBodySchema, 'body'),
+  asyncHandler(catalogController.updateStatus),
 );
 
 export default router;

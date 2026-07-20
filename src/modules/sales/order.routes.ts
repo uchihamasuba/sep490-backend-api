@@ -10,6 +10,7 @@ import {
   createOrderBodySchema,
   createSettlementBodySchema,
   listOrdersQuerySchema,
+  listPicklistsQuerySchema,
   orderIdParamSchema,
   orderItemIdParamSchema,
   updateLiveChecklistBodySchema,
@@ -38,8 +39,16 @@ router.post(
 );
 
 // Đăng ký TRƯỚC `/:orderId` — Express khớp theo thứ tự đăng ký, không theo độ cụ thể (cùng lưu ý ở
-// inventory.routes.ts), nếu không "stats" sẽ bị nuốt làm giá trị orderId.
+// inventory.routes.ts), nếu không "stats"/"picklists" sẽ bị nuốt làm giá trị orderId.
 router.get('/stats', requireRole('MANAGER', 'ADMIN'), asyncHandler(orderController.stats));
+
+// Pick-list xuất kho (docs/api/picklistxuatkho_api.md) — trang không có mirror Admin, chỉ Manager.
+router.get(
+  '/picklists',
+  requireRole('MANAGER'),
+  validate(listPicklistsQuerySchema, 'query'),
+  asyncHandler(orderController.listPicklists),
+);
 
 router.get(
   '/:orderId',
@@ -138,6 +147,13 @@ router.patch(
   validate(orderIdParamSchema, 'params'),
   validate(updateOrderQuotationBodySchema, 'body'),
   asyncHandler(orderController.updateQuotation),
+);
+
+router.put(
+  '/:orderId/picklist/picked-up',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  asyncHandler(orderController.markPicklistPickedUp),
 );
 
 router.put(

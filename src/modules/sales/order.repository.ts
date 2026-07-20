@@ -52,6 +52,14 @@ const detailInclude = {
 
 export type OrderWithDetails = Prisma.OrderGetPayload<{ include: typeof detailInclude }>;
 
+const picklistInclude = {
+  customer: { select: { customerName: true } },
+  orderItems: { select: { quantity: true, preparedQty: true } },
+  pickedUpByUser: { select: { fullName: true } },
+} satisfies Prisma.OrderInclude;
+
+export type OrderForPicklist = Prisma.OrderGetPayload<{ include: typeof picklistInclude }>;
+
 function buildWhere(filter: OrderListFilter): Prisma.OrderWhereInput {
   const where: Prisma.OrderWhereInput = {};
   if (filter.orderStatus) where.orderStatus = filter.orderStatus;
@@ -359,5 +367,78 @@ export const orderRepository = {
       data: { closedAt: new Date(), closedBy },
       include: detailInclude,
     });
+  },
+
+  markPickedUp(orderId: string, pickedUpBy: string): Promise<OrderForPicklist> {
+    return prisma.order.update({
+      where: { orderId },
+      data: { pickedUpAt: new Date(), pickedUpBy },
+      include: picklistInclude,
+    });
+  },
+};
+
+// ============================================================================
+// Picklists (docs/api/picklistxuatkho_api.md) — luôn cố định orderStatus IN (CONFIRMED, IN_PROGRESS),
+// không phải param client truyền vào (mục 2: "kho chỉ thật sự bị khóa sau khi xác nhận cọc").
+export interface PicklistFilter {
+  search?: string;
+  exportStatus?: 'PENDING' | 'EXPORTED';
+}
+
+export interface PicklistParams extends PicklistFilter {
+  skip: number;
+  take: number;
+}
+
+function buildPicklistWhere(filter: PicklistFilter): Prisma.OrderWhereInput {
+  const where: Prisma.OrderWhereInput = { orderStatus: { in: ['CONFIRMED', 'IN_PROGRESS'] } };
+  if (filter.search) {
+    const q = filter.search;
+    where.OR = [{ orderCode: { contains: q } }, { customer: { customerName: { contains: q } } }];
+  }
+  if (filter.exportStatus === 'PENDING') where.pickedUpAt = null;
+  if (filter.exportStatus === 'EXPORTED') where.pickedUpAt = { not: null };
+  return where;
+}
+
+export const orderPicklistRepository = {
+  async findMany(params: PicklistParams) {
+    const where = buildPicklistWhere(params);
+    const [rows, totalItems] = await Promise.all([
+      prisma.order.findMany({ where, skip: params.skip, take: params.take, orderBy: { eventDate: 'asc' }, include: picklistInclude }),
+      prisma.order.count({ where }),
+    ]);
+    return { rows, totalItems };
+  },
+
+  // Đếm trên TOÀN BỘ tập đã lọc theo search (không phân trang) — dùng cho meta.readyCount/exportedCount
+  // (docs/api/picklistxuatkho_api.md mục 1/5.1). Quy mô nhỏ (theo ghi chú trong tài liệu, dữ liệu thật
+  // hiện chỉ vài chục đơn CONFIRMED/IN_PROGRESS) nên tính trực tiếp ở tầng ứng dụng thay vì raw SQL.
+  async findAllForCounts(search?: string) {
+    const where = buildPicklistWhere({ search });
+    return prisma.order.findMany({
+      where,
+      select: { orderId: true, pickedUpAt: true, orderItems: { select: { quantity: true, preparedQty: true } } },
+    });
+  },
+
+  // Điều phối viên = LEAD của schedule_plans sớm nhất theo start_time (docs/api/picklistxuatkho_api.md
+  // mục 3.4, đã chốt hướng (a)) — 1 truy vấn cho cả trang, group theo orderId ở tầng ứng dụng.
+  async findLeadCoordinatorsByOrderIds(orderIds: string[]): Promise<Map<string, string>> {
+    if (orderIds.length === 0) return new Map();
+    const plans = await prisma.schedulePlan.findMany({
+      where: { orderId: { in: orderIds } },
+      orderBy: { startTime: 'asc' },
+      select: { orderId: true, assignees: { where: { role: 'LEAD' }, select: { user: { select: { fullName: true } } } } },
+    });
+
+    const result = new Map<string, string>();
+    for (const plan of plans) {
+      if (result.has(plan.orderId)) continue;
+      const lead = plan.assignees[0];
+      if (lead) result.set(plan.orderId, lead.user.fullName);
+    }
+    return result;
   },
 };

@@ -25,6 +25,7 @@ let loaItemId: string;
 let denItemId: string;
 let order1Id: string;
 let fixtureItemId: string;
+let fixtureItemNoInventoryId: string;
 const createdReportIds: string[] = [];
 
 beforeAll(async () => {
@@ -59,6 +60,20 @@ beforeAll(async () => {
   await prisma.inventory.create({
     data: { inventoryId: randomUUID(), itemId: fixtureItemId, quantityTotal: 50, quantityDamaged: 0, quantityReserved: 5, quantityAvailable: 45 },
   });
+
+  // Fixture RIÊNG, cố tình KHÔNG tạo sẵn dòng inventory — dùng cho test POST /api/v1/inventory (khởi
+  // tạo tồn kho lần đầu, xem inventory.service.ts#createInventory).
+  const fixtureItemNoInventory = await prisma.item.create({
+    data: {
+      itemId: randomUUID(),
+      itemCode: `ITM-TEST-NOINV-${Date.now()}`,
+      itemName: 'Fixture Test Item (no inventory yet)',
+      typeId: loaWithType.typeId,
+      unit: 'Cái',
+      rentalPrice: 100000,
+    },
+  });
+  fixtureItemNoInventoryId = fixtureItemNoInventory.itemId;
 });
 
 afterAll(async () => {
@@ -72,6 +87,8 @@ afterAll(async () => {
   await prisma.collectedEquipmentReportItem.deleteMany({ where: { itemId: fixtureItemId } });
   await prisma.inventory.deleteMany({ where: { itemId: fixtureItemId } });
   await prisma.item.delete({ where: { itemId: fixtureItemId } });
+  await prisma.inventory.deleteMany({ where: { itemId: fixtureItemNoInventoryId } });
+  await prisma.item.delete({ where: { itemId: fixtureItemNoInventoryId } });
   await prisma.$disconnect();
 });
 
@@ -250,5 +267,83 @@ describe('Write endpoints — successful quantity updates (Manager), against a t
       .set('Authorization', authHeader(managerId, 'MANAGER'))
       .send({});
     expect(reconfirmRes.status).toBe(400);
+  });
+
+  it('POST /api/v1/inventory creates the first inventory row for an item that has none yet (201)', async () => {
+    const res = await request(app)
+      .post('/api/v1/inventory')
+      .set('Authorization', authHeader(managerId, 'MANAGER'))
+      .send({ itemId: fixtureItemNoInventoryId, quantityTotal: 20, quantityDamaged: 2 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ itemId: fixtureItemNoInventoryId, quantityTotal: 20, quantityDamaged: 2, quantityReserved: 0, quantityAvailable: 18 });
+  });
+
+  it('POST /api/v1/inventory returns 409 when an inventory row already exists for the item', async () => {
+    const res = await request(app)
+      .post('/api/v1/inventory')
+      .set('Authorization', authHeader(managerId, 'MANAGER'))
+      .send({ itemId: fixtureItemId, quantityTotal: 5 });
+
+    expect(res.status).toBe(409);
+  });
+
+  it('POST /api/v1/inventory is forbidden for ADMIN', async () => {
+    const res = await request(app)
+      .post('/api/v1/inventory')
+      .set('Authorization', authHeader(adminId, 'ADMIN'))
+      .send({ itemId: fixtureItemNoInventoryId, quantityTotal: 5 });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('/return-reports — alias of /collected-equipment-reports, same underlying data', () => {
+  it('GET /api/v1/inventory/return-reports lists the same seeded report as /collected-equipment-reports', async () => {
+    const res = await request(app)
+      .get(`/api/v1/inventory/return-reports?orderId=${order1Id}&status=SUBMITTED`)
+      .set('Authorization', authHeader(managerId, 'MANAGER'));
+
+    expect(res.status).toBe(200);
+    const seededReport = res.body.data.find(
+      (r: { notes: string }) => r.notes === 'Thu hồi thiết bị sau sự kiện Tech Summit 2026',
+    );
+    expect(seededReport).toMatchObject({ orderCode: 'ORD-001', status: 'SUBMITTED' });
+  });
+
+  it('creates a report via /return-reports as LEADER (201) and confirms via /return-reports/:id/confirm as MANAGER (200)', async () => {
+    const createRes = await request(app)
+      .post('/api/v1/inventory/return-reports')
+      .set('Authorization', authHeader(leaderId, 'LEADER'))
+      .send({
+        orderId: order1Id,
+        reportType: 'INTERNAL',
+        notes: 'Thu hồi fixture test qua alias return-reports',
+        items: [{ itemId: fixtureItemId, goodQuantity: 1, damagedQuantity: 0, lostQuantity: 0 }],
+      });
+
+    expect(createRes.status).toBe(201);
+    const reportId = createRes.body.data.reportId as string;
+    createdReportIds.push(reportId);
+
+    const getRes = await request(app)
+      .get(`/api/v1/inventory/return-reports/${reportId}`)
+      .set('Authorization', authHeader(managerId, 'MANAGER'));
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.data.reportId).toBe(reportId);
+
+    const confirmRes = await request(app)
+      .put(`/api/v1/inventory/return-reports/${reportId}/confirm`)
+      .set('Authorization', authHeader(managerId, 'MANAGER'))
+      .send({});
+    expect(confirmRes.status).toBe(200);
+    expect(confirmRes.body.data.status).toBe('CONFIRMED');
+  });
+
+  it('POST /api/v1/inventory/return-reports is forbidden for ADMIN', async () => {
+    const res = await request(app)
+      .post('/api/v1/inventory/return-reports')
+      .set('Authorization', authHeader(adminId, 'ADMIN'))
+      .send({ orderId: order1Id, reportType: 'INTERNAL', items: [{ itemId: fixtureItemId, goodQuantity: 1 }] });
+    expect(res.status).toBe(403);
   });
 });

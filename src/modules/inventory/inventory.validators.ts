@@ -31,6 +31,12 @@ export const listMovementsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
 
+export const createInventoryBodySchema = z.object({
+  itemId: z.string().trim().min(1, 'itemId is required'),
+  quantityTotal: z.coerce.number().int().nonnegative().default(0),
+  quantityDamaged: z.coerce.number().int().nonnegative().default(0),
+});
+
 export const adjustInventoryBodySchema = z.object({
   itemId: z.string().trim().min(1, 'itemId is required'),
   deltaTotal: z.coerce.number().int().refine((v) => v !== 0, 'deltaTotal must not be 0'),
@@ -76,6 +82,7 @@ export const confirmReportBodySchema = z.object({
 export type ItemIdParam = z.infer<typeof itemIdParamSchema>;
 export type OrderIdParam = z.infer<typeof orderIdParamSchema>;
 export type ReportIdParam = z.infer<typeof reportIdParamSchema>;
+export type CreateInventoryBody = z.infer<typeof createInventoryBodySchema>;
 export type ListInventoryQuery = z.infer<typeof listInventoryQuerySchema>;
 export type ListMovementsQuery = z.infer<typeof listMovementsQuerySchema>;
 export type AdjustInventoryBody = z.infer<typeof adjustInventoryBodySchema>;

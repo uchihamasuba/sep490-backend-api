@@ -4,8 +4,10 @@ import { customerRepository } from './customer.repository';
 import { quotationRepository } from './quotation.repository';
 import {
   DEFAULT_LIVE_SHOW_CHECKLIST,
+  orderPicklistRepository,
   orderRepository,
   type LiveShowChecklist,
+  type OrderForPicklist,
   type OrderLineInput,
   type OrderWithDetails,
 } from './order.repository';
@@ -16,6 +18,7 @@ import type {
   CreateOrderBody,
   CreateSettlementBody,
   ListOrdersQuery,
+  ListPicklistsQuery,
   UpdateLiveChecklistBody,
   UpdateOrderItemBody,
   UpdateOrderQuotationBody,
@@ -539,6 +542,91 @@ async function confirmPreparedItems(orderId: string, body: ConfirmPreparedItemsB
   return mapDetail(updated);
 }
 
+export interface PicklistItemDTO {
+  orderId: string;
+  orderCode: string;
+  customerName: string;
+  eventDate: string;
+  coordinatorName: string | null;
+  totalItemsCount: number;
+  preparedItemsCount: number;
+  pickedUpAt: string | null;
+  pickedUpByName: string | null;
+}
+
+export interface PicklistListMeta {
+  page: number;
+  limit: number;
+  totalCount: number;
+  readyCount: number;
+  exportedCount: number;
+}
+
+// "Sẵn sàng xuất kho" — không có cột `items_confirmed_at` riêng trong schema thật hiện tại, dùng công
+// thức tổng hợp trực tiếp trên order_items (docs/api/picklistxuatkho_api.md mục 6, phương án fallback
+// khi chưa có cột xác nhận riêng): mọi dòng đã prepared đủ số lượng và đơn có ít nhất 1 dòng.
+function isReadyToPickUp(order: { pickedUpAt: Date | null; orderItems: { quantity: number; preparedQty: number }[] }): boolean {
+  if (order.pickedUpAt) return false;
+  if (order.orderItems.length === 0) return false;
+  return order.orderItems.every((item) => item.preparedQty >= item.quantity);
+}
+
+function mapPicklistItem(row: OrderForPicklist, coordinatorName: string | null): PicklistItemDTO {
+  const totalItemsCount = row.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+  const preparedItemsCount = row.orderItems.reduce((sum, item) => sum + item.preparedQty, 0);
+  return {
+    orderId: row.orderId,
+    orderCode: row.orderCode,
+    customerName: row.customer.customerName,
+    eventDate: row.eventDate.toISOString(),
+    coordinatorName,
+    totalItemsCount,
+    preparedItemsCount,
+    pickedUpAt: row.pickedUpAt ? row.pickedUpAt.toISOString() : null,
+    pickedUpByName: row.pickedUpByUser ? row.pickedUpByUser.fullName : null,
+  };
+}
+
+async function listPicklists(query: ListPicklistsQuery): Promise<{ data: PicklistItemDTO[]; meta: PicklistListMeta }> {
+  const { page, limit } = query;
+  const skip = (page - 1) * limit;
+
+  const [{ rows, totalItems: _ignoredPagedTotal }, allForCounts] = await Promise.all([
+    orderPicklistRepository.findMany({ search: query.search, exportStatus: query.exportStatus, skip, take: limit }),
+    orderPicklistRepository.findAllForCounts(query.search),
+  ]);
+  void _ignoredPagedTotal;
+
+  const coordinators = await orderPicklistRepository.findLeadCoordinatorsByOrderIds(rows.map((r) => r.orderId));
+
+  const totalCount = allForCounts.length;
+  const exportedCount = allForCounts.filter((o) => o.pickedUpAt !== null).length;
+  const readyCount = allForCounts.filter((o) => isReadyToPickUp(o)).length;
+
+  return {
+    data: rows.map((row) => mapPicklistItem(row, coordinators.get(row.orderId) ?? null)),
+    meta: { page, limit, totalCount, readyCount, exportedCount },
+  };
+}
+
+async function markPicklistPickedUp(orderId: string, pickedUpBy: string): Promise<PicklistItemDTO> {
+  const existing = await findOrderOrThrow(orderId);
+
+  if (existing.orderStatus !== 'CONFIRMED' && existing.orderStatus !== 'IN_PROGRESS') {
+    throw AppError.conflict('Chỉ đơn CONFIRMED hoặc IN_PROGRESS mới có thể xuất kho');
+  }
+  if (existing.pickedUpAt) {
+    throw AppError.conflict('Đơn hàng đã được đánh dấu xuất kho trước đó');
+  }
+  if (!isReadyToPickUp({ pickedUpAt: existing.pickedUpAt, orderItems: existing.orderItems })) {
+    throw AppError.badRequest('Cần chuẩn bị đủ số lượng thiết bị (preparedQty >= quantity cho mọi dòng) trước khi xuất kho');
+  }
+
+  const updated = await orderRepository.markPickedUp(orderId, pickedUpBy);
+  const coordinators = await orderPicklistRepository.findLeadCoordinatorsByOrderIds([orderId]);
+  return mapPicklistItem(updated, coordinators.get(orderId) ?? null);
+}
+
 export const orderService = {
   listOrders,
   getOrderById,
@@ -557,4 +645,6 @@ export const orderService = {
   createSettlement,
   closeOrder,
   confirmPreparedItems,
+  listPicklists,
+  markPicklistPickedUp,
 };

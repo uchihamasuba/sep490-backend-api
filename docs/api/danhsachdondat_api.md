@@ -141,23 +141,26 @@ khuyến nghị ở tài liệu Hợp đồng mục 3.2 cuối).
 | Đơn hàng (badge trạng thái, ví dụ "Mới") | `status` | `orders.order_status` — khớp 1:1 (mục 1.1). |
 | Thao tác (Xem/Xóa) | `router` sang `/manager/orders/[id]` hoặc `/admin/orders_audit/[id]`; `deleteAdminOrder()` xóa cứng | Xem chi tiết: `GET /api/v1/orders/:id` (đã có, trả kèm `orderItems`/`orderWarnings`/`deposits`/`settlements`). **Xóa đơn đặt: không có API tương đương an toàn** — `order.service.ts` chỉ có `updateOrderStatus` (dùng chung cho hủy đơn, `PUT /orders/:id/status` với `orderStatus: 'CANCELLED'` + `cancelReason`), **không có `DELETE /api/v1/orders/:id`** nào được tài liệu hóa. CLAUDE.md không liệt kê nghiệp vụ "xóa Order" trong toàn bộ vòng đời — chỉ có "hủy đơn" (mục 1 CLAUDE.md, chính sách hoàn cọc theo mốc thời gian). **Đây là finding giống hệt mục 2.3 của `docs/danhsachhopdong_api.md`** (cùng vấn đề với nút xóa hợp đồng) — nút "Xóa đơn đặt" hiện tại cần đổi thành "Hủy đơn" gọi `updateOrderStatus(id, {orderStatus: 'CANCELLED', cancelReason})` thay vì xóa cứng bản ghi. Về mặt schema, các bảng con (`order_items`, `deposits`, `schedule_plans`) đều có `ON DELETE CASCADE` theo `order_id` nên xóa cứng **khả thi kỹ thuật**, nhưng không có căn cứ nghiệp vụ nào trong CLAUDE.md cho phép — cần Product quyết định trước khi Backend cân nhắc thêm endpoint DELETE thật. |
 
-### 4.1. Field `coordinatorName` ("Điều phối viên") — không có căn cứ trực tiếp trên `orders`, cần join qua `schedule_plan_assignees`
+### 4.1. Field `coordinatorName` ("Điều phối viên") — không có căn cứ trực tiếp trên `orders`, cần join qua `schedule_plan_assignees` — **đã chốt (2026-07-20)**
 
 Giống hệt phát hiện "Nhân sự phụ trách ký duyệt" ở `docs/danhsachhopdong_api.md` mục 1.4/3.1:
 `COORDINATOR_POOL` lấy từ `db/employees.ts` (`Employee` mock, **KHÁC** bảng `users` RBAC thật). Đối chiếu
 schema thật — **`orders` không có cột nào lưu "người điều phối"**. Khái niệm gần nhất tồn tại thật trong
 DB là `schedule_plan_assignees` (`plan_id`, `user_id`, `role ENUM('LEAD','TECHNICAL')`) nối qua
 `schedule_plans.order_id` — tức là quan hệ **order → nhiều schedule_plan → nhiều user** (nhiều người, có
-vai trò LEAD/TECHNICAL, không phải "1 điều phối viên duy nhất" như mock giả định). Hệ quả:
+vai trò LEAD/TECHNICAL, không phải "1 điều phối viên duy nhất" như mock giả định).
 
-- Không thể lọc "Mọi điều phối viên" ở màn danh sách Order bằng 1 query param đơn giản trên `orders` —
-  cần JOIN 2 cấp (`orders` → `schedule_plans` → `schedule_plan_assignees` → `users`) và quyết định lấy
-  người có `role = 'LEAD'` đầu tiên tìm thấy làm "điều phối viên đại diện", hoặc bỏ hẳn khái niệm 1-người
-  duy nhất này khỏi màn danh sách Order (khuyến nghị, vì thật ra Schedule Plan mới là nơi có nhân sự
-  điều phối, không phải Order).
-- Cần Product xác nhận: giữ filter này (yêu cầu Backend thêm 1 trong 2: endpoint join sẵn, hoặc query
-  param mới trên `GET /orders` kiểu `assignedUserId`), hay bỏ hẳn khỏi UI danh sách Order và để nghiệp vụ
-  "xem theo điều phối viên" thuộc về màn Lịch trình/Schedule Plan (nơi đã có sẵn dữ liệu thật).
+**Đã chốt — đi theo hướng (a)** (cùng quyết định áp dụng cho `docs/picklistxuatkho_api.md` mục 3.4, 1
+lần quyết định dùng chung cho mọi màn danh sách Order hiển thị field này, không quyết định riêng lẻ
+từng màn): JOIN 2 cấp (`orders` → `schedule_plans` → `schedule_plan_assignees` → `users`), lấy người
+`role = 'LEAD'` của dòng `schedule_plans` **sớm nhất theo `start_time`** thuộc đơn đó làm "điều phối
+viên đại diện" — chấp nhận đây là số liệu xấp xỉ (1 đơn có thể có nhiều hoạt động với LEAD khác nhau),
+đổi lại giữ nguyên đúng UI hiện có. Đơn chưa có `schedule_plans`/`LEAD` nào → trả `coordinatorName =
+null`, FE hiển thị "Chưa phân công". Xem SQL mẫu ở `docs/picklistxuatkho_api.md` mục 3.4.
+
+Hệ quả cho filter "Mọi điều phối viên" ở màn này: **không thể lọc bằng 1 query param đơn giản trên
+`orders`** — cần Backend thêm query param mới trên `GET /orders` kiểu `assignedUserId` (lọc theo cùng
+join LEAD sớm nhất ở trên), vì `orders` không có cột gốc nào để lọc trực tiếp.
 
 ## 5. Modal "Khởi tạo đơn đặt hàng" — ánh xạ sang `POST /api/v1/orders`
 

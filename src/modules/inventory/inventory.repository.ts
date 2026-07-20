@@ -76,6 +76,13 @@ export const inventoryRepository = {
     return prisma.item.findUnique({ where: { itemId }, select: { itemId: true, itemName: true } });
   },
 
+  create(data: { itemId: string; quantityTotal: number; quantityDamaged: number; quantityAvailable: number }): Promise<InventoryWithItem> {
+    return prisma.inventory.create({
+      data: { itemId: data.itemId, quantityTotal: data.quantityTotal, quantityDamaged: data.quantityDamaged, quantityReserved: 0, quantityAvailable: data.quantityAvailable },
+      include: inventoryItemInclude,
+    });
+  },
+
   orderExists(orderId: string) {
     return prisma.order.findUnique({ where: { orderId }, select: { orderId: true } });
   },

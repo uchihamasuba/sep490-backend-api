@@ -1,6 +1,7 @@
 import type { BusinessPolicy } from '@prisma/client';
+import { AppError } from '../../utils/AppError';
 import { policyRepository } from './policy.repository';
-import type { ListPoliciesQuery } from './policy.validators';
+import type { CreatePolicyBody, ListPoliciesQuery, UpdatePolicyBody } from './policy.validators';
 
 export interface PolicyDTO {
   policyId: string;
@@ -55,6 +56,38 @@ async function listPolicies(query: ListPoliciesQuery): Promise<{ data: PolicyDTO
   };
 }
 
+async function createPolicy(body: CreatePolicyBody): Promise<PolicyDTO> {
+  const existing = await policyRepository.findByCode(body.policyCode);
+  if (existing) throw AppError.conflict('policyCode already exists');
+
+  const created = await policyRepository.create({
+    policyCode: body.policyCode,
+    policyName: body.policyName,
+    policyType: body.policyType,
+    policyValue: body.policyValue,
+    unit: body.unit,
+    description: body.description ?? null,
+  });
+
+  return mapPolicy(created);
+}
+
+async function updatePolicy(policyId: string, body: UpdatePolicyBody): Promise<PolicyDTO> {
+  const existing = await policyRepository.findById(policyId);
+  if (!existing) throw AppError.notFound('Policy not found');
+
+  const updated = await policyRepository.update(policyId, {
+    ...(body.policyValue !== undefined ? { policyValue: body.policyValue } : {}),
+    ...(body.unit !== undefined ? { unit: body.unit } : {}),
+    ...(body.description !== undefined ? { description: body.description } : {}),
+    ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
+  });
+
+  return mapPolicy(updated);
+}
+
 export const policyService = {
   listPolicies,
+  createPolicy,
+  updatePolicy,
 };

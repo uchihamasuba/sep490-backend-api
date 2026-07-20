@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 
 export interface PolicyListFilter {
-  policyType?: 'DEPOSIT' | 'CANCELLATION' | 'COMPENSATION' | 'FEE';
+  policyType?: 'DEPOSIT' | 'CANCELLATION' | 'COMPENSATION' | 'FEE' | 'WAGE';
   isActive?: boolean;
   search?: string;
 }
@@ -30,5 +30,28 @@ export const policyRepository = {
       prisma.businessPolicy.count({ where }),
     ]);
     return { rows, totalItems };
+  },
+
+  findById(policyId: string) {
+    return prisma.businessPolicy.findUnique({ where: { policyId } });
+  },
+
+  findByCode(policyCode: string) {
+    return prisma.businessPolicy.findUnique({ where: { policyCode } });
+  },
+
+  create(data: {
+    policyCode: string;
+    policyName: string;
+    policyType: 'DEPOSIT' | 'CANCELLATION' | 'COMPENSATION' | 'FEE' | 'WAGE';
+    policyValue: number;
+    unit: string;
+    description: string | null;
+  }) {
+    return prisma.businessPolicy.create({ data });
+  },
+
+  update(policyId: string, data: { policyValue?: number; unit?: string; description?: string | null; isActive?: boolean }) {
+    return prisma.businessPolicy.update({ where: { policyId }, data });
   },
 };

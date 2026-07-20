@@ -15,5 +15,10 @@ export const listUsersQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
 
+export const updateUserStatusBodySchema = z.object({
+  status: userStatusEnum,
+});
+
 export type UserIdParam = z.infer<typeof userIdParamSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
+export type UpdateUserStatusBody = z.infer<typeof updateUserStatusBodySchema>;

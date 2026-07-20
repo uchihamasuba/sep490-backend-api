@@ -7,10 +7,24 @@
 > `identity` được tạo và test bằng curl với DB thật (Aiven) ngày 2026-07-20, tại
 > `D:\sep490-backend-api\src\modules\identity\` (`user.repository.ts`, `auth.validators.ts`,
 > `auth.service.ts`, `auth.controller.ts`, `auth.routes.ts`), đăng ký vào `src/routes.ts`.
+> **Đã đối chiếu lại độc lập trong phiên này (2026-07-20)** — đọc trực tiếp code 4 file trên + so khớp
+> field-by-field với DB thật qua MySQL MCP (`SELECT * FROM users`, `SHOW CREATE TABLE users`): khớp
+> hoàn toàn, không phát hiện lệch mới. Xem thêm mục 5.
 >
-> Viết dựa trên: code FE hiện tại + code backend đã implement (nguồn chính xác nhất, không dựa vào
-> `docs/api/01-auth.md` — file đó **không tồn tại** trong repo này, các comment trong
-> `src/types/auth.ts` trỏ tới nó là tham chiếu tới vị trí backend cũ, đã lỗi thời).
+> ⚠️ **Có 1 repo backend KHÁC dễ gây nhầm lẫn**: `D:\bnwems-backend-api` (nhánh
+> `feature/align-new-api-contracts-and-test`) cũng có route `POST /auth/login`
+> (`src/routes/auth.route.ts` → `auth.service.ts` → `prisma.internalUser`), nhưng Prisma schema của
+> repo đó map vào bảng `internal_users` (khóa `BigInt`) — bảng này **không tồn tại** trên DB thật (DB
+> thật chỉ có bảng `users`, khóa `VARCHAR(36)` UUID, xem mục 1). Migration của repo đó
+> (`init`/`add_role_status`/`sync_schema_and_constraints`) cũng không khớp migration thật sự đã chạy
+> trên DB (`20260718230757_init_core`). Nếu lỡ start nhầm backend này, `/auth/login` sẽ lỗi ngay ở tầng
+> Prisma (bảng không tồn tại) dù FE gọi đúng. **Backend đúng cần chạy là `D:\sep490-backend-api`**
+> (migration `20260718230757_init_core` khớp chính xác DB thật).
+>
+> Viết dựa trên: code FE hiện tại + code backend đã implement ở `D:\sep490-backend-api` (nguồn chính
+> xác nhất, không dựa vào `docs/api/01-auth.md` — file đó **không tồn tại** trong repo này, các comment
+> trong `src/types/auth.ts` trỏ tới nó và tới `D:\bnwems-backend-api` là tham chiếu tới vị trí backend
+> cũ/sai, đã lỗi thời — xem cảnh báo ở trên).
 
 ## 0. Base URL & Auth
 
@@ -160,16 +174,40 @@ chạm DB) hoặc nếu `oldPassword` sai (`"Mật khẩu hiện tại không đ
   delete/summary/orders khách hàng) → tất cả chạy đúng với DB thật, bao gồm `409 Conflict` khi xóa
   khách hàng đã có đơn hàng.
 
-## 4. Việc còn lại phía FE (chưa làm trong lượt này — chỉ viết doc + code backend)
+## 4. Việc còn lại phía FE (chưa làm — chỉ viết doc, KHÔNG sửa code trong lượt này)
 
-- `src/app/auth/login/page.tsx` **hiện chưa gọi** `authApiService.login()` thật — đang dùng 2 tài
-  khoản ảo cố định (`src/mocks/authAccounts.ts`) vì comment cũ trong code ghi
-  *"Aiven cloud DB hiện lệch schema... `POST /auth/login` luôn trả 400 DB_ERROR"*
-  (`docs/more-require.md` mục (jj)). **Comment này đã lỗi thời** — endpoint đã chạy đúng như test ở
-  mục 3. Cần gỡ nhánh mock, gọi lại `authApiService.login()` thật, và cập nhật/xóa mục (jj) trong
-  `docs/more-require.md` khi làm việc này.
+- `src/app/auth/login/page.tsx` **hiện vẫn chưa gọi** `authApiService.login()` thật — đang dùng 2 tài
+  khoản ảo cố định (`src/mocks/authAccounts.ts`). Comment cũ trong code trỏ tới
+  *"docs/more-require.md mục (jj)"* — **mục (jj) không tồn tại trong `docs/more-require.md` hiện tại**
+  (file này hiện chỉ có mục (a) và (b), xem `docs/more-require.md`) — tham chiếu đã hỏng, không tra
+  cứu lại được lý do gốc. Endpoint thật **đã chạy đúng** (mục 3 + đối chiếu lại mục 5) nên lý do chặn
+  cũ (nếu từng đúng) không còn hiệu lực. Việc cần làm khi triển khai: gỡ nhánh `findMockAccount`, gọi
+  `authApiService.login()` thật, xoá comment tham chiếu mục (jj) đã hỏng.
 - `src/context/AuthContext.tsx` **không cần sửa gì** — đã sẵn code gọi `authApiService.getProfile()`
   để re-validate token khi hydrate, khớp đúng response mục 2.3.
 - Trang "Đổi mật khẩu"/"Quên mật khẩu"/"Hồ sơ cá nhân" (nếu có UI tương ứng) có thể nối thẳng vào
   `authApiService.changePassword()` / `forgotPassword()` / `updateProfile()` — cả 3 hàm đã có sẵn ở
   `src/services/auth.service.ts`, chỉ chưa được UI nào gọi tới.
+- `authApiService.registerDeviceToken()` (`POST /auth/device-token`) — **backend đúng
+  (`D:\sep490-backend-api`) không có route này** (`auth.routes.ts` chỉ đăng ký đúng 5 route: `login`/
+  `forgot-password`/`profile` GET+PUT/`change-password`, không có `device-token`). Grep toàn bộ `src/`
+  xác nhận hàm này cũng **chưa được gọi ở bất kỳ đâu** trong FE (chỉ khai báo, không dùng) — không phải
+  gap cần backend xử lý ngay, giữ nguyên as-is cho tới khi có nhu cầu push notification thật (FCM) mới
+  cần backend bổ sung route + Product xác nhận thiết kế.
+
+## 5. Đối chiếu lại độc lập (2026-07-20, phiên này) — không phát hiện lệch mới
+
+Đọc trực tiếp `auth.service.ts`/`auth.controller.ts`/`auth.routes.ts`/`user.repository.ts`/
+`auth.validators.ts` ở `D:\sep490-backend-api\src\modules\identity\` + `SHOW CREATE TABLE users` và
+`SELECT user_id, username, full_name, role, status FROM users` qua MySQL MCP:
+
+- Model `User` (Prisma) khớp 100% cột thật của bảng `users` (tên cột, kiểu, nullable) — không có cột
+  thừa/thiếu.
+- 4 tài khoản seed thật tồn tại, đều `status = ACTIVE`: `admin`/`manager`/`leader`/`tech` (khớp đúng 4
+  role `ADMIN`/`MANAGER`/`LEADER`/`TECHNICAL`) — dùng được ngay để test thủ công khi nối API thật.
+- Zod schema (`auth.validators.ts`) khớp chính xác field-by-field với 4 payload interface phía FE
+  (`LoginPayload`, `ForgotPasswordPayload`, `UpdateProfilePayload`, `ChangePasswordPayload` ở
+  `src/services/auth.service.ts`) — không cần đổi tên field nào ở 1 trong 2 phía.
+- Route list thật (`auth.routes.ts`): `POST /login`, `POST /forgot-password`, `GET /profile`,
+  `PUT /profile`, `PUT /change-password` — đúng 5 route, khớp mục 2.1-2.5. **Không có** route thứ 6 cho
+  `device-token` (xem mục 4).

@@ -70,7 +70,16 @@ async function getUserById(userId: string): Promise<UserDetailDTO> {
   return mapDetail(user);
 }
 
+async function updateUserStatus(userId: string, status: User['status']): Promise<UserDetailDTO> {
+  const existing = await userRepository.findById(userId);
+  if (!existing) throw AppError.notFound('User not found');
+
+  const updated = await userRepository.update(userId, { status });
+  return mapDetail(updated);
+}
+
 export const userService = {
   listUsers,
   getUserById,
+  updateUserStatus,
 };

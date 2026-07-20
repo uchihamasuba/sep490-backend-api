@@ -9,6 +9,7 @@ import type {
   CreateOrderBody,
   CreateSettlementBody,
   ListOrdersQuery,
+  ListPicklistsQuery,
   OrderIdParam,
   OrderItemIdParam,
   UpdateLiveChecklistBody,
@@ -132,6 +133,19 @@ async function confirmPreparedItems(req: Request, res: Response) {
   ok(res, order);
 }
 
+async function listPicklists(req: Request, res: Response) {
+  const query = req.query as unknown as ListPicklistsQuery;
+  const result = await orderService.listPicklists(query);
+  ok(res, result.data, { ...result.meta });
+}
+
+async function markPicklistPickedUp(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { orderId } = req.params as unknown as OrderIdParam;
+  const result = await orderService.markPicklistPickedUp(orderId, req.user.id);
+  ok(res, result);
+}
+
 export const orderController = {
   list,
   getById,
@@ -150,4 +164,6 @@ export const orderController = {
   createSettlement,
   close,
   confirmPreparedItems,
+  listPicklists,
+  markPicklistPickedUp,
 };

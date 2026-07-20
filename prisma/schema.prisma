@@ -55,6 +55,7 @@ enum PolicyType {
   CANCELLATION
   COMPENSATION
   FEE
+  WAGE
 }
 
 enum ItemStatus {
@@ -201,6 +202,11 @@ model User {
   phone        String?    @db.VarChar(30)
   bio          String?    @db.Text
   avatarUrl    String?    @map("avatar_url") @db.Text
+  /// Nhân sự vận hành (Leader/Technical) — mã hiển thị dạng NV### (docs/api/admin_themnhansu_api.md
+  /// mục 3.1, Hướng A: tận dụng bảng users, không tạo bảng employees riêng).
+  employeeCode String?    @unique @map("employee_code") @db.VarChar(10)
+  /// Vai trò chuyên môn (Bếp trưởng/MC.../ độc lập với role RBAC) — mục 3.2 cùng tài liệu trên.
+  jobTitle     String?    @map("job_title") @db.VarChar(100)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
@@ -220,6 +226,7 @@ model User {
   inventoryMovementsPerformed        InventoryMovement[]        @relation("InventoryMovementPerformedBy")
   collectedEquipmentReportsReported  CollectedEquipmentReport[] @relation("CollectedEquipmentReportedBy")
   collectedEquipmentReportsConfirmed CollectedEquipmentReport[] @relation("CollectedEquipmentConfirmedBy")
+  ordersPickedUp                     Order[]                    @relation("OrderPickedUpBy")
 
   @@map("users")
 }
@@ -443,12 +450,17 @@ model Order {
   /// OrderStatus.COMPLETED, không thêm giá trị enum mới.
   closedAt      DateTime?     @map("closed_at") @db.Timestamp(0)
   closedBy      String?       @map("closed_by") @db.VarChar(36)
+  /// "Đã xuất kho" cho picklist (docs/api/picklistxuatkho_api.md mục 4) — cột mới nhỏ, không escalate
+  /// more-require.md (cùng mức với closedAt/closedBy).
+  pickedUpAt    DateTime?     @map("picked_up_at") @db.Timestamp(0)
+  pickedUpBy    String?       @map("picked_up_by") @db.VarChar(36)
 
   customer                  Customer                   @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
   quotation                 Quotation?                 @relation(fields: [quotationId], references: [quotationId], onDelete: SetNull)
   policy                    BusinessPolicy?            @relation(fields: [policyId], references: [policyId], onDelete: SetNull)
   creator                   User                       @relation("OrderCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
   closer                    User?                      @relation("OrderClosedBy", fields: [closedBy], references: [userId], onDelete: SetNull)
+  pickedUpByUser            User?                      @relation("OrderPickedUpBy", fields: [pickedUpBy], references: [userId], onDelete: SetNull)
   orderItems                OrderItem[]
   schedulePlans             SchedulePlan[]
   surveyReports             SurveyReport[]

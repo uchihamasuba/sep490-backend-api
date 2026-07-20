@@ -7,6 +7,7 @@ import {
 } from './inventory.repository';
 import type {
   AdjustInventoryBody,
+  CreateInventoryBody,
   CreateReportBody,
   ListInventoryQuery,
   ListMovementsQuery,
@@ -191,6 +192,31 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
   }));
 }
 
+// POST /api/v1/inventory — khởi tạo dòng tồn kho cho 1 item chưa từng có (Inventory là quan hệ 1-1
+// optional với Item, docs/api/more-require.md mục (b): item mới tạo chưa có tồn kho, cần nhập kho
+// riêng). Không có endpoint nào khác tạo được dòng inventory đầu tiên — adjust/reserve/release đều yêu
+// cầu dòng đã tồn tại (findInventoryOrThrow).
+async function createInventory(body: CreateInventoryBody): Promise<InventoryDTO> {
+  const item = await inventoryRepository.itemExists(body.itemId);
+  if (!item) throw AppError.notFound('Item not found');
+
+  const existing = await inventoryRepository.findByItemId(body.itemId);
+  if (existing) throw AppError.conflict('Inventory record already exists for this item');
+
+  if (body.quantityDamaged > body.quantityTotal) {
+    throw AppError.badRequest('quantityDamaged must not exceed quantityTotal');
+  }
+
+  const created = await inventoryRepository.create({
+    itemId: body.itemId,
+    quantityTotal: body.quantityTotal,
+    quantityDamaged: body.quantityDamaged,
+    quantityAvailable: body.quantityTotal - body.quantityDamaged,
+  });
+
+  return mapInventory(created);
+}
+
 async function adjustInventory(body: AdjustInventoryBody, actorId: string): Promise<InventoryDTO> {
   const current = await findInventoryOrThrow(body.itemId);
 
@@ -331,6 +357,7 @@ async function confirmReport(reportId: string, confirmedBy: string): Promise<Rep
 export const inventoryService = {
   listInventory,
   getInventoryByItemId,
+  createInventory,
   listMovements,
   getPicklist,
   adjustInventory,

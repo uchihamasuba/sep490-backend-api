@@ -5,6 +5,7 @@ import { inventoryService } from './inventory.service';
 import type {
   AdjustInventoryBody,
   ConfirmReportBody,
+  CreateInventoryBody,
   CreateReportBody,
   ItemIdParam,
   ListInventoryQuery,
@@ -43,6 +44,12 @@ async function getPicklist(req: Request, res: Response) {
   const { orderId } = req.params as unknown as OrderIdParam;
   const picklist = await inventoryService.getPicklist(orderId);
   ok(res, picklist);
+}
+
+async function create(req: Request, res: Response) {
+  const body = req.body as CreateInventoryBody;
+  const inventory = await inventoryService.createInventory(body);
+  created(res, inventory);
 }
 
 async function adjust(req: Request, res: Response) {
@@ -96,6 +103,7 @@ async function confirmReport(req: Request, res: Response) {
 export const inventoryController = {
   list,
   getByItemId,
+  create,
   listMovements,
   getPicklist,
   adjust,
