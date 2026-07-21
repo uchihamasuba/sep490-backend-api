@@ -140,6 +140,117 @@ describe('HTTP routes — role permission matrix', () => {
       .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(403);
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('POST /api/v1/survey-reports rejects an unauthenticated request with 401', async () => {
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+
+    expect(res.status).toBe(401);
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a payload missing orderId with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('LEADER'))
+      .send({ surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a payload missing location with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('LEADER'))
+      .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when orderId does not exist (end-to-end through the route, not just the service)', async () => {
+    mockedRepo.orderExists.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('LEADER'))
+      .send({ orderId: 'missing-order', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+
+    expect(res.status).toBe(404);
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('creates the report with the full payload (all optional fields) and returns 201', async () => {
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'ord-1' });
+    mockedRepo.planExists.mockResolvedValue({ planId: 'plan-1' });
+    mockedRepo.generateNextReportCode.mockResolvedValue('SUR-002');
+    mockedRepo.create.mockResolvedValue(
+      fakeSurvey({
+        reportCode: 'SUR-002',
+        planId: 'plan-1',
+        area: 50,
+        length: 10,
+        width: 5,
+        entrance: 'Cổng chính',
+        siteConstraints: 'Không có thang máy',
+        additionalRequests: 'Cần thêm bàn ghế',
+        proposedItems: 'Loa JBL, Đèn Beam',
+        notes: 'Ghi chú khảo sát',
+        evidenceId: 'evi-1',
+      }) as never,
+    );
+
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('LEADER'))
+      .send({
+        orderId: 'ord-1',
+        planId: 'plan-1',
+        surveyDate: '2026-07-25T02:00:00Z',
+        location: 'Hall A',
+        area: 50,
+        length: 10,
+        width: 5,
+        entrance: 'Cổng chính',
+        siteConstraints: 'Không có thang máy',
+        additionalRequests: 'Cần thêm bàn ghế',
+        proposedItems: 'Loa JBL, Đèn Beam',
+        notes: 'Ghi chú khảo sát',
+        evidenceId: 'evi-1',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      reportCode: 'SUR-002',
+      planId: 'plan-1',
+      area: 50,
+      length: 10,
+      width: 5,
+      entrance: 'Cổng chính',
+      status: 'NEEDS_REVIEW',
+    });
+    expect(mockedRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ orderId: 'ord-1', planId: 'plan-1', reportedBy: 'user-1', reportCode: 'SUR-002' }),
+    );
+  });
+
+  it('returns 404 when planId is provided but does not exist', async () => {
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'ord-1' });
+    mockedRepo.planExists.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('LEADER'))
+      .send({ orderId: 'ord-1', planId: 'missing-plan', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+
+    expect(res.status).toBe(404);
+    expect(mockedRepo.create).not.toHaveBeenCalled();
   });
 
   it('rejects partial dimension data (area without length/width) with 400', async () => {
