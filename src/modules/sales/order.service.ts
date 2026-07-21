@@ -4,8 +4,10 @@ import { customerRepository } from './customer.repository';
 import { quotationRepository } from './quotation.repository';
 import {
   DEFAULT_LIVE_SHOW_CHECKLIST,
+  InsufficientStockError,
   orderPicklistRepository,
   orderRepository,
+  type ExportEquipmentTargetLine,
   type LiveShowChecklist,
   type OrderForPicklist,
   type OrderLineInput,
@@ -542,6 +544,91 @@ async function confirmPreparedItems(orderId: string, body: ConfirmPreparedItemsB
   return mapDetail(updated);
 }
 
+export interface ExportEquipmentResultDTO {
+  orderId: string;
+  orderCode: string;
+  syncedQuotationId: string;
+  syncedQuotationCode: string;
+  pickedUpAt: string | null;
+  pickedUpBy: string | null;
+  movements: { itemId: string; itemName: string; quantity: number; movementType: 'OUTBOUND' | 'INBOUND' }[];
+  skippedSupplierItems: { itemId: string; itemName: string; quantity: number }[];
+  unchanged: boolean;
+}
+
+// Xuất thiết bị v2 — reconcile theo báo giá liên kết (docs/api/xuatthietbi_tubaogia_api.md, bản
+// "CẬP NHẬT LẦN 2"): đồng bộ order_items theo quotation_items rồi xuất bù/thu hồi chênh lệch tồn kho.
+// Bấm lặp lại là hành vi hợp lệ (không còn 409 idempotency); no-op trả unchanged: true. Vẫn khác chủ
+// đích với markPicklistPickedUp: chấp nhận đơn NEW, không yêu cầu preparedQty đủ (mục 4.2).
+async function exportEquipment(
+  orderId: string,
+  performedBy: string,
+  notes: string | null,
+): Promise<ExportEquipmentResultDTO> {
+  const existing = await findOrderOrThrow(orderId);
+
+  if (TERMINAL_STATUSES.includes(existing.orderStatus)) {
+    throw AppError.conflict(`Đơn hàng đang ở trạng thái ${existing.orderStatus} (đã kết thúc), không thể xuất thiết bị`);
+  }
+  if (!existing.quotationId) {
+    throw AppError.conflict('Đơn chưa liên kết báo giá');
+  }
+
+  const quotation = await quotationRepository.findById(existing.quotationId);
+  if (!quotation) {
+    throw AppError.conflict('Báo giá liên kết không còn tồn tại');
+  }
+
+  // Gộp phòng thủ theo itemId (báo giá về nguyên tắc không có 2 dòng cùng item, nhưng nếu có thì
+  // cộng dồn thay vì để Map nuốt mất dòng trước) — dùng snapshot itemName của quotation_items.
+  const targetByItem = new Map<string, ExportEquipmentTargetLine>();
+  for (const line of quotation.items) {
+    const prev = targetByItem.get(line.itemId);
+    if (prev) {
+      prev.quantity += line.quantity;
+      prev.subtotal += Number(line.lineTotal);
+    } else {
+      targetByItem.set(line.itemId, {
+        itemId: line.itemId,
+        itemName: line.itemName,
+        quantity: line.quantity,
+        unitPrice: Number(line.price),
+        subtotal: Number(line.lineTotal),
+      });
+    }
+  }
+  const targetLines = [...targetByItem.values()];
+
+  try {
+    const result = await orderRepository.exportEquipment({
+      orderId,
+      performedBy,
+      notes,
+      quotationCode: quotation.quotationCode,
+      targetLines,
+    });
+
+    return {
+      orderId: result.order.orderId,
+      orderCode: result.order.orderCode,
+      syncedQuotationId: quotation.quotationId,
+      syncedQuotationCode: quotation.quotationCode,
+      pickedUpAt: result.order.pickedUpAt ? result.order.pickedUpAt.toISOString() : null,
+      pickedUpBy: result.order.pickedUpBy,
+      movements: result.movements,
+      skippedSupplierItems: result.order.orderItems
+        .filter((line) => line.source === 'SUPPLIER')
+        .map((line) => ({ itemId: line.itemId, itemName: line.item.itemName, quantity: line.quantity })),
+      unchanged: result.movements.length === 0 && !result.itemsChanged,
+    };
+  } catch (err) {
+    if (err instanceof InsufficientStockError) {
+      throw AppError.badRequest('Tồn kho không đủ để xuất thiết bị', { items: err.items });
+    }
+    throw err;
+  }
+}
+
 export interface PicklistItemDTO {
   orderId: string;
   orderCode: string;
@@ -645,6 +732,7 @@ export const orderService = {
   createSettlement,
   closeOrder,
   confirmPreparedItems,
+  exportEquipment,
   listPicklists,
   markPicklistPickedUp,
 };

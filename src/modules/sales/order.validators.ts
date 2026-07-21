@@ -86,6 +86,10 @@ export const closeOrderBodySchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+export const exportEquipmentBodySchema = z.object({
+  notes: z.string().trim().optional(),
+});
+
 const confirmPreparedItemSchema = z.object({
   orderItemId: z.string().trim().min(1, 'orderItemId is required'),
   preparedQty: z.coerce.number().int().nonnegative('preparedQty must be >= 0'),
@@ -133,6 +137,7 @@ export type UpdateOrderItemBody = z.infer<typeof updateOrderItemBodySchema>;
 export type UpdateLiveChecklistBody = z.infer<typeof updateLiveChecklistBodySchema>;
 export type UpdateOrderQuotationBody = z.infer<typeof updateOrderQuotationBodySchema>;
 export type CloseOrderBody = z.infer<typeof closeOrderBodySchema>;
+export type ExportEquipmentBody = z.infer<typeof exportEquipmentBodySchema>;
 export type ConfirmPreparedItemsBody = z.infer<typeof confirmPreparedItemsBodySchema>;
 export type CreateDepositBody = z.infer<typeof createDepositBodySchema>;
 export type CreateSettlementBody = z.infer<typeof createSettlementBodySchema>;

@@ -346,6 +346,7 @@ async function confirmReport(reportId: string, confirmedBy: string): Promise<Rep
 
   const confirmed = await inventoryRepository.confirmReportAndApplyInventory(
     reportId,
+    report.orderId,
     confirmedBy,
     report.items.map((line) => ({
       itemId: line.itemId,

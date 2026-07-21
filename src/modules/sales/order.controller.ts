@@ -8,6 +8,7 @@ import type {
   CreateDepositBody,
   CreateOrderBody,
   CreateSettlementBody,
+  ExportEquipmentBody,
   ListOrdersQuery,
   ListPicklistsQuery,
   OrderIdParam,
@@ -146,6 +147,14 @@ async function markPicklistPickedUp(req: Request, res: Response) {
   ok(res, result);
 }
 
+async function exportEquipment(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { orderId } = req.params as unknown as OrderIdParam;
+  const body = req.body as ExportEquipmentBody;
+  const result = await orderService.exportEquipment(orderId, req.user.id, body.notes ?? null);
+  ok(res, result);
+}
+
 export const orderController = {
   list,
   getById,
@@ -164,6 +173,7 @@ export const orderController = {
   createSettlement,
   close,
   confirmPreparedItems,
+  exportEquipment,
   listPicklists,
   markPicklistPickedUp,
 };

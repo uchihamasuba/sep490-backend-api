@@ -376,7 +376,245 @@ export const orderRepository = {
       include: picklistInclude,
     });
   },
+
+  // Xuất thiết bị v2 — reconcile theo báo giá (docs/api/xuatthietbi_tubaogia_api.md mục 4.1, bản
+  // "CẬP NHẬT LẦN 2"): đồng bộ order_items theo quotation_items, rồi xuất bù/thu hồi phần chênh lệch
+  // tồn kho so với movement đã ghi cho đơn — tất cả trong CÙNG 1 transaction, chạy lặp lại an toàn.
+  // Prisma không expose SELECT...FOR UPDATE nên guard đồng thời bằng updateMany có điều kiện
+  // `quantityAvailable >= delta` — count=0 nghĩa là 1 request khác vừa trừ kho trước, rollback toàn bộ.
+  async exportEquipment(params: {
+    orderId: string;
+    performedBy: string;
+    notes: string | null;
+    quotationCode: string;
+    targetLines: ExportEquipmentTargetLine[];
+  }): Promise<ExportEquipmentResult> {
+    const { orderId, performedBy, notes, quotationCode, targetLines } = params;
+
+    // BUG mục 7 (docs/api/xuatthietbi_tubaogia_api.md): DB Aiven latency ~200ms/round-trip nên
+    // transaction phải (a) nới timeout khỏi mặc định 5000ms, (b) gộp INSERT thành createMany và đọc
+    // response cuối NGOÀI transaction để giảm số round-trip giữ transaction.
+    const { movements, itemsChanged } = await prisma.$transaction(
+      async (tx) => {
+      // ── Bước 1: đồng bộ order_items theo quotation_items (đối chiếu theo itemId) ──
+      const currentItems = await tx.orderItem.findMany({ where: { orderId } });
+      const currentByItem = new Map(currentItems.map((line) => [line.itemId, line]));
+      const targetByItem = new Map(targetLines.map((line) => [line.itemId, line]));
+
+      let itemsChanged = false;
+
+      const toDelete = currentItems.filter((line) => !targetByItem.has(line.itemId));
+      if (toDelete.length > 0) {
+        await tx.orderItem.deleteMany({ where: { orderItemId: { in: toDelete.map((line) => line.orderItemId) } } });
+        itemsChanged = true;
+      }
+
+      const toInsert = targetLines.filter((line) => !currentByItem.has(line.itemId));
+      if (toInsert.length > 0) {
+        await tx.orderItem.createMany({
+          data: toInsert.map((line) => ({
+            orderId,
+            itemId: line.itemId,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            subtotal: line.subtotal,
+            source: 'INTERNAL' as const,
+            preparedQty: 0,
+          })),
+        });
+        itemsChanged = true;
+      }
+
+      for (const line of targetLines) {
+        const existing = currentByItem.get(line.itemId);
+        if (!existing) {
+          continue; // đã INSERT gộp ở trên
+        }
+        if (
+          existing.quantity !== line.quantity ||
+          Number(existing.unitPrice) !== line.unitPrice ||
+          Number(existing.subtotal) !== line.subtotal
+        ) {
+          await tx.orderItem.update({
+            where: { orderItemId: existing.orderItemId },
+            data: {
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              subtotal: line.subtotal,
+              // Không để "đã bàn giao" vượt số lượng mới khi báo giá giảm SL (mục 4.1 bước 1).
+              preparedQty: Math.min(existing.preparedQty, line.quantity),
+            },
+          });
+          itemsChanged = true;
+        }
+      }
+
+      if (itemsChanged) {
+        const totalAmount = targetLines.reduce((sum, line) => sum + line.subtotal, 0);
+        await tx.order.update({ where: { orderId }, data: { totalAmount } });
+      }
+
+      // ── Bước 2: reconcile tồn kho theo delta = quantity đích − net đã xuất (OUTBOUND − INBOUND) ──
+      // Đích chỉ tính cho dòng INTERNAL (giữ source cũ; dòng mới mặc định INTERNAL). Vòng lặp đi trên
+      // hợp {item trong báo giá} ∪ {item có movement gắn đơn} để thu hồi cả item đã bị xóa khỏi báo giá.
+      const internalTargetByItem = new Map(
+        targetLines
+          .filter((line) => (currentByItem.get(line.itemId)?.source ?? 'INTERNAL') === 'INTERNAL')
+          .map((line) => [line.itemId, line.quantity]),
+      );
+
+      const movementAgg = await tx.inventoryMovement.groupBy({
+        by: ['itemId', 'movementType'],
+        where: { orderId },
+        _sum: { quantity: true },
+      });
+      const netExportedByItem = new Map<string, number>();
+      for (const row of movementAgg) {
+        const signed =
+          row.movementType === 'OUTBOUND'
+            ? (row._sum.quantity ?? 0)
+            : row.movementType === 'INBOUND'
+              ? -(row._sum.quantity ?? 0)
+              : 0;
+        netExportedByItem.set(row.itemId, (netExportedByItem.get(row.itemId) ?? 0) + signed);
+      }
+
+      const unionItemIds = [...new Set([...internalTargetByItem.keys(), ...netExportedByItem.keys()])];
+
+      const inventories = await tx.inventory.findMany({
+        where: { itemId: { in: unionItemIds } },
+        select: { itemId: true, quantityAvailable: true, quantityReserved: true },
+      });
+      const inventoryByItem = new Map(inventories.map((inv) => [inv.itemId, inv]));
+
+      // Tên item cho movement/lỗi: ưu tiên snapshot itemName của báo giá, fallback catalog cho item
+      // chỉ còn trong movement (đã bị xóa khỏi báo giá).
+      const nameByItem = new Map(targetLines.map((line) => [line.itemId, line.itemName]));
+      const unnamedIds = unionItemIds.filter((id) => !nameByItem.has(id));
+      if (unnamedIds.length > 0) {
+        const rows = await tx.item.findMany({ where: { itemId: { in: unnamedIds } }, select: { itemId: true, itemName: true } });
+        for (const row of rows) nameByItem.set(row.itemId, row.itemName);
+      }
+
+      const insufficient: { itemId: string; itemName: string; required: number; available: number }[] = [];
+      const movements: ExportEquipmentMovement[] = [];
+      const movementRows: {
+        itemId: string;
+        orderId: string;
+        movementType: 'OUTBOUND' | 'INBOUND';
+        quantity: number;
+        performedBy: string;
+        notes: string;
+      }[] = [];
+
+      for (const itemId of unionItemIds) {
+        const target = internalTargetByItem.get(itemId) ?? 0;
+        const delta = target - (netExportedByItem.get(itemId) ?? 0);
+        if (delta === 0) continue;
+
+        const itemName = nameByItem.get(itemId) ?? itemId;
+
+        if (delta > 0) {
+          // Item chưa có dòng inventory coi như available = 0 — báo thiếu luôn thay vì lỗi update mù mờ.
+          const available = inventoryByItem.get(itemId)?.quantityAvailable ?? 0;
+          if (available < delta) {
+            insufficient.push({ itemId, itemName, required: delta, available });
+            continue;
+          }
+          const updated = await tx.inventory.updateMany({
+            where: { itemId, quantityAvailable: { gte: delta } },
+            data: { quantityAvailable: { decrement: delta }, quantityReserved: { increment: delta } },
+          });
+          if (updated.count === 0) {
+            insufficient.push({ itemId, itemName, required: delta, available });
+            continue;
+          }
+          movementRows.push({
+            itemId,
+            orderId,
+            movementType: 'OUTBOUND',
+            quantity: delta,
+            performedBy,
+            notes: notes
+              ? `Xuất thiết bị theo báo giá ${quotationCode} — ${notes}`
+              : `Xuất thiết bị theo báo giá ${quotationCode}`,
+          });
+          movements.push({ itemId, itemName, quantity: delta, movementType: 'OUTBOUND' });
+        } else {
+          const recall = -delta;
+          // Clamp reserved về 0 — movement cũ có thể được ghi trước khi có cơ chế reserved theo đơn.
+          const reservedDelta = Math.min(inventoryByItem.get(itemId)?.quantityReserved ?? 0, recall);
+          await tx.inventory.updateMany({
+            where: { itemId },
+            data: { quantityAvailable: { increment: recall }, quantityReserved: { decrement: reservedDelta } },
+          });
+          movementRows.push({
+            itemId,
+            orderId,
+            movementType: 'INBOUND',
+            quantity: recall,
+            performedBy,
+            notes: `Thu hồi chênh lệch do đồng bộ báo giá ${quotationCode}`,
+          });
+          movements.push({ itemId, itemName, quantity: recall, movementType: 'INBOUND' });
+        }
+      }
+
+      // Gom đủ danh sách thiếu rồi mới throw — FE nhận trọn các dòng thiếu trong 1 lần (mục 4.2).
+      if (insufficient.length > 0) throw new InsufficientStockError(insufficient);
+
+      // 1 createMany cho toàn bộ movement thay vì N create rời (BUG mục 7.2).
+      if (movementRows.length > 0) {
+        await tx.inventoryMovement.createMany({ data: movementRows });
+      }
+
+      // ── Bước 3: cờ mức đơn — chỉ ghi đè khi lần chạy này thật sự có movement (mục 4.1 bước 3) ──
+      if (movements.length > 0) {
+        await tx.order.update({
+          where: { orderId },
+          data: { pickedUpAt: new Date(), pickedUpBy: performedBy },
+        });
+      }
+
+      return { movements, itemsChanged };
+      },
+      // DB Aiven ở xa (~200ms/round-trip): 5000ms mặc định vỡ ngay từ đơn 3 hạng mục (BUG mục 7.1).
+      { timeout: 20000, maxWait: 5000 },
+    );
+
+    // Đọc response NGOÀI transaction — detailInclude nặng, chỉ phục vụ build response (BUG mục 7.2).
+    const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
+    if (!order) throw new Error('Order not found after export-equipment — should be unreachable');
+    return { order, movements, itemsChanged };
+  },
 };
+
+export interface ExportEquipmentTargetLine {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
+export interface ExportEquipmentMovement {
+  itemId: string;
+  itemName: string;
+  quantity: number;
+  movementType: 'OUTBOUND' | 'INBOUND';
+}
+
+export interface ExportEquipmentResult {
+  order: OrderWithDetails;
+  movements: ExportEquipmentMovement[];
+  itemsChanged: boolean;
+}
+
+export class InsufficientStockError extends Error {
+  constructor(readonly items: { itemId: string; itemName: string; required: number; available: number }[]) {
+    super('Tồn kho không đủ để xuất thiết bị');
+  }
+}
 
 // ============================================================================
 // Picklists (docs/api/picklistxuatkho_api.md) — luôn cố định orderStatus IN (CONFIRMED, IN_PROGRESS),

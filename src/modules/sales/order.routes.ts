@@ -9,6 +9,7 @@ import {
   createDepositBodySchema,
   createOrderBodySchema,
   createSettlementBodySchema,
+  exportEquipmentBodySchema,
   listOrdersQuerySchema,
   listPicklistsQuerySchema,
   orderIdParamSchema,
@@ -154,6 +155,16 @@ router.put(
   requireRole('MANAGER'),
   validate(orderIdParamSchema, 'params'),
   asyncHandler(orderController.markPicklistPickedUp),
+);
+
+// Xuất thiết bị (luồng nhanh từ màn chi tiết báo giá — docs/api/xuatthietbi_tubaogia_api.md):
+// khác picklist/picked-up ở chỗ có hiệu ứng tồn kho thật + điều kiện nới (mục 4.2 tài liệu đó).
+router.post(
+  '/:orderId/export-equipment',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(exportEquipmentBodySchema, 'body'),
+  asyncHandler(orderController.exportEquipment),
 );
 
 router.put(

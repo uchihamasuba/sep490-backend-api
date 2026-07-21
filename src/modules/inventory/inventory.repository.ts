@@ -191,45 +191,60 @@ export const inventoryRepository = {
     });
   },
 
-  // Xác nhận báo cáo + áp dụng hiệu ứng tồn kho (available += good, damaged += damaged, total -= lost)
-  // + ghi 1 dòng inventory_movements(INBOUND)/item trong CÙNG 1 transaction — đảm bảo không có trạng
-  // thái "đã confirm report nhưng chưa cập nhật tồn kho" nếu 1 bước giữa chừng lỗi.
+  // Xác nhận báo cáo + áp dụng hiệu ứng tồn kho (available += good, damaged += damaged, total -= lost,
+  // reserved -= toàn bộ số về) + ghi 1 dòng inventory_movements(INBOUND)/item trong CÙNG 1 transaction —
+  // đảm bảo không có trạng thái "đã confirm report nhưng chưa cập nhật tồn kho" nếu 1 bước giữa chừng lỗi.
   async confirmReportAndApplyInventory(
     reportId: string,
+    orderId: string,
     confirmedBy: string,
     items: { itemId: string; goodQuantity: number; damagedQuantity: number; lostQuantity: number }[],
   ): Promise<ReportWithDetails> {
-    await prisma.$transaction([
-      prisma.collectedEquipmentReport.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.collectedEquipmentReport.update({
         where: { reportId },
         data: { status: 'CONFIRMED', confirmedBy, confirmedAt: new Date() },
-      }),
-      ...items.map((line) =>
-        prisma.inventory.update({
+      });
+
+      for (const line of items) {
+        // Hoàn lại phần "đang giữ cho đơn" đã cộng lúc xuất thiết bị (OUTBOUND — xem
+        // order.repository.ts#exportEquipment): mọi thiết bị về (tốt/hỏng/mất) đều rời trạng thái
+        // reserved. Clamp về 0 vì có biên bản thu hồi cho đơn chưa từng đi qua luồng export
+        // (dữ liệu trước khi có endpoint, hoặc reserve thủ công không theo đơn).
+        const inv = await tx.inventory.findUnique({
+          where: { itemId: line.itemId },
+          select: { quantityReserved: true },
+        });
+        const returnedTotal = line.goodQuantity + line.damagedQuantity + line.lostQuantity;
+        const reservedDelta = Math.min(inv?.quantityReserved ?? 0, returnedTotal);
+        await tx.inventory.update({
           where: { itemId: line.itemId },
           data: {
             quantityAvailable: { increment: line.goodQuantity },
             quantityDamaged: { increment: line.damagedQuantity },
             quantityTotal: { decrement: line.lostQuantity },
+            quantityReserved: { decrement: reservedDelta },
           },
-        }),
-      ),
-      ...items
-        .filter((line) => line.goodQuantity + line.damagedQuantity > 0)
-        .map((line) =>
-          prisma.inventoryMovement.create({
-            data: {
-              itemId: line.itemId,
-              reportId,
-              orderId: null,
-              movementType: 'INBOUND',
-              quantity: line.goodQuantity + line.damagedQuantity,
-              performedBy: confirmedBy,
-              notes: 'Nhập kho từ biên bản thu hồi thiết bị',
-            },
-          }),
-        ),
-    ]);
+        });
+      }
+
+      // Set order_id (trước đây NULL) để công thức net_exported của export-equipment v2 phản ánh
+      // "đồ đã về kho thì được phép xuất lại" — docs/api/xuatthietbi_tubaogia_api.md mục 4.1 bước 2.1.
+      const movementLines = items.filter((line) => line.goodQuantity + line.damagedQuantity > 0);
+      if (movementLines.length > 0) {
+        await tx.inventoryMovement.createMany({
+          data: movementLines.map((line) => ({
+            itemId: line.itemId,
+            reportId,
+            orderId,
+            movementType: 'INBOUND' as const,
+            quantity: line.goodQuantity + line.damagedQuantity,
+            performedBy: confirmedBy,
+            notes: 'Nhập kho từ biên bản thu hồi thiết bị',
+          })),
+        });
+      }
+    });
 
     const report = await prisma.collectedEquipmentReport.findUnique({ where: { reportId }, include: reportInclude });
     if (!report) throw new Error('Report not found after confirm — should be unreachable');
