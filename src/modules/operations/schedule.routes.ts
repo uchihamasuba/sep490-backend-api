@@ -6,7 +6,9 @@ import { scheduleController } from './schedule.controller';
 import {
   addAssigneeBodySchema,
   assigneeParamSchema,
+  attachEvidenceBodySchema,
   batchUpdateSchedulePlanStatusBodySchema,
+  checkInBodySchema,
   createSchedulePlanBodySchema,
   createSchedulePlansBatchBodySchema,
   listSchedulePlansQuerySchema,
@@ -68,12 +70,12 @@ scheduleRouter.patch(
   asyncHandler(scheduleController.updateStatusBatch),
 );
 
-// Phân quyền theo trạng thái đích được kiểm tra chi tiết ở service (CONFIRMED/CANCELLED: Manager;
-// IN_PROGRESS/COMPLETED: Leader/Technical đang được phân công) — route chỉ chặn trước các role chắc
-// chắn không bao giờ được phép (ADMIN chỉ xem/audit theo docs/api/lichtrinhkythuat_api.md mục 0).
+// Chỉ Manager (xác nhận/hủy kế hoạch) — đã chốt ở docs/api/more-require.md mục (ae) (2026-07-21):
+// IN_PROGRESS/COMPLETED không còn là transition Leader/Technical tự gọi tay qua endpoint này nữa, mà tự
+// suy ra ở tầng service khi assignee LEAD check-in/check-out (xem scheduleController.checkIn/checkOut).
 scheduleRouter.patch(
   '/:planId/status',
-  requireRole('MANAGER', 'LEADER', 'TECHNICAL'),
+  requireRole('MANAGER'),
   validate(planIdParamSchema, 'params'),
   validate(updateSchedulePlanStatusBodySchema, 'body'),
   asyncHandler(scheduleController.updateStatus),
@@ -98,6 +100,7 @@ scheduleRouter.post(
   '/:planId/assignees/:userId/check-in',
   requireRole('LEADER', 'TECHNICAL'),
   validate(assigneeParamSchema, 'params'),
+  validate(checkInBodySchema, 'body'),
   asyncHandler(scheduleController.checkIn),
 );
 
@@ -106,6 +109,17 @@ scheduleRouter.post(
   requireRole('LEADER', 'TECHNICAL'),
   validate(assigneeParamSchema, 'params'),
   asyncHandler(scheduleController.checkOut),
+);
+
+// Gắn schedule_plans.evidence_id độc lập với transition status (docs/api/more-require.md mục (ag)) —
+// thay cho đường cũ PATCH .../status { COMPLETED, evidenceId } không còn dùng được. Không bắt buộc,
+// không gắn với trạng thái nào — bất kỳ ai được phân công vào plan (LEAD/TECHNICAL) đều gắn được.
+scheduleRouter.patch(
+  '/:planId/evidence',
+  requireRole('LEADER', 'TECHNICAL'),
+  validate(planIdParamSchema, 'params'),
+  validate(attachEvidenceBodySchema, 'body'),
+  asyncHandler(scheduleController.attachEvidence),
 );
 
 // Mounted at /api/v1/work-tasks

@@ -59,6 +59,7 @@ function fakeItem(overrides: Partial<Item> = {}): Item {
     status: 'ACTIVE',
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
+    components: null,
     ...overrides,
   };
 }
@@ -216,6 +217,26 @@ describe('orderService.createOrder', () => {
 
     expect(result).toEqual({ orderId: 'ord-1', orderCode: 'ORD-002' });
   });
+
+  it('allows creating an order with an empty items array (items decided later at the quotation step)', async () => {
+    mockedCustomerRepo.findById.mockResolvedValue(fakeCustomer() as never);
+    mockedOrderRepo.findItemsByIds.mockResolvedValue([]);
+    mockedOrderRepo.generateNextOrderCode.mockResolvedValue('ORD-003');
+    mockedOrderRepo.create.mockResolvedValue(buildOrderRow({ orderCode: 'ORD-003', items: [] }) as never);
+
+    const result = await orderService.createOrder(
+      {
+        customerId: 'cus-1',
+        eventType: 'Conference',
+        eventDate: new Date('2026-08-15T09:00:00Z'),
+        location: 'Hall A',
+        items: [],
+      } as never,
+      'user-1',
+    );
+
+    expect(result).toEqual({ orderId: 'ord-1', orderCode: 'ORD-003' });
+  });
 });
 
 describe('orderService.updateOrderStatus / updateOrderItems — terminal-state guard', () => {
@@ -304,7 +325,12 @@ describe('orderService.listOrders', () => {
 });
 
 describe('HTTP routes', () => {
-  it('POST /api/v1/orders rejects an empty items array with 400', async () => {
+  it('POST /api/v1/orders allows creating an order with an empty items array', async () => {
+    mockedCustomerRepo.findById.mockResolvedValue(fakeCustomer() as never);
+    mockedOrderRepo.findItemsByIds.mockResolvedValue([]);
+    mockedOrderRepo.generateNextOrderCode.mockResolvedValue('ORD-004');
+    mockedOrderRepo.create.mockResolvedValue(buildOrderRow({ orderCode: 'ORD-004', items: [] }) as never);
+
     const res = await request(app)
       .post('/api/v1/orders')
       .set('Authorization', authHeader())
@@ -316,8 +342,28 @@ describe('HTTP routes', () => {
         items: [],
       });
 
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.status).toBe(201);
+    expect(res.body.data).toEqual({ orderId: 'ord-1', orderCode: 'ORD-004' });
+  });
+
+  it('POST /api/v1/orders allows creating an order without an items field at all', async () => {
+    mockedCustomerRepo.findById.mockResolvedValue(fakeCustomer() as never);
+    mockedOrderRepo.findItemsByIds.mockResolvedValue([]);
+    mockedOrderRepo.generateNextOrderCode.mockResolvedValue('ORD-005');
+    mockedOrderRepo.create.mockResolvedValue(buildOrderRow({ orderCode: 'ORD-005', items: [] }) as never);
+
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', authHeader())
+      .send({
+        customerId: 'cus-1',
+        eventType: 'Conference',
+        eventDate: '2026-08-15T09:00:00Z',
+        location: 'Hall A',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toEqual({ orderId: 'ord-1', orderCode: 'ORD-005' });
   });
 
   it('POST /api/v1/orders is forbidden for non-Manager roles', async () => {

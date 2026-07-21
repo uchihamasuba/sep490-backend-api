@@ -185,13 +185,6 @@ export const scheduleRepository = {
     return prisma.schedulePlan.findMany({ where: { planId: { in: planIds } }, include: detailInclude });
   },
 
-  findAssignee(planId: string, userId: string) {
-    return prisma.schedulePlanAssignee.findUnique({
-      where: { planId_userId: { planId, userId } },
-      include: { attendance: true },
-    });
-  },
-
   addAssignee(planId: string, userId: string, role: PlanMemberRole) {
     return prisma.schedulePlanAssignee.create({ data: { planId, userId, role } });
   },
@@ -200,16 +193,20 @@ export const scheduleRepository = {
     return prisma.schedulePlanAssignee.delete({ where: { planId_userId: { planId, userId } } });
   },
 
-  checkIn(assigneeId: string) {
+  checkIn(assigneeId: string, checkInEvidenceId?: string) {
     return prisma.attendance.upsert({
       where: { assigneeId },
-      create: { assigneeId, checkInAt: new Date() },
-      update: { checkInAt: new Date() },
+      create: { assigneeId, checkInAt: new Date(), checkInEvidenceId },
+      update: { checkInAt: new Date(), checkInEvidenceId },
     });
   },
 
   checkOut(assigneeId: string) {
     return prisma.attendance.update({ where: { assigneeId }, data: { checkOutAt: new Date() } });
+  },
+
+  attachEvidence(planId: string, evidenceId: string) {
+    return prisma.schedulePlan.update({ where: { planId }, data: { evidenceId } });
   },
 
   listWorkTasks() {

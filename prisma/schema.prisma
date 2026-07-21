@@ -333,6 +333,11 @@ model Item {
   status         ItemStatus @default(ACTIVE)
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  // Baseline theo DB thật (docs/api/more-require.md mục (ag)) — cột đã tồn tại sẵn trên DB dùng chung,
+  // chưa có migration nào commit trước lượt này. Chưa có dữ liệu/shape thật (toàn bộ NULL) — dự phòng
+  // cho hướng BOM "1 item combo gồm nhiều item con" từng nêu ở docs/xemchitietbaogia_api.md mục 3.1
+  // (chưa chốt shape JSON cụ thể, chưa có code nào đọc/ghi cột này).
+  components     Json?      @db.Json
 
   type                          ItemType                       @relation(fields: [typeId], references: [typeId], onDelete: Restrict)
   quotationItems                QuotationItem[]
@@ -424,36 +429,36 @@ model QuotationItem {
 // ============================================================================
 
 model Order {
-  orderId       String        @id @default(dbgenerated("(uuid())")) @map("order_id") @db.VarChar(36)
-  orderCode     String        @unique @map("order_code") @db.VarChar(50)
-  customerId    String        @map("customer_id") @db.VarChar(36)
-  quotationId   String?       @map("quotation_id") @db.VarChar(36)
-  policyId      String?       @map("policy_id") @db.VarChar(36)
-  eventType     String        @map("event_type") @db.VarChar(100)
-  eventName     String?       @map("event_name") @db.VarChar(255)
-  eventDate     DateTime      @map("event_date") @db.Timestamp(0)
-  location      String        @db.Text
+  orderId           String        @id @default(dbgenerated("(uuid())")) @map("order_id") @db.VarChar(36)
+  orderCode         String        @unique @map("order_code") @db.VarChar(50)
+  customerId        String        @map("customer_id") @db.VarChar(36)
+  quotationId       String?       @map("quotation_id") @db.VarChar(36)
+  policyId          String?       @map("policy_id") @db.VarChar(36)
+  eventType         String        @map("event_type") @db.VarChar(100)
+  eventName         String?       @map("event_name") @db.VarChar(255)
+  eventDate         DateTime      @map("event_date") @db.Timestamp(0)
+  location          String        @db.Text
   /// CHECK (guest_count >= 0) trong DDL — validate ở Zod.
-  guestCount    Int?          @map("guest_count")
-  totalAmount   Decimal       @default(0) @map("total_amount") @db.Decimal(14, 2)
-  paymentStatus PaymentStatus @default(UNPAID) @map("payment_status")
-  orderStatus   OrderStatus   @default(NEW) @map("order_status")
-  cancelReason  String?       @map("cancel_reason") @db.Text
-  notes         String?       @db.Text
-  createdBy     String        @map("created_by") @db.VarChar(36)
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  guestCount        Int?          @map("guest_count")
+  totalAmount       Decimal       @default(0) @map("total_amount") @db.Decimal(14, 2)
+  paymentStatus     PaymentStatus @default(UNPAID) @map("payment_status")
+  orderStatus       OrderStatus   @default(NEW) @map("order_status")
+  cancelReason      String?       @map("cancel_reason") @db.Text
+  notes             String?       @db.Text
+  createdBy         String        @map("created_by") @db.VarChar(36)
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt         DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
   /// Mốc 4 "Live Show" (docs/api/tiendosukien_api.md mục 5, đã chốt hướng A) — checklist thao tác nhanh
   /// { backdrop, soundTest, powerBackup, operatorReady }, không có audit ai/lúc nào tick từng mục.
-  liveShowChecklist Json?     @map("live_show_checklist")
+  liveShowChecklist Json?         @map("live_show_checklist")
   /// Mốc 6 "Đóng đơn hàng" (docs/api/tiendosukien_api.md mục 7, đã chốt hướng A) — cờ độc lập lớp trên
   /// OrderStatus.COMPLETED, không thêm giá trị enum mới.
-  closedAt      DateTime?     @map("closed_at") @db.Timestamp(0)
-  closedBy      String?       @map("closed_by") @db.VarChar(36)
+  closedAt          DateTime?     @map("closed_at") @db.Timestamp(0)
+  closedBy          String?       @map("closed_by") @db.VarChar(36)
   /// "Đã xuất kho" cho picklist (docs/api/picklistxuatkho_api.md mục 4) — cột mới nhỏ, không escalate
   /// more-require.md (cùng mức với closedAt/closedBy).
-  pickedUpAt    DateTime?     @map("picked_up_at") @db.Timestamp(0)
-  pickedUpBy    String?       @map("picked_up_by") @db.VarChar(36)
+  pickedUpAt        DateTime?     @map("picked_up_at") @db.Timestamp(0)
+  pickedUpBy        String?       @map("picked_up_by") @db.VarChar(36)
 
   customer                  Customer                   @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
   quotation                 Quotation?                 @relation(fields: [quotationId], references: [quotationId], onDelete: SetNull)

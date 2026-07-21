@@ -40,6 +40,7 @@ export interface SchedulePlanDTO {
   endTime: string | null;
   location: string | null;
   status: ScheduleStatus;
+  evidenceId: string | null;
   notes: string | null;
   assignees: AssigneeDTO[];
 }
@@ -86,6 +87,7 @@ function mapPlan(row: SchedulePlanWithDetails): SchedulePlanDTO {
     endTime: row.endTime ? row.endTime.toISOString() : null,
     location: row.location,
     status: row.status,
+    evidenceId: row.evidenceId,
     notes: row.notes,
     assignees: row.assignees.map(mapAssignee),
   };
@@ -107,6 +109,16 @@ async function validateAssigneeInputs(assignees: { userId: string; role: PlanMem
         role: user.role,
       });
     }
+  }
+}
+
+// Tối đa 1 LEAD/plan (Note gốc của schedule_plan_assignees trong docs/schema.full.dbml, xác nhận lại ở
+// docs/api/more-require.md mục (ae) điểm 3) — bắt buộc phải đúng 1 LEAD để suy status tự động từ đúng 1
+// mốc chấm công duy nhất khi có nhiều assignee trên cùng 1 plan.
+function assertAtMostOneLead(assignees: { role: PlanMemberRole }[]): void {
+  const leadCount = assignees.filter((a) => a.role === 'LEAD').length;
+  if (leadCount > 1) {
+    throw AppError.badRequest('Mỗi kế hoạch chỉ được phân công tối đa 1 người vai trò LEAD');
   }
 }
 
@@ -150,6 +162,7 @@ async function createSchedulePlan(body: CreateSchedulePlanBody, createdBy: strin
   if (!task) throw AppError.notFound('Work task not found');
 
   await validateAssigneeInputs(body.assignees);
+  assertAtMostOneLead(body.assignees);
 
   const planCode = await scheduleRepository.generateNextPlanCode();
   const created = await scheduleRepository.create({
@@ -182,44 +195,25 @@ async function updateSchedulePlan(planId: string, body: UpdateSchedulePlanBody):
   return mapPlan(updated);
 }
 
-// Ranh giới vai trò đã chốt ở docs/api/lichtrinhkythuat_api.md mục 0: Manager xác nhận/hủy kế hoạch trên
-// web; chuyển IN_PROGRESS/COMPLETED là việc Leader/Technical (hiện trường, qua mobile) tự cập nhật.
+// Ranh giới vai trò đã chốt ở docs/api/more-require.md mục (ae) (2026-07-21): endpoint này giờ CHỈ còn
+// 2 transition Manager tự gọi tay trên web (CONFIRMED/CANCELLED — validator đã chặn IN_PROGRESS/
+// COMPLETED ở tầng schema). Chuyển IN_PROGRESS/COMPLETED không còn qua đây nữa — service tự suy ra từ
+// chấm công của assignee LEAD khi gọi checkIn/checkOut bên dưới.
 async function updateSchedulePlanStatus(
   planId: string,
   body: UpdateSchedulePlanStatusBody,
   actor: Actor,
 ): Promise<SchedulePlanDTO> {
+  if (actor.role !== 'MANAGER') {
+    throw AppError.forbidden('Chỉ Manager được xác nhận hoặc hủy kế hoạch');
+  }
+
   const existing = await findPlanOrThrow(planId);
-
-  const isManagerTransition = body.status === 'CONFIRMED' || body.status === 'CANCELLED';
-  const isFieldStaffTransition = body.status === 'IN_PROGRESS' || body.status === 'COMPLETED';
-
-  if (isManagerTransition) {
-    if (actor.role !== 'MANAGER') {
-      throw AppError.forbidden('Chỉ Manager được xác nhận hoặc hủy kế hoạch');
-    }
-    if (body.status === 'CONFIRMED' && existing.status !== 'PENDING') {
-      throw AppError.badRequest('Chỉ có thể xác nhận kế hoạch đang ở trạng thái PENDING');
-    }
-    if (body.status === 'CANCELLED' && TERMINAL_OR_LOCKED_STATUSES.includes(existing.status)) {
-      throw AppError.badRequest(`Không thể hủy kế hoạch đang ở trạng thái ${existing.status}`);
-    }
-  } else if (isFieldStaffTransition) {
-    if (actor.role !== 'LEADER' && actor.role !== 'TECHNICAL') {
-      throw AppError.forbidden('Chỉ Leader/Technical được cập nhật tiến độ thi công');
-    }
-    const isAssigned = existing.assignees.some((a) => a.userId === actor.id);
-    if (!isAssigned) {
-      throw AppError.forbidden('Chỉ nhân sự được phân công vào kế hoạch này mới được cập nhật trạng thái');
-    }
-    if (body.status === 'IN_PROGRESS' && existing.status !== 'CONFIRMED') {
-      throw AppError.badRequest('Chỉ có thể bắt đầu thi công khi kế hoạch đã CONFIRMED');
-    }
-    if (body.status === 'COMPLETED' && existing.status !== 'IN_PROGRESS') {
-      throw AppError.badRequest('Chỉ có thể hoàn thành khi kế hoạch đang IN_PROGRESS');
-    }
-  } else {
-    throw AppError.badRequest(`Không hỗ trợ chuyển trạng thái về ${body.status} qua endpoint này`);
+  if (body.status === 'CONFIRMED' && existing.status !== 'PENDING') {
+    throw AppError.badRequest('Chỉ có thể xác nhận kế hoạch đang ở trạng thái PENDING');
+  }
+  if (body.status === 'CANCELLED' && TERMINAL_OR_LOCKED_STATUSES.includes(existing.status)) {
+    throw AppError.badRequest(`Không thể hủy kế hoạch đang ở trạng thái ${existing.status}`);
   }
 
   const updated = await scheduleRepository.updateStatus(planId, body.status, body.notes, body.evidenceId);
@@ -239,6 +233,10 @@ async function addAssignee(planId: string, body: AddAssigneeBody): Promise<Sched
     throw new AppError(409, 'ALREADY_ASSIGNED', 'Nhân sự này đã được phân công vào kế hoạch');
   }
 
+  if (body.role === 'LEAD' && existing.assignees.some((a) => a.role === 'LEAD')) {
+    throw new AppError(409, 'LEAD_ALREADY_ASSIGNED', 'Kế hoạch này đã có người vai trò LEAD');
+  }
+
   await scheduleRepository.addAssignee(planId, body.userId, body.role);
   return getSchedulePlanById(planId);
 }
@@ -256,18 +254,32 @@ async function removeAssignee(planId: string, userId: string): Promise<ScheduleP
   return getSchedulePlanById(planId);
 }
 
-async function checkIn(planId: string, userId: string, actor: Actor): Promise<SchedulePlanDTO> {
+// Đã chốt ở docs/api/more-require.md mục (ae) (2026-07-21): status tự suy ra từ chấm công của assignee
+// LEAD (chỉ đúng 1 người/plan, xem assertAtMostOneLead) — check-in của LEAD đưa plan sang IN_PROGRESS,
+// check-out của LEAD đưa plan sang COMPLETED. Check-in/check-out của TECHNICAL chỉ ghi nhận chấm công cá
+// nhân, không đụng tới status. Bỏ qua khi plan đã CANCELLED để không hồi sinh 1 kế hoạch đã hủy.
+async function checkIn(
+  planId: string,
+  userId: string,
+  actor: Actor,
+  checkInEvidenceId?: string,
+): Promise<SchedulePlanDTO> {
   if (actor.id !== userId) {
     throw AppError.forbidden('Chỉ chính nhân sự được phân công mới được check-in cho bản thân');
   }
 
-  const assignee = await scheduleRepository.findAssignee(planId, userId);
+  const plan = await findPlanOrThrow(planId);
+  const assignee = plan.assignees.find((a) => a.userId === userId);
   if (!assignee) throw AppError.notFound('Assignee not found on this schedule plan');
   if (assignee.attendance?.checkInAt) {
     throw AppError.badRequest('Đã check-in trước đó');
   }
 
-  await scheduleRepository.checkIn(assignee.assigneeId);
+  await scheduleRepository.checkIn(assignee.assigneeId, checkInEvidenceId);
+  if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
+    await scheduleRepository.updateStatus(planId, 'IN_PROGRESS', undefined, undefined);
+  }
+
   return getSchedulePlanById(planId);
 }
 
@@ -276,7 +288,8 @@ async function checkOut(planId: string, userId: string, actor: Actor): Promise<S
     throw AppError.forbidden('Chỉ chính nhân sự được phân công mới được check-out cho bản thân');
   }
 
-  const assignee = await scheduleRepository.findAssignee(planId, userId);
+  const plan = await findPlanOrThrow(planId);
+  const assignee = plan.assignees.find((a) => a.userId === userId);
   if (!assignee) throw AppError.notFound('Assignee not found on this schedule plan');
   if (!assignee.attendance?.checkInAt) {
     throw AppError.badRequest('Chưa check-in, không thể check-out');
@@ -286,6 +299,25 @@ async function checkOut(planId: string, userId: string, actor: Actor): Promise<S
   }
 
   await scheduleRepository.checkOut(assignee.assigneeId);
+  if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
+    await scheduleRepository.updateStatus(planId, 'COMPLETED', undefined, undefined);
+  }
+
+  return getSchedulePlanById(planId);
+}
+
+// Gắn schedule_plans.evidence_id độc lập với transition status (docs/api/more-require.md mục (ag)) —
+// thay cho đường cũ PATCH .../status { COMPLETED, evidenceId } không còn dùng được. Không bắt buộc,
+// không gắn điều kiện status nào ("tách biệt hoàn toàn") — bất kỳ assignee nào (LEAD/TECHNICAL) của plan
+// đều gắn được, không riêng người check-in/out.
+async function attachEvidence(planId: string, evidenceId: string, actor: Actor): Promise<SchedulePlanDTO> {
+  const plan = await findPlanOrThrow(planId);
+  const isAssigned = plan.assignees.some((a) => a.userId === actor.id);
+  if (!isAssigned) {
+    throw AppError.forbidden('Chỉ nhân sự được phân công vào kế hoạch này mới được gắn ảnh minh chứng');
+  }
+
+  await scheduleRepository.attachEvidence(planId, evidenceId);
   return getSchedulePlanById(planId);
 }
 
@@ -320,6 +352,7 @@ async function createSchedulePlansBatch(body: CreateSchedulePlansBatchBody, crea
     const task = await scheduleRepository.taskExists(plan.taskId);
     if (!task) throw AppError.notFound(`Work task not found: ${plan.taskId}`, { taskId: plan.taskId });
     await validateAssigneeInputs(plan.assignees);
+    assertAtMostOneLead(plan.assignees);
   }
 
   const created = await scheduleRepository.createBatch(
@@ -387,6 +420,7 @@ export const scheduleService = {
   removeAssignee,
   checkIn,
   checkOut,
+  attachEvidence,
   listWorkTasks,
   deleteSchedulePlan,
   createSchedulePlansBatch,

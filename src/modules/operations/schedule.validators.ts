@@ -59,13 +59,30 @@ export const updateSchedulePlanBodySchema = z
     path: ['endTime'],
   });
 
+// IN_PROGRESS/COMPLETED KHÔNG còn là input hợp lệ ở đây (docs/api/more-require.md mục (ae), đã chốt
+// 2026-07-21) — 2 giá trị này giờ được service tự suy ra từ chấm công (attendances) của assignee LEAD
+// khi gọi check-in/check-out, không còn là transition Leader/Technical tự PATCH tay qua endpoint này.
 export const updateSchedulePlanStatusBodySchema = z.object({
-  status: scheduleStatusEnum,
+  status: z.enum(['CONFIRMED', 'CANCELLED']),
   notes: z.string().trim().optional(),
   evidenceId: z.string().trim().min(1).optional(),
 });
 
 export const addAssigneeBodySchema = assigneeInputSchema;
+
+// POST /schedule-plans/:planId/assignees/:userId/check-in — ảnh minh chứng chỉ chụp lúc bắt đầu (đã chốt
+// ở docs/api/more-require.md mục (ag)), dùng đúng cột attendances.check_in_evidence_id có sẵn. Check-out
+// KHÔNG nhận evidenceId (không thêm cột check_out_evidence_id).
+export const checkInBodySchema = z.object({
+  checkInEvidenceId: z.string().trim().min(1).optional(),
+});
+
+// PATCH /schedule-plans/:planId/evidence — gắn schedule_plans.evidence_id độc lập với transition status
+// (đã chốt ở docs/api/more-require.md mục (ag), thay cho đường cũ PATCH .../status { COMPLETED,
+// evidenceId } không còn dùng được). Không bắt buộc, nhân viên tự gắn khi có ảnh.
+export const attachEvidenceBodySchema = z.object({
+  evidenceId: z.string().trim().min(1, 'evidenceId is required'),
+});
 
 // POST /schedule-plans/batch — tạo nhiều dòng cùng orderId trong 1 transaction (docs/api/
 // kehoachvaphancong_api.md mục 8.5 điểm 2), tránh trạng thái lưu dở dang nếu gọi POST tuần tự bị lỗi
@@ -100,6 +117,8 @@ export const batchUpdateSchedulePlanStatusBodySchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+export type CheckInBody = z.infer<typeof checkInBodySchema>;
+export type AttachEvidenceBody = z.infer<typeof attachEvidenceBodySchema>;
 export type PlanIdParam = z.infer<typeof planIdParamSchema>;
 export type BatchUpdateSchedulePlanStatusBody = z.infer<typeof batchUpdateSchedulePlanStatusBodySchema>;
 export type AssigneeParam = z.infer<typeof assigneeParamSchema>;

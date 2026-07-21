@@ -5,7 +5,9 @@ import { scheduleService } from './schedule.service';
 import type {
   AddAssigneeBody,
   AssigneeParam,
+  AttachEvidenceBody,
   BatchUpdateSchedulePlanStatusBody,
+  CheckInBody,
   CreateSchedulePlanBody,
   CreateSchedulePlansBatchBody,
   ListSchedulePlansQuery,
@@ -69,7 +71,8 @@ async function removeAssignee(req: Request, res: Response) {
 async function checkIn(req: Request, res: Response) {
   const actor = requireActor(req);
   const { planId, userId } = req.params as unknown as AssigneeParam;
-  const plan = await scheduleService.checkIn(planId, userId, actor);
+  const body = req.body as CheckInBody;
+  const plan = await scheduleService.checkIn(planId, userId, actor, body.checkInEvidenceId);
   ok(res, plan);
 }
 
@@ -77,6 +80,14 @@ async function checkOut(req: Request, res: Response) {
   const actor = requireActor(req);
   const { planId, userId } = req.params as unknown as AssigneeParam;
   const plan = await scheduleService.checkOut(planId, userId, actor);
+  ok(res, plan);
+}
+
+async function attachEvidence(req: Request, res: Response) {
+  const actor = requireActor(req);
+  const { planId } = req.params as unknown as PlanIdParam;
+  const body = req.body as AttachEvidenceBody;
+  const plan = await scheduleService.attachEvidence(planId, body.evidenceId, actor);
   ok(res, plan);
 }
 
@@ -114,6 +125,7 @@ export const scheduleController = {
   removeAssignee,
   checkIn,
   checkOut,
+  attachEvidence,
   listWorkTasks,
   remove,
   createBatch,

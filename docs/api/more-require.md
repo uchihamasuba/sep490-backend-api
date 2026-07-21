@@ -1202,3 +1202,248 @@ tồn đọng riêng, chưa xử lý ở lần sửa này.
   đầu implement — quan trọng hơn việc đối chiếu tên cột/enum chi tiết (doc gốc mục 0).
 - **Trạng thái**: không có thay đổi code. Xác nhận lại bằng `curl` với backend thật đang chạy
   (2026-07-21).
+
+## (ae) Chấm công theo `schedule_plan_assignees` (check-in/check-out từng người) — endpoint ghi chưa xác nhận hoạt động, model FE cũ lệch schema thật, chưa chốt nghiệp vụ tự chuyển trạng thái
+
+- **Màn liên quan**: khối "Lịch thi công & đơn vị phụ trách kỹ thuật" (tab "Lịch trình & Kỹ thuật",
+  `/manager/orders/[id]`) — xem [`docs/lichtrinhkythuat_api.md`](lichtrinhkythuat_api.md) mục 0/1/6/7 —
+  và rộng hơn là nghiệp vụ **Chấm công (Attendance)** ở CLAUDE.md mục 1 (2 lớp xác nhận trước khi tính
+  lương: Technical Staff tự check-in → Leader Staff xác nhận điểm danh & hoàn thành việc → Manager xác
+  nhận tổng hợp công/lương cuối cùng).
+- **Schema thật do người dùng cung cấp (2026-07-21), khác hẳn giả định cũ ở `src/types/attendance.ts`**:
+
+  ```text
+  attendances: attendance_id PK, assignee_id (FK → schedule_plan_assignees.assignee_id),
+    check_in_at, check_in_evidence_id, check_out_at, note, created_at, updated_at
+  schedule_plan_assignees: assignee_id PK, plan_id, user_id, role ENUM('LEAD','TECHNICAL'),
+    notes, created_at
+  ```
+
+  Tức 1 dòng `attendances` gắn với **1 dòng `schedule_plan_assignees`** (1 người trong 1 plan cụ thể),
+  không phải gắn trực tiếp `planId`+`userId` như `src/types/attendance.ts` hiện khai báo
+  (`attendanceId, planId, userId, checkInAt, checkInEvidenceId, checkOutAt, note...`). Type FE này viết
+  từ nguồn `D:\bnwems-backend-api` — **backend sai**, đã bị cảnh báo lỗi thời ở đầu file này (dòng
+  7-19) — cần viết lại theo đúng `assignee_id` làm khóa liên kết.
+
+  - **Tin đã xác nhận qua curl thật (2026-07-20/21)**: chiều **đọc** đã hoạt động đúng — mỗi phần tử
+    `assignees[]` trong response `GET /api/v1/schedule-plans` đã có sẵn `checkInAt`/`checkOutAt` theo
+    từng người (xem `src/types/schedulePlan.ts:35`, mục (aa) ở trên) — khớp đúng việc join
+    `schedule_plan_assignees` ⋈ `attendances` theo `assignee_id`. Không cần Backend làm gì thêm cho
+    chiều đọc này.
+  - **Chưa xác nhận — chiều ghi**: `POST /attendance/check-in`/`PUT /attendance/:id/check-out` (khai ở
+    `src/attendance.service.ts`) test route surface ngày 2026-07-20 (cảnh báo đầu file) cho kết quả
+    `/attendance` **404 — chưa mount** trên backend đang chạy, cùng nhóm thiếu với `/suppliers`/
+    `/evidence`/`/wages`. Chưa có lần re-test nào sau đó (khác các module khác đã re-test 2026-07-21)
+    xác nhận lại route này — **cần Backend xác nhận hiện trạng** (đã mount chưa, có khớp payload đề xuất
+    dưới đây không).
+- **Payload đề xuất cần Backend xác nhận/implement, viết lại theo đúng `assignee_id`** (thay hẳn
+  `planId`+`userId` cũ):
+
+  1. `POST /api/v1/attendance/check-in` — body `{ assigneeId: string, checkInAt: string, checkInEvidenceId?: string }`
+     (`assigneeId` = `schedule_plan_assignees.assignee_id` của đúng người + đúng plan đang check-in, **không
+     phải** `userId`). Trả lại `Attendance` vừa tạo. Backend nên validate: người gọi (`userId` suy từ
+     token) phải trùng `schedule_plan_assignees.user_id` của `assigneeId` gửi lên (không cho check-in hộ),
+     và 1 `assigneeId` chỉ tạo được 1 `attendances` (như comment cũ `@@unique` đã ghi, cần xác nhận còn
+     giữ đúng ràng buộc này với schema mới).
+  2. `PUT /api/v1/attendance/:attendanceId/check-out` — body `{ checkOutAt: string, note?: string }`,
+     giữ nguyên như type cũ (không đổi theo `assignee_id` vì đã có `attendanceId` từ bước check-in).
+  3. **Endpoint mới, chưa từng đề xuất**: `GET /api/v1/attendance?assigneeId=` hoặc
+     `GET /api/v1/schedule-plans/:id/attendance` (Backend chọn 1 trong 2, hoặc dùng luôn `assignees[]` đã
+     join sẵn nếu đủ) — dùng cho màn hình tổng hợp công/lương cuối tháng (Manager xác nhận tổng hợp), vì
+     `checkInAt`/`checkOutAt` join theo từng plan hiện tại chưa đủ để truy vấn theo khoảng thời gian
+     (tháng) xuyên nhiều plan/nhiều đơn cho 1 nhân sự — **chưa có tài liệu/màn hình nào ở FE cho bước
+     tổng hợp lương này**, ngoài phạm vi các mục đã ghi ở file này.
+- **Đã chốt hướng nghiệp vụ (2026-07-21, xác nhận bởi người dùng)** — thay cho câu hỏi mở trước đây: bạn
+  mô tả "khi nhân viên check-in thì `schedule_plans.status` tự chuyển `IN_PROGRESS`, check-out thì tự
+  chuyển `COMPLETED`" mâu thuẫn với tài liệu cũ (`docs/lichtrinhkythuat_api.md` mục 0/6, mô tả 2
+  transition này là mobile tự gọi `PATCH /schedule-plans/:id/status {status:'IN_PROGRESS'|'COMPLETED'}`,
+  tách biệt hoàn toàn khỏi `attendances`) — nay **đã chốt chọn hướng (2)**: `status` **tự suy ra** từ
+  `attendances`, không còn là transition Leader tự gọi tay cho 2 giá trị này.
+
+  **Quy tắc chốt cho trường hợp nhiều `assignee` trên cùng 1 plan** (câu hỏi "lấy mốc giờ của ai khi có
+  nhiều `TECHNICAL` check-in/out lệch nhau"): **chỉ lấy theo người có `role = 'LEAD'`** trên plan đó, bỏ
+  qua giờ check-in/out của các `TECHNICAL` khi suy ra `status` — cụ thể:
+  - Nếu plan chỉ có **1 assignee** (bất kể `LEAD` hay `TECHNICAL`) → lấy check-in/out của đúng người đó.
+  - Nếu plan có **nhiều assignee** → **chỉ** lấy check-in/out của assignee có `role = 'LEAD'` làm mốc,
+    check-in/out của các `TECHNICAL` khác **không ảnh hưởng** tới `status` của plan (vẫn lưu bình thường
+    trong `attendances` để phục vụ chấm công/tính lương cá nhân — mục đích khác, không liên quan `status`).
+
+  **Suy ra cụ thể**: `status` (chỉ 2 giá trị `IN_PROGRESS`/`COMPLETED` bị chi phối bởi rule này, `PENDING`/
+  `CONFIRMED`/`CANCELLED` vẫn do Manager/Backend set tay như cũ, không đổi):
+  - Assignee `LEAD` của plan có `attendances.check_in_at` nhưng chưa `check_out_at` → `status = 'IN_PROGRESS'`.
+  - Assignee `LEAD` của plan đã có cả `check_in_at` và `check_out_at` → `status = 'COMPLETED'`.
+  - Assignee `LEAD` của plan chưa có `attendances` nào (chưa check-in) → giữ nguyên `status` hiện tại
+    (không tự đổi, vẫn `PENDING`/`CONFIRMED` chờ Leader check-in).
+
+  **Việc cần Backend làm theo hướng đã chốt**:
+  1. **Bỏ** 2 giá trị `IN_PROGRESS`/`COMPLETED` khỏi input hợp lệ của `PATCH /schedule-plans/:id/status`
+     (endpoint này từ giờ chỉ nhận `CONFIRMED`/`CANCELLED` — 2 giá trị Manager set tay trên web, xem mục
+     6/8.2 của `docs/lichtrinhkythuat_api.md`) — trả `400` nếu client cố gửi `IN_PROGRESS`/`COMPLETED`.
+  2. Trigger đổi `status` **tự động ở tầng service** ngay khi `POST /attendance/check-in` hoặc
+     `PUT /attendance/:id/check-out` được gọi **và** `assigneeId` tương ứng có `role = 'LEAD'` — tính lại
+     theo đúng 3 case ở trên. Check-in/out của `TECHNICAL` chỉ ghi vào `attendances`, không gọi trigger này.
+  3. Cần xác nhận: 1 plan có **đúng 1** assignee `role = 'LEAD'` (ràng buộc ở tầng tạo `schedule_plan_assignees`
+     — vd chỉ cho gán tối đa 1 `LEAD`/plan) hay có thể nhiều `LEAD`? Nếu cho phép nhiều `LEAD`, cần chốt
+     thêm quy tắc "nhiều LEAD thì lấy ai" (chưa được hỏi/trả lời ở phạm vi này).
+  4. Cập nhật lại `docs/lichtrinhkythuat_api.md` mục 0/6 cho khớp hướng mới (đã đánh dấu ở cuối mục
+     này, chưa tự sửa file đó — cần rà soát lại toàn bộ mục 0/3/6 của tài liệu đó vì đang mô tả ngược
+     lại hướng vừa chốt).
+- **Chưa mô hình hóa 2 lớp xác nhận (CLAUDE.md mục 1)**: schema `attendances` hiện tại chỉ có 1 cặp
+  `check_in_at`/`check_out_at` cho 1 `assignee_id` — chưa thấy cột nào thể hiện bước "Leader Staff xác
+  nhận điểm danh của Technical Staff" (vd `confirmed_by_leader_id`, `leader_confirmed_at`) hay bước
+  "Manager xác nhận tổng hợp công/lương cuối cùng" (vd `manager_confirmed_at`, hoặc 1 bảng tổng hợp lương
+  riêng theo tháng). Cần Backend xác nhận: 2 lớp xác nhận này có được model ở bảng/API khác chưa công bố,
+  hay `attendances` hiện tại **chỉ mới có lớp 1** (tự check-in) và 2 lớp còn lại vẫn cần thiết kế thêm.
+- **Ranh giới vai trò (nhắc lại, không đổi)**: theo CLAUDE.md và `docs/lichtrinhkythuat_api.md` mục 0,
+  hành động check-in/check-out là của Leader/Technical Staff qua **mobile**, ngoài phạm vi ghi dữ liệu
+  của repo web này — web Manager chỉ cần chiều **đọc** (đã có, xem trên) và (khi có) endpoint tổng hợp
+  công/lương cuối tháng ở điểm 3.
+- **Trạng thái**: FE **chưa code** thêm gì cho luồng ghi (đúng phạm vi, vì thuộc mobile) — chỉ cần
+  Backend: (1) xác nhận `/attendance` đã mount và khớp payload theo `assignee_id` ở trên, (2) implement
+  đúng hướng tự động hóa `status` theo rule LEAD đã chốt ở trên (bỏ `IN_PROGRESS`/`COMPLETED` khỏi
+  `PATCH .../status`, thêm trigger ở `POST check-in`/`PUT check-out`), (3) làm rõ mô hình 2 lớp xác nhận
+  chấm công, (4) cân nhắc thêm endpoint tổng hợp chấm công/lương theo khoảng thời gian cho màn "Công &
+  lương" (Manager) — màn này hiện chưa có tài liệu API riêng trong `docs/`. Web Manager **không đổi gì**
+  ở tab "Lịch trình & Kỹ thuật" hiện tại (vẫn đọc `status` read-only như đang làm) — hướng mới chỉ đổi
+  cách Backend/mobile tự tính `status`, không phát sinh việc code mới phía web.
+- **Cập nhật thực thi (2026-07-21) — đã code xong điểm (2) ở trên**, phát hiện quan trọng cần sửa lại
+  điểm (1): endpoint ghi **không phải** `/attendance/check-in`/`/attendance/:id/check-out` như payload đề
+  xuất ban đầu — đọc thẳng code `src/modules/operations/schedule.{routes,service,repository}.ts` cho
+  thấy check-in/check-out **đã tồn tại sẵn từ trước** (không phải viết mới) dưới dạng
+  `POST /api/v1/schedule-plans/:planId/assignees/:userId/check-in` và
+  `.../:userId/check-out` — 2 route này **đã mount thật**, đã gắn `requireRole('LEADER','TECHNICAL')` và
+  tự validate `actor.id === userId` (không cho check-in hộ), đúng tinh thần payload đề xuất nhưng khác
+  hẳn path/shape (`assigneeId` suy từ `planId`+`userId` trong URL, không phải body). `src/attendance.service.ts`
+  nhắc ở trên **không tồn tại trong repo backend này** — nhiều khả năng đó là artefact từ
+  `D:\bnwems-backend-api` (backend sai, xem cảnh báo đầu file), route `/attendance` 404 vì **đúng là
+  không có module `/attendance` nào** — nhưng không sao, vì nghiệp vụ ghi chấm công đã được phục vụ đủ bởi
+  2 route trên `/schedule-plans` sẵn có. Đã sửa:
+  1. `updateSchedulePlanStatusBodySchema` (`schedule.validators.ts`) thu hẹp `status` còn đúng
+     `CONFIRMED`/`CANCELLED` — gửi `IN_PROGRESS`/`COMPLETED` giờ trả `400 VALIDATION_ERROR`.
+  2. Route `PATCH /schedule-plans/:planId/status` (`schedule.routes.ts`) thu hẹp role còn `MANAGER`
+     (trước đó cho cả `LEADER`/`TECHNICAL`).
+  3. `scheduleService.updateSchedulePlanStatus` bỏ hẳn nhánh field-staff-transition (chỉ còn 2 case
+     Manager).
+  4. `scheduleService.checkIn`/`checkOut` (`schedule.service.ts`): sau khi ghi `attendances`, nếu
+     `assignee.role === 'LEAD'` **và** `plan.status !== 'CANCELLED'`, tự gọi
+     `scheduleRepository.updateStatus(planId, 'IN_PROGRESS'|'COMPLETED', undefined, undefined)` — đúng 3
+     case đã chốt (check-in LEAD → `IN_PROGRESS`, check-out LEAD → `COMPLETED`, không có attendance thì
+     giữ nguyên vì hàm này chỉ chạy sau khi đã ghi attendance). Check-in/out của `TECHNICAL` không gọi
+     nhánh này.
+  5. Điểm (3) ở trên (tối đa 1 `LEAD`/plan) — **đã chọn hướng "đúng 1 LEAD"**: thêm
+     `assertAtMostOneLead()` chặn tạo/`POST /schedule-plans/batch` với ≥2 `LEAD` trong cùng 1 plan (400),
+     và chặn `POST /:planId/assignees` thêm `LEAD` thứ 2 vào plan đã có sẵn 1 `LEAD` (409
+     `LEAD_ALREADY_ASSIGNED`) — khớp đúng Note gốc `docs/schema.full.dbml` dòng 313 ("tối đa 1 LEAD/plan")
+     vốn đã ghi nhưng chưa từng được code enforce.
+  - **Còn lại, chưa làm trong lượt này**: điểm (3) mô hình 2 lớp xác nhận chấm công (Leader xác nhận
+    Technical, Manager xác nhận tổng hợp lương) và điểm (4) endpoint tổng hợp công/lương theo khoảng thời
+    gian — 2 việc này cần thiết kế schema mới (không phải sửa nhỏ), để lại cho lượt sau khi có yêu cầu cụ
+    thể hơn cho màn "Công & lương".
+  - File đã sửa: `src/modules/operations/schedule.validators.ts`,
+    `src/modules/operations/schedule.routes.ts`, `src/modules/operations/schedule.service.ts`,
+    `src/modules/operations/schedule.repository.ts` (bỏ `findAssignee` không còn dùng),
+    `src/modules/operations/__tests__/schedule.test.ts` (viết lại toàn bộ test liên quan
+    check-in/check-out/status cho khớp hành vi mới, thêm test max-1-LEAD).
+  - **Trạng thái**: `npx tsc --noEmit` sạch; `npx jest` (toàn bộ suite) — 313/319 pass, 6 fail đều thuộc
+    `src/modules/inventory/__tests__/inventory.test.ts` (test chạy với seed data thật, không liên quan gì
+    tới thay đổi lượt này — không đụng tới file inventory nào). Chưa test bằng `curl`/trình duyệt thật với
+    DB thật (không có kết nối DB trong phiên này).
+
+## (af) `types/schedulePlan.ts` (FE) lệch schema thật sau khi Backend đổi hướng ở mục (ae) — 4 điểm FE cần cập nhật
+
+- **Màn liên quan**: cùng phạm vi mục (ae)/(f) — khối "Lịch thi công & đơn vị phụ trách kỹ thuật"
+  (`/manager/orders/[id]`) và trang "Kế hoạch và phân công".
+- **Nguồn**: người dùng dán lại nguyên văn `types/schedulePlan.ts` phía FE (2026-07-21) để đối chiếu. File
+  này tự ghi "ĐÍNH CHÍNH 2026-07-21" cho phần đa phân công (đúng, khớp code thật) nhưng **chưa cập nhật
+  theo thay đổi backend vừa code xong ở mục (ae) cùng ngày** — 4 điểm lệch:
+  1. **`UpdateSchedulePlanStatusPayload.status: ScheduleStatus`** (còn khai đủ 5 giá trị) — **sai** kể từ
+     mục (ae): `PATCH /schedule-plans/:id/status` giờ chỉ nhận `'CONFIRMED' | 'CANCELLED'`, gửi
+     `'IN_PROGRESS'`/`'COMPLETED'` trả `400 VALIDATION_ERROR`. Cần thu hẹp type thành
+     `status: 'CONFIRMED' | 'CANCELLED'`.
+  2. **Thiếu hẳn type cho 2 endpoint check-in/check-out** — file này không có dòng nào nhắc tới
+     `POST /schedule-plans/:planId/assignees/:userId/check-in` / `.../check-out`, dù đây chính là 2
+     endpoint mobile Leader/Technical Staff dùng để chấm công (đã có sẵn từ trước, xác nhận lại ở mục
+     (ae)). Đề xuất thêm:
+
+     ```ts
+     // POST /schedule-plans/:planId/assignees/:userId/check-in
+     // POST /schedule-plans/:planId/assignees/:userId/check-out
+     // Không có body — userId trong URL phải trùng user đang đăng nhập (403 nếu khác).
+     // Trả về full SchedulePlan (assignees[].checkInAt/checkOutAt cập nhật); nếu người check-in/out có
+     // role = 'LEAD', status tự chuyển IN_PROGRESS (check-in)/COMPLETED (check-out) — TECHNICAL thì không.
+     ```
+
+  3. **`AddScheduleAssigneePayload` (`POST /schedule-plans/:id/assignees`) có thêm mã lỗi 409 mới** —
+     ngoài `ALREADY_ASSIGNED` (gán trùng 1 người 2 lần) đã ghi, giờ có thêm `LEAD_ALREADY_ASSIGNED` (gán
+     người thứ 2 với `role: 'LEAD'` vào plan đã có sẵn 1 `LEAD` — tối đa 1 LEAD/plan, xem mục (ae) điểm 5).
+  4. **`CreateSchedulePlanPayload` thiếu ràng buộc "tối đa 1 LEAD" trong `assignees[]`** — endpoint
+     `POST /schedule-plans` (và `POST /schedule-plans/batch`) giờ trả `400` nếu mảng `assignees` gửi lên
+     có ≥ 2 phần tử `role: 'LEAD'` cho cùng 1 plan. Type hiện tại không thấy field `assignees` trong
+     `CreateSchedulePlanPayload` được dán ở đây (chỉ có `assignedTo` — field chết) — nếu FE thực đã đổi
+     sang gửi `assignees[]` ở chỗ khác không dán ra ở đây thì chỉ cần thêm validate phía client cho ràng
+     buộc trên; nếu chưa, cần bổ sung field này trước (vì `assignedTo` không còn tác dụng, xem comment gốc
+     cùng file).
+- **Trạng thái**: đây là gap ở FE type/tài liệu, không phải gap backend — backend đã implement đúng cả 4
+  điểm trên (xem mục (ae)). Ghi lại ở đây để FE đối chiếu khi cập nhật `types/schedulePlan.ts` và
+  `schedulePlanApiService`, chưa có việc nào cần Backend làm thêm.
+
+## (ag) 4 quyết định tiếp theo cho chấm công (2026-07-21) — 3 điểm đã code, 1 điểm TẠM HOÃN vì phát hiện DB thật lệch migration history
+
+- **Màn liên quan**: cùng phạm vi mục (ae)/(af).
+- **4 quyết định người dùng chốt trong lượt này**:
+  1. **Giữ nguyên endpoint check-in/check-out dạng `POST /schedule-plans/:planId/assignees/:userId/check-in`/
+     `.../check-out`** (không đổi sang `/attendance/check-in` với `assigneeId` trong body như đề xuất cũ ở
+     mục (ae)) — lý do: `assigneeId` **không hề có trong response `GET /schedule-plans`** (chỉ có `userId`
+     ở từng phần tử `assignees[]`), nên client không có cách nào lấy được `assigneeId` để gửi lên nếu theo
+     đường cũ. Route hiện tại tự suy `assigneeId` từ `planId`+`userId` trong URL, đã đúng hướng — **không
+     cần đổi gì** (đã khớp sẵn từ khi implement mục (ae)).
+  2. **Không thêm cột `check_out_evidence_id`** — giữ nguyên schema `attendances` chỉ có `check_in_evidence_id`
+     (ảnh minh chứng chỉ chụp lúc bắt đầu ca, không chụp lúc kết thúc). **Đã code**: thêm
+     `checkInBodySchema { checkInEvidenceId?: string }` (`schedule.validators.ts`), route check-in giờ
+     validate body này, `scheduleService.checkIn`/`scheduleRepository.checkIn` nhận thêm tham số
+     `checkInEvidenceId` và ghi vào đúng cột có sẵn. Route check-out **không đổi** (vẫn không nhận body).
+  3. **`schedule_plans.evidence_id` tách biệt hoàn toàn khỏi transition status, nhân viên tự gắn, không
+     bắt buộc** — bịt gap đã treo ở `docs/api/lichtrinhkythuat_api.md` mục 7 (đường cũ
+     `PATCH .../status { COMPLETED, evidenceId }` không còn dùng được từ mục (ae)). **Đã code**: endpoint
+     mới `PATCH /schedule-plans/:planId/evidence` `{ evidenceId: string }` — role `LEADER`/`TECHNICAL`,
+     bất kỳ assignee nào của plan (không riêng LEAD, không riêng người check-in/out) đều gọi được, **không
+     có điều kiện status nào** (đúng tinh thần "tách biệt hoàn toàn"). Tiện thể phát hiện và vá 1 gap có
+     từ trước: `SchedulePlanDTO`/`mapPlan` (`schedule.service.ts`) **chưa từng trả `evidenceId`** trong
+     response `GET /schedule-plans` dù cột đã có sẵn trên bảng — giờ đã thêm field `evidenceId` vào DTO.
+  4. **Bỏ ràng buộc `@@unique` trên `attendances.assignee_id`** — 1 assignee được phép có nhiều lượt
+     check-in/check-out (không chỉ đúng 1 dòng `attendances`/người); khi suy `status`, chỉ lấy dòng **mới
+     nhất** của assignee `LEAD`. **TẠM HOÃN, CHƯA CODE** — xem lý do ở mục dưới.
+- **⚠️ Phát hiện quan trọng khi chuẩn bị migration cho điểm 4 — DB thật lệch migration history**: chạy
+  `npx prisma migrate dev` để tạo migration bỏ unique constraint thì Prisma báo **drift**: bảng `items`
+  trên DB thật (Aiven MySQL, `bnwems-db-bnwems-db-g83.l.aivencloud.com`) có cột `components` (JSON,
+  nullable) **không nằm trong bất kỳ file migration nào** đã commit trong `prisma/migrations/` — nghĩa là
+  có ai đó (nhánh khác/phiên khác) đã `ALTER TABLE` trực tiếp lên DB dùng chung mà chưa commit migration
+  tương ứng. `prisma migrate dev` từ chối chạy tiếp và đòi **reset toàn bộ DB** (xóa sạch dữ liệu) để đồng
+  bộ lại — **không chấp nhận được** vì đây là DB dùng chung có dữ liệu thật/seed.
+  - Đã chuẩn bị sẵn cách an toàn hơn (viết tay 1 migration chỉ chứa đúng `DROP INDEX
+    attendances_assignee_id_key` + `CREATE INDEX idx_attendances_assignee`, áp bằng `prisma db execute`
+    thay vì `migrate dev`, không đụng gì tới bảng `items`) nhưng **người dùng chọn dừng lại để tự kiểm tra
+    nguồn gốc cột `components` trước**, tránh chồng chéo với thay đổi của nhánh/phiên khác đang chạy song
+    song. Đã revert lại `prisma/schema.prisma` (bỏ thay đổi `Attendance.assigneeId`/`SchedulePlanAssignee.attendance`)
+    về đúng trạng thái cũ (vẫn `@unique`/quan hệ 1-1) để code khớp với DB thật hiện tại, không để
+    schema.prisma "nói dối" so với DB đang chạy.
+  - **Cần làm trước khi tiếp tục điểm 4**: xác nhận cột `items.components` đến từ đâu (migration chưa
+    commit ở nhánh khác? ai đó chạy tay?), sau đó hoặc (a) commit migration còn thiếu cho
+    `items.components` trước, hoặc (b) xác nhận cột đó an toàn để bỏ qua/rollback, rồi mới quay lại chạy
+    migration cho `attendances` ở điểm 4.
+- **Việc còn lại khi điểm 4 được nối tiếp** (chưa code, ghi trước để không quên): `scheduleRepository.checkIn`
+  đổi từ `upsert` (1 dòng/assignee) sang `create` (dòng mới mỗi lần); `checkOut` tìm dòng **mở** mới nhất
+  (có `checkInAt`, chưa `checkOutAt`) của assignee thay vì dòng duy nhất; `mapAssignee`
+  (`schedule.service.ts`) đổi từ đọc `a.attendance` (1-1) sang lấy dòng mới nhất của `a.attendances[]`;
+  logic suy `status` ở `checkIn`/`checkOut` không đổi (vẫn dựa vào `assignee.role === 'LEAD'`), chỉ đổi
+  nguồn đọc `checkInAt`/`checkOutAt` sang dòng mới nhất.
+- **File đã sửa (điểm 1-3)**: `src/modules/operations/schedule.validators.ts` (`checkInBodySchema`,
+  `attachEvidenceBodySchema`), `schedule.routes.ts` (route check-in thêm validate body,
+  route mới `PATCH /:planId/evidence`), `schedule.controller.ts` (`attachEvidence`, `checkIn` truyền
+  `checkInEvidenceId`), `schedule.service.ts` (`SchedulePlanDTO.evidenceId`, `attachEvidence`, `checkIn`
+  nhận thêm tham số), `schedule.repository.ts` (`checkIn` ghi `checkInEvidenceId`, `attachEvidence` mới),
+  `__tests__/schedule.test.ts` (thêm test cho cả 3 điểm).
+- **Trạng thái**: `npx tsc --noEmit` sạch; `npx jest` toàn bộ suite — 318/324 pass, 6 fail vẫn là
+  `inventory.test.ts` (không liên quan, đã ghi ở mục (ae)). Điểm 4 (bỏ unique `attendances.assignee_id`)
+  **chưa động tới DB thật lẫn code** — giữ nguyên hành vi hiện tại (1 assignee = tối đa 1 lượt check-in/
+  check-out) cho tới khi drift `items.components` được làm rõ.

@@ -38,7 +38,7 @@ export const createOrderBodySchema = z.object({
   eventDate: z.coerce.date(),
   location: z.string().trim().min(1, 'location is required'),
   guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'guestCount is too large').optional(),
-  items: z.array(orderItemInputSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(orderItemInputSchema).default([]),
   notes: z.string().trim().optional(),
 });
 
