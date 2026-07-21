@@ -23,6 +23,8 @@ export interface InventoryDTO {
   unit: string;
   categoryName: string;
   typeName: string;
+  rentalPrice: number;
+  purchasePrice: number | null;
   quantityTotal: number;
   quantityDamaged: number;
   quantityReserved: number;
@@ -95,6 +97,8 @@ function mapInventory(row: InventoryWithItem): InventoryDTO {
     unit: row.item.unit,
     categoryName: row.item.type.category.categoryName,
     typeName: row.item.type.typeName,
+    rentalPrice: Number(row.item.rentalPrice),
+    purchasePrice: row.item.purchasePrice === null ? null : Number(row.item.purchasePrice),
     quantityTotal: row.quantityTotal,
     quantityDamaged: row.quantityDamaged,
     quantityReserved: row.quantityReserved,

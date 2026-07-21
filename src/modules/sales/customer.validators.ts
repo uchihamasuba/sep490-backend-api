@@ -31,7 +31,7 @@ export const createCustomerBodySchema = z.object({
   email: emailField,
   // Bắt buộc ở modal "Thêm khách hàng" (docs/api/taokhachhang_api.md mục 1) — khác PUT (vẫn nullable).
   address: z.string().trim().min(1, 'address is required'),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
@@ -44,7 +44,7 @@ export const updateCustomerBodySchema = z.object({
     .regex(PHONE_RE, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.'),
   email: emailField,
   address: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   status: z.enum(['active', 'inactive']),
 });
 

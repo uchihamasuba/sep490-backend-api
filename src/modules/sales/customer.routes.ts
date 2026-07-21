@@ -14,7 +14,7 @@ import {
 const router = Router();
 
 router.use(requireAuth);
-
+// tương ứng với /api/v1/customers
 router.get(
   '/',
   requireRole('MANAGER', 'ADMIN'),

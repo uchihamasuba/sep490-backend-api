@@ -1,4 +1,5 @@
-import type { PlanMemberRole, Prisma, ScheduleStatus } from '@prisma/client';
+import type { PlanMemberRole, ScheduleStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 
 export interface SchedulePlanListFilter {
@@ -35,31 +36,54 @@ const detailInclude = {
 
 export type SchedulePlanWithDetails = Prisma.SchedulePlanGetPayload<{ include: typeof detailInclude }>;
 
-function buildWhere(filter: SchedulePlanListFilter): Prisma.SchedulePlanWhereInput {
+function buildWhere(filter: SchedulePlanListFilter, dateMatchedOrderIds?: string[]): Prisma.SchedulePlanWhereInput {
   const where: Prisma.SchedulePlanWhereInput = {};
-  if (filter.orderId) where.orderId = filter.orderId;
   if (filter.status) where.status = filter.status;
   if (filter.taskId) where.taskId = filter.taskId;
 
-  // Overlap giữa [startTime, endTime] của từng dòng và cửa sổ [dateFrom, dateTo] đang xem — phục vụ
-  // tab "Lịch điều phối"/"Lịch timeline" (docs/api/kehoachvaphancong_api.md mục 3-4). Việc gộp theo
-  // order_id + tính rangeStart=event_date/rangeEnd=MAX(end_time) là xử lý phía FE sau khi nhận dữ liệu
-  // phẳng (docs/api/lichtimeline_api.md mục 3) — backend chỉ cần trả đủ các dòng giao với cửa sổ.
-  const rangeConditions: Prisma.SchedulePlanWhereInput[] = [];
-  if (filter.dateFrom) {
-    rangeConditions.push({ OR: [{ endTime: null, startTime: { gte: filter.dateFrom } }, { endTime: { gte: filter.dateFrom } }] });
-  }
-  if (filter.dateTo) {
-    rangeConditions.push({ startTime: { lte: filter.dateTo } });
-  }
-  if (rangeConditions.length > 0) where.AND = rangeConditions;
+  // orderId tường minh (trang chi tiết 1 đơn) VÀ orderId lọc theo cửa sổ ngày (tab timeline/lịch điều
+  // phối đa đơn) có thể cùng xuất hiện — kết hợp bằng AND thay vì ghi đè lẫn nhau.
+  const orderIdConditions: Prisma.SchedulePlanWhereInput[] = [];
+  if (filter.orderId) orderIdConditions.push({ orderId: filter.orderId });
+  if (dateMatchedOrderIds) orderIdConditions.push({ orderId: { in: dateMatchedOrderIds } });
+  if (orderIdConditions.length === 1) Object.assign(where, orderIdConditions[0]);
+  else if (orderIdConditions.length > 1) where.AND = orderIdConditions;
 
   return where;
 }
 
+// Xác định các order_id có khoảng [orders.event_date, MAX(schedule_plans.end_time)] giao với cửa sổ
+// [dateFrom, dateTo] đang xem — đã chốt với người dùng 2026-07-20 (docs/api/lichtimeline_api.md mục
+// 2.1), KHÁC với so [start_time, end_time] của riêng từng dòng schedule_plans. Trả về TOÀN BỘ dòng
+// schedule_plans của các order_id khớp (không lọc riêng từng dòng theo dateFrom/dateTo) để FE có đủ dữ
+// liệu tính rangeEnd và hiển thị trong drawer chi tiết (kể cả dòng nằm ngoài cửa sổ, vd khảo sát làm
+// trước event_date rất lâu).
+async function findDateMatchedOrderIds(dateFrom?: Date, dateTo?: Date): Promise<string[] | undefined> {
+  const havingConditions: Prisma.Sql[] = [];
+  if (dateTo) havingConditions.push(Prisma.sql`DATE(o.event_date) <= DATE(${dateTo})`);
+  if (dateFrom) {
+    // COALESCE phòng trường hợp mọi dòng của đơn đều endTime NULL — không để đơn đó bị loại hẳn khỏi
+    // cửa sổ chỉ vì thiếu end_time. GREATEST phòng trường hợp mọi dòng kết thúc trước event_date.
+    havingConditions.push(
+      Prisma.sql`GREATEST(DATE(o.event_date), COALESCE(MAX(DATE(sp.end_time)), DATE(o.event_date))) >= DATE(${dateFrom})`,
+    );
+  }
+  if (havingConditions.length === 0) return undefined;
+
+  const rows = await prisma.$queryRaw<{ orderId: string }[]>(Prisma.sql`
+    SELECT sp.order_id AS orderId
+    FROM schedule_plans sp
+    JOIN orders o ON o.order_id = sp.order_id
+    GROUP BY sp.order_id, o.event_date
+    HAVING ${Prisma.join(havingConditions, ' AND ')}
+  `);
+  return rows.map((r) => r.orderId);
+}
+
 export const scheduleRepository = {
   async findMany(params: SchedulePlanListParams) {
-    const where = buildWhere(params);
+    const dateMatchedOrderIds = await findDateMatchedOrderIds(params.dateFrom, params.dateTo);
+    const where = buildWhere(params, dateMatchedOrderIds);
     const [rows, totalItems] = await Promise.all([
       prisma.schedulePlan.findMany({
         where,

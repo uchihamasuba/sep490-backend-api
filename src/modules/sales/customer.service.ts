@@ -72,6 +72,10 @@ function toDbEmail(email: string | undefined): string | null {
   return email && email.length > 0 ? email : null;
 }
 
+function toDbNotes(notes: string | undefined): string | null {
+  return notes && notes.length > 0 ? notes : null;
+}
+
 function toNumber(value: unknown): number {
   return value === null || value === undefined ? 0 : Number(value);
 }
@@ -155,7 +159,7 @@ async function createCustomer(body: CreateCustomerBody): Promise<CustomerDTO> {
     phone: body.phone,
     email: toDbEmail(body.email),
     address: body.address ?? null,
-    notes: body.notes ?? null,
+    notes: toDbNotes(body.notes),
     status: toDbStatus(body.status),
   });
   return mapCustomer(created, { totalBookings: 0, totalSpent: 0 });
@@ -174,7 +178,7 @@ async function updateCustomer(customerId: string, body: UpdateCustomerBody): Pro
     phone: body.phone,
     email: toDbEmail(body.email),
     address: body.address ?? null,
-    notes: body.notes ?? null,
+    notes: toDbNotes(body.notes),
     status: toDbStatus(body.status),
   });
   const stats = await customerRepository.getOrderStatsForCustomer(customerId);

@@ -213,6 +213,8 @@ async function main() {
     data: [
       { taskId: task1Id, taskCode: 'TSK-SETUP', taskName: 'Lắp đặt thiết bị' },
       { taskId: task2Id, taskCode: 'TSK-TEARDOWN', taskName: 'Tháo dỡ thiết bị' },
+      { taskId: genId(), taskCode: 'TSK-SURVEY', taskName: 'Khảo sát hiện trường' },
+      { taskId: genId(), taskCode: 'TSK-COLLECT', taskName: 'Thu hồi thiết bị' },
     ],
   });
 
