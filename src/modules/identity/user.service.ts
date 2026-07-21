@@ -1,7 +1,8 @@
 import type { User } from '@prisma/client';
+import bcrypt from 'bcrypt';
 import { AppError } from '../../utils/AppError';
 import { userRepository } from './user.repository';
-import type { ListUsersQuery } from './user.validators';
+import type { CreateUserBody, ListUsersQuery, UpdateUserBody } from './user.validators';
 
 // GET /api/v1/users (danh sách) KHÔNG trả email/phone/bio/avatarUrl — đã chốt ở docs/api/
 // lichtrinhkythuat_api.md mục 4 điểm 3 ("chỉ có ở GET /auth/profile"); GET /users/:id (chi tiết) vẫn
@@ -78,8 +79,46 @@ async function updateUserStatus(userId: string, status: User['status']): Promise
   return mapDetail(updated);
 }
 
+async function createUser(body: CreateUserBody): Promise<UserDetailDTO> {
+  const existing = await userRepository.findByUsername(body.username);
+  if (existing) {
+    throw AppError.badRequest('Tên đăng nhập đã tồn tại');
+  }
+
+  const passwordHash = await bcrypt.hash(body.password, 10);
+  const user = await userRepository.create({
+    username: body.username,
+    passwordHash,
+    fullName: body.fullName,
+    role: body.role,
+    email: body.email || null,
+    phone: body.phone || null,
+    status: 'ACTIVE',
+  });
+
+  return mapDetail(user);
+}
+
+async function updateUser(userId: string, body: UpdateUserBody): Promise<UserDetailDTO> {
+  const existing = await userRepository.findById(userId);
+  if (!existing) {
+    throw AppError.notFound('User not found');
+  }
+
+  const data: Record<string, any> = {};
+  if (body.fullName !== undefined) data.fullName = body.fullName;
+  if (body.role !== undefined) data.role = body.role;
+  if (body.email !== undefined) data.email = body.email;
+  if (body.phone !== undefined) data.phone = body.phone;
+
+  const updated = await userRepository.update(userId, data);
+  return mapDetail(updated);
+}
+
 export const userService = {
   listUsers,
   getUserById,
   updateUserStatus,
+  createUser,
+  updateUser,
 };

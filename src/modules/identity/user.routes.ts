@@ -3,7 +3,7 @@ import { requireAuth, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { userController } from './user.controller';
-import { listUsersQuerySchema, updateUserStatusBodySchema, userIdParamSchema } from './user.validators';
+import { createUserBodySchema, listUsersQuerySchema, updateUserBodySchema, updateUserStatusBodySchema, userIdParamSchema } from './user.validators';
 
 const router = Router();
 
@@ -33,6 +33,21 @@ router.patch(
   validate(userIdParamSchema, 'params'),
   validate(updateUserStatusBodySchema, 'body'),
   asyncHandler(userController.updateStatus),
+);
+
+router.post(
+  '/',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(createUserBodySchema, 'body'),
+  asyncHandler(userController.create),
+);
+
+router.put(
+  '/:userId',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(userIdParamSchema, 'params'),
+  validate(updateUserBodySchema, 'body'),
+  asyncHandler(userController.update),
 );
 
 export default router;

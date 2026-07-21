@@ -10,24 +10,24 @@ const itemStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
 // filter (không phân trang) — phục vụ use-case "tải hết rồi nhóm theo danh mục" ở modal báo giá/đơn.
 export const listCatalogItemsQuerySchema = z.object({
   status: itemStatusEnum.optional(),
-  typeId: z.string().trim().min(1).optional(),
-  categoryId: z.string().trim().min(1).optional(),
-  search: z.string().trim().min(1).optional(),
+  typeId: z.string().trim().optional(),
+  categoryId: z.string().trim().optional(),
+  search: z.string().trim().optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
 export const createCatalogItemBodySchema = z.object({
-  itemCode: z.string().trim().min(1).optional(),
+  itemCode: z.string().trim().optional(),
   itemName: z.string().trim().min(1, 'itemName is required'),
   typeId: z.string().trim().min(1, 'typeId is required'),
-  description: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
   unit: z.string().trim().min(1, 'unit is required'),
   rentalPrice: z.coerce.number().nonnegative().default(0),
   purchasePrice: z.coerce.number().nonnegative().optional(),
   priceValidFrom: z.coerce.date().optional(),
   priceValidTo: z.coerce.date().optional(),
-  imageUrl: z.string().trim().min(1).optional(),
+  imageUrl: z.string().trim().optional(),
   status: itemStatusEnum.default('ACTIVE'),
 });
 
@@ -36,13 +36,13 @@ export const createCatalogItemBodySchema = z.object({
 export const updateCatalogItemBodySchema = z.object({
   itemName: z.string().trim().min(1, 'itemName is required'),
   typeId: z.string().trim().min(1, 'typeId is required'),
-  description: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
   unit: z.string().trim().min(1, 'unit is required'),
   rentalPrice: z.coerce.number().nonnegative(),
   purchasePrice: z.coerce.number().nonnegative().optional(),
   priceValidFrom: z.coerce.date().optional(),
   priceValidTo: z.coerce.date().optional(),
-  imageUrl: z.string().trim().min(1).optional(),
+  imageUrl: z.string().trim().optional(),
 });
 
 export const updateCatalogItemStatusBodySchema = z.object({
@@ -54,21 +54,21 @@ export const categoryIdParamSchema = z.object({
 });
 
 export const listCategoriesQuerySchema = z.object({
-  search: z.string().trim().min(1).optional(),
+  search: z.string().trim().optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
 export const createCategoryBodySchema = z.object({
   categoryName: z.string().trim().min(1, 'categoryName is required'),
-  description: z.string().trim().min(1).optional(),
+  description: z.string().trim().optional(),
 });
 
 export const updateCategoryBodySchema = createCategoryBodySchema;
 
 export const listTypesQuerySchema = z.object({
-  categoryId: z.string().trim().min(1).optional(),
-  search: z.string().trim().min(1).optional(),
+  categoryId: z.string().trim().optional(),
+  search: z.string().trim().optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
