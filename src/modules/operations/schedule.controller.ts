@@ -5,6 +5,7 @@ import { scheduleService } from './schedule.service';
 import type {
   AddAssigneeBody,
   AssigneeParam,
+  BatchUpdateSchedulePlanStatusBody,
   CreateSchedulePlanBody,
   CreateSchedulePlansBatchBody,
   ListSchedulePlansQuery,
@@ -97,6 +98,12 @@ async function createBatch(req: Request, res: Response) {
   created(res, plans);
 }
 
+async function updateStatusBatch(req: Request, res: Response) {
+  const body = req.body as BatchUpdateSchedulePlanStatusBody;
+  const plans = await scheduleService.updateSchedulePlansStatusBatch(body);
+  ok(res, plans);
+}
+
 export const scheduleController = {
   list,
   getById,
@@ -110,4 +117,5 @@ export const scheduleController = {
   listWorkTasks,
   remove,
   createBatch,
+  updateStatusBatch,
 };

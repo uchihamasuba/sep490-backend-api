@@ -89,7 +89,19 @@ export const createSchedulePlansBatchBodySchema = z.object({
   plans: z.array(batchPlanInputSchema).min(1, 'plans must contain at least 1 line'),
 });
 
+// PATCH /schedule-plans/batch/status — cập nhật trạng thái nhiều dòng cùng lúc trong 1 transaction
+// (docs/api/more-require.md mục (l): "hủy nhiều dòng cùng lúc"), tránh phải gọi tuần tự PATCH .../status
+// cho từng dòng (kém an toàn hơn khi lỗi giữa chừng). Giới hạn 2 đích CONFIRMED/CANCELLED — cùng phạm vi
+// hành động Manager được phép ở updateSchedulePlanStatus (IN_PROGRESS/COMPLETED thuộc quyền Leader/
+// Technical, gắn với đúng 1 người thi công nên không có nhu cầu batch).
+export const batchUpdateSchedulePlanStatusBodySchema = z.object({
+  planIds: z.array(z.string().trim().min(1)).min(1, 'planIds must contain at least 1 id'),
+  status: z.enum(['CONFIRMED', 'CANCELLED']),
+  notes: z.string().trim().min(1).optional(),
+});
+
 export type PlanIdParam = z.infer<typeof planIdParamSchema>;
+export type BatchUpdateSchedulePlanStatusBody = z.infer<typeof batchUpdateSchedulePlanStatusBodySchema>;
 export type AssigneeParam = z.infer<typeof assigneeParamSchema>;
 export type ListSchedulePlansQuery = z.infer<typeof listSchedulePlansQuerySchema>;
 export type CreateSchedulePlanBody = z.infer<typeof createSchedulePlanBodySchema>;

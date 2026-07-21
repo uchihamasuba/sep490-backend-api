@@ -20,7 +20,18 @@ export const confirmSettlementBodySchema = z.object({
   status: z.literal('CONFIRMED'),
 });
 
+// GET /deposits (gộp toàn hệ thống) — gap chính đã ghi ở docs/api/datcoc_api.md mục 1.2/8.
+const depositStatusEnum = z.enum(['PENDING', 'SUCCESS', 'OVERDUE', 'CANCELLED']);
+
+export const listDepositsQuerySchema = z.object({
+  status: depositStatusEnum.optional(),
+  search: z.string().trim().min(1).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+});
+
 export type DepositIdParam = z.infer<typeof depositIdParamSchema>;
 export type SettlementIdParam = z.infer<typeof settlementIdParamSchema>;
 export type UpdateDepositStatusBody = z.infer<typeof updateDepositStatusBodySchema>;
 export type ConfirmSettlementBody = z.infer<typeof confirmSettlementBodySchema>;
+export type ListDepositsQuery = z.infer<typeof listDepositsQuerySchema>;

@@ -17,6 +17,7 @@ jest.mock('../schedule.repository', () => ({
     create: jest.fn(),
     update: jest.fn(),
     updateStatus: jest.fn(),
+    updateStatusBatch: jest.fn(),
     findAssignee: jest.fn(),
     addAssignee: jest.fn(),
     removeAssignee: jest.fn(),
@@ -307,5 +308,97 @@ describe('HTTP routes — role permission matrix', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('PATCH /api/v1/schedule-plans/batch/status', () => {
+  it('is registered before /:planId/status — "batch" is never swallowed as a planId', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({ planId: 'plan-1', status: 'PENDING' }) as never);
+    mockedRepo.updateStatusBatch.mockResolvedValue([fakePlan({ planId: 'plan-1', status: 'CANCELLED' })] as never);
+
+    const res = await request(app)
+      .patch('/api/v1/schedule-plans/batch/status')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ planIds: ['plan-1'], status: 'CANCELLED' });
+
+    expect(res.status).toBe(200);
+    expect(mockedRepo.updateStatusBatch).toHaveBeenCalledWith(['plan-1'], 'CANCELLED', undefined);
+  });
+
+  it('cancels multiple plans in one call', async () => {
+    mockedRepo.findById.mockImplementation((planId: string) =>
+      Promise.resolve(fakePlan({ planId, status: 'CONFIRMED' }) as never),
+    );
+    mockedRepo.updateStatusBatch.mockResolvedValue([
+      fakePlan({ planId: 'plan-1', status: 'CANCELLED' }),
+      fakePlan({ planId: 'plan-2', status: 'CANCELLED' }),
+    ] as never);
+
+    const res = await request(app)
+      .patch('/api/v1/schedule-plans/batch/status')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ planIds: ['plan-1', 'plan-2'], status: 'CANCELLED', notes: 'Hủy theo yêu cầu khách' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    expect(mockedRepo.updateStatusBatch).toHaveBeenCalledWith(
+      ['plan-1', 'plan-2'],
+      'CANCELLED',
+      'Hủy theo yêu cầu khách',
+    );
+  });
+
+  it('rejects cancelling a plan that is already COMPLETED with 400, and does not update any plan', async () => {
+    mockedRepo.findById.mockImplementation((planId: string) =>
+      Promise.resolve(fakePlan({ planId, status: planId === 'plan-2' ? 'COMPLETED' : 'PENDING' }) as never),
+    );
+
+    const res = await request(app)
+      .patch('/api/v1/schedule-plans/batch/status')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ planIds: ['plan-1', 'plan-2'], status: 'CANCELLED' });
+
+    expect(res.status).toBe(400);
+    expect(mockedRepo.updateStatusBatch).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when one of the planIds does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/schedule-plans/batch/status')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ planIds: ['ghost'], status: 'CANCELLED' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an empty planIds array with 400', async () => {
+    const res = await request(app)
+      .patch('/api/v1/schedule-plans/batch/status')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ planIds: [], status: 'CANCELLED' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects a status outside CONFIRMED/CANCELLED with 400', async () => {
+    const res = await request(app)
+      .patch('/api/v1/schedule-plans/batch/status')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ planIds: ['plan-1'], status: 'COMPLETED' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('is forbidden for non-Manager roles', async () => {
+    const res = await request(app)
+      .patch('/api/v1/schedule-plans/batch/status')
+      .set('Authorization', authHeader('LEADER'))
+      .send({ planIds: ['plan-1'], status: 'CANCELLED' });
+
+    expect(res.status).toBe(403);
   });
 });

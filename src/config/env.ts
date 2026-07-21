@@ -18,6 +18,14 @@ const envSchema = z.object({
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
   FIREBASE_STORAGE_BUCKET: z.string().optional(),
+
+  // Tài khoản ngân hàng nhận cọc/quyết toán của công ty (docs/api/more-require.md mục 1) — trước đây
+  // hardcode ở FE (src/constants/company-bank.ts), chưa có bảng cấu hình nào ở DB. Optional: GET
+  // /settings/bank-account trả null cho field nào chưa cấu hình thay vì bịa giá trị giả.
+  COMPANY_BANK_BIN: z.string().optional(),
+  COMPANY_BANK_NAME: z.string().optional(),
+  COMPANY_BANK_ACCOUNT_NUMBER: z.string().optional(),
+  COMPANY_BANK_ACCOUNT_NAME: z.string().optional(),
 });
 
 function loadEnv() {

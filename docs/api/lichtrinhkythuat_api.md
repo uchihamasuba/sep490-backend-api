@@ -253,6 +253,32 @@ sách thẻ (mục 1) — không gọi thêm API khi mở modal. Khi nối dữ 
 kê ở mục 1 đã có đủ trong 1 dòng `schedule_plans` (kèm `assignees`/`taskName` join sẵn) trước khi build
 `ScheduleCardItem`, không cần round-trip gọi riêng `GET /schedule-plans/:id` khi mở modal.
 
+## 9b. Nút "Tạo lịch trình" — ĐÃ NỐI 2026-07-21, phát hiện endpoint gán nhân sự riêng chưa có trong tài liệu này
+
+Web Manager giờ có nút **"Tạo lịch trình"** ở đầu tab (`CreateSchedulePlanModal.tsx`, chỉ hiện ở
+`/manager/orders/[id]`, không hiện ở bản Admin read-only) — chọn loại việc (`work_tasks`), thời gian bắt
+đầu/kết thúc, địa điểm, ghi chú, và **nhân sự phụ trách** (nhiều dòng, chọn từ user role
+`LEADER`/`TECHNICAL`).
+
+**Phát hiện quan trọng qua `curl` thật (2026-07-21), khác hẳn giả định cũ ở mục 4/`types/schedulePlan.ts`**:
+
+- `POST /schedule-plans` nhận field `assignedTo: string` (validator không báo lỗi khi thiếu, cũng
+  không lỗi khi có) nhưng **field này bị bỏ qua hoàn toàn ở tầng service** — response luôn trả
+  `assignees: []` dù gửi kèm `assignedTo`. Không dùng field này nữa.
+- Gán người vào 1 plan phải qua **endpoint riêng, chưa từng được tài liệu hóa**:
+  `POST /api/v1/schedule-plans/:id/assignees` body `{ "userId": string, "role": "LEAD" | "TECHNICAL" }`
+  — trả lại **full `SchedulePlan`** kèm `assignees[]` mới nhất, lỗi `{code:'ALREADY_ASSIGNED'}` nếu gán
+  trùng 1 người 2 lần vào cùng 1 plan. Đã xác nhận hoạt động thật (tạo `PLN-004` cho `ORD-001`, gán 2
+  người `LEAD`+`TECHNICAL`, `GET` lại đúng cả 2 — đã hủy plan test ngay sau khi xác nhận).
+- Modal gọi tuần tự: `createSchedulePlan()` (không gửi `assignedTo`) → lấy `planId` → `Promise.all` gọi
+  `addAssignee(planId, {userId, role})` cho từng người đã chọn. Role gửi lên map từ `users.role` thật
+  (`LEADER → 'LEAD'`, `TECHNICAL → 'TECHNICAL'`), không phải role tự chọn tay trên UI.
+- Đã cập nhật `types/schedulePlan.ts` (thêm `AddScheduleAssigneePayload`, sửa comment đầu file từng ghi
+  sai "không còn khái niệm nhiều người") và `schedulePlanApiService.addAssignee()`.
+- **Chưa làm**: không có nút "Xóa nhân sự khỏi plan đã tạo" trên UI dù `DELETE
+  /schedule-plans/:id/assignees/:userId` cũng đã xác nhận hoạt động qua `curl` — ngoài phạm vi nút "Tạo
+  lịch trình", để dành cho nhu cầu "sửa phân công" sau này nếu cần.
+
 ## 10. Tổng hợp — đã chốt vs. còn cần Backend xác nhận
 
 ### 10.1 Đã chốt hướng (2026-07-20) — Backend có thể bắt đầu implement theo đúng mô tả ở mục tương ứng

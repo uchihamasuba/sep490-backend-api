@@ -169,6 +169,22 @@ export const scheduleRepository = {
     });
   },
 
+  async updateStatusBatch(
+    planIds: string[],
+    status: ScheduleStatus,
+    notes: string | null | undefined,
+  ): Promise<SchedulePlanWithDetails[]> {
+    await prisma.$transaction(
+      planIds.map((planId) =>
+        prisma.schedulePlan.update({
+          where: { planId },
+          data: { status, ...(notes !== undefined ? { notes } : {}) },
+        }),
+      ),
+    );
+    return prisma.schedulePlan.findMany({ where: { planId: { in: planIds } }, include: detailInclude });
+  },
+
   findAssignee(planId: string, userId: string) {
     return prisma.schedulePlanAssignee.findUnique({
       where: { planId_userId: { planId, userId } },

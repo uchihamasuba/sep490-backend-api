@@ -7,6 +7,8 @@ import { evidenceRepository } from '../evidence.repository';
 jest.mock('../evidence.repository', () => ({
   evidenceRepository: {
     findById: jest.fn(),
+    create: jest.fn(),
+    uploadFile: jest.fn(),
   },
 }));
 
@@ -48,6 +50,64 @@ describe('GET /api/v1/evidence/:id', () => {
 
   it('requires authentication', async () => {
     const res = await request(app).get('/api/v1/evidence/evi-1');
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('POST /api/v1/evidence/upload', () => {
+  it('uploads a file to storage and creates the evidence record', async () => {
+    mockedRepo.uploadFile.mockResolvedValue('https://storage.googleapis.com/bucket/evidences/abc.jpg');
+    mockedRepo.create.mockResolvedValue({
+      evidenceId: 'evi-2',
+      fileUrl: 'https://storage.googleapis.com/bucket/evidences/abc.jpg',
+      description: 'Anh lap dat thiet bi',
+      uploadedBy: 'user-1',
+      createdAt: new Date('2026-07-01T00:00:00Z'),
+      uploader: { userId: 'user-1', fullName: 'Leader A' },
+    } as never);
+
+    const res = await request(app)
+      .post('/api/v1/evidence/upload')
+      .set('Authorization', authHeader())
+      .field('description', 'Anh lap dat thiet bi')
+      .attach('file', Buffer.from('fake-image-bytes'), { filename: 'photo.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      evidenceId: 'evi-2',
+      fileUrl: 'https://storage.googleapis.com/bucket/evidences/abc.jpg',
+      uploadedBy: { userId: 'user-1', fullName: 'Leader A' },
+    });
+    expect(mockedRepo.uploadFile).toHaveBeenCalledWith(expect.stringContaining('.jpg'), expect.any(Buffer), 'image/jpeg');
+    expect(mockedRepo.create).toHaveBeenCalledWith({
+      fileUrl: 'https://storage.googleapis.com/bucket/evidences/abc.jpg',
+      description: 'Anh lap dat thiet bi',
+      uploadedBy: 'user-1',
+    });
+  });
+
+  it('rejects a request with no file attached (400)', async () => {
+    const res = await request(app).post('/api/v1/evidence/upload').set('Authorization', authHeader());
+
+    expect(res.status).toBe(400);
+    expect(mockedRepo.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unsupported file type (400)', async () => {
+    const res = await request(app)
+      .post('/api/v1/evidence/upload')
+      .set('Authorization', authHeader())
+      .attach('file', Buffer.from('not-an-image'), { filename: 'notes.txt', contentType: 'text/plain' });
+
+    expect(res.status).toBe(400);
+    expect(mockedRepo.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('requires authentication', async () => {
+    const res = await request(app)
+      .post('/api/v1/evidence/upload')
+      .attach('file', Buffer.from('fake-image-bytes'), { filename: 'photo.jpg', contentType: 'image/jpeg' });
+
     expect(res.status).toBe(401);
   });
 });

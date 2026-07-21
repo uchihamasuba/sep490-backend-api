@@ -6,6 +6,7 @@ import { scheduleController } from './schedule.controller';
 import {
   addAssigneeBodySchema,
   assigneeParamSchema,
+  batchUpdateSchedulePlanStatusBodySchema,
   createSchedulePlanBodySchema,
   createSchedulePlansBatchBodySchema,
   listSchedulePlansQuerySchema,
@@ -56,6 +57,15 @@ scheduleRouter.put(
   validate(planIdParamSchema, 'params'),
   validate(updateSchedulePlanBodySchema, 'body'),
   asyncHandler(scheduleController.update),
+);
+
+// Đăng ký TRƯỚC `/:planId/status` — nếu không "batch" sẽ bị nuốt làm giá trị planId (Express khớp theo
+// thứ tự đăng ký, giống ghi chú "/next-code" ở customer.routes.ts).
+scheduleRouter.patch(
+  '/batch/status',
+  requireRole('MANAGER'),
+  validate(batchUpdateSchedulePlanStatusBodySchema, 'body'),
+  asyncHandler(scheduleController.updateStatusBatch),
 );
 
 // Phân quyền theo trạng thái đích được kiểm tra chi tiết ở service (CONFIRMED/CANCELLED: Manager;

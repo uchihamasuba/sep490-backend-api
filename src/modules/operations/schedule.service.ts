@@ -3,6 +3,7 @@ import { AppError } from '../../utils/AppError';
 import { scheduleRepository, type SchedulePlanWithDetails } from './schedule.repository';
 import type {
   AddAssigneeBody,
+  BatchUpdateSchedulePlanStatusBody,
   CreateSchedulePlanBody,
   CreateSchedulePlansBatchBody,
   ListSchedulePlansQuery,
@@ -337,6 +338,26 @@ async function createSchedulePlansBatch(body: CreateSchedulePlansBatchBody, crea
   return created.map(mapPlan);
 }
 
+// PATCH /schedule-plans/batch/status — cập nhật trạng thái nhiều dòng cùng lúc trong 1 transaction
+// (docs/api/more-require.md mục (l)), tránh trạng thái lưu dở dang nếu gọi PATCH .../status tuần tự bị
+// lỗi giữa chừng. Route chỉ cho Manager gọi (giống POST /batch) nên không cần actor/role guard ở đây —
+// vẫn giữ nguyên các ràng buộc chuyển trạng thái CONFIRMED/CANCELLED đã áp dụng cho endpoint đơn lẻ.
+async function updateSchedulePlansStatusBatch(body: BatchUpdateSchedulePlanStatusBody): Promise<SchedulePlanDTO[]> {
+  const plans = await Promise.all(body.planIds.map((planId) => findPlanOrThrow(planId)));
+
+  for (const plan of plans) {
+    if (body.status === 'CONFIRMED' && plan.status !== 'PENDING') {
+      throw AppError.badRequest(`Kế hoạch ${plan.planCode} không ở trạng thái PENDING, không thể xác nhận`);
+    }
+    if (body.status === 'CANCELLED' && TERMINAL_OR_LOCKED_STATUSES.includes(plan.status)) {
+      throw AppError.badRequest(`Kế hoạch ${plan.planCode} đang ở trạng thái ${plan.status}, không thể hủy`);
+    }
+  }
+
+  const updated = await scheduleRepository.updateStatusBatch(body.planIds, body.status, body.notes);
+  return updated.map(mapPlan);
+}
+
 export type AggregateScheduleStatus = 'CANCELLED' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CONFIRMED';
 
 // Thuật toán tổng hợp trạng thái nhiều dòng schedule_plans cùng order_id thành 1 badge — đề xuất ở
@@ -369,4 +390,5 @@ export const scheduleService = {
   listWorkTasks,
   deleteSchedulePlan,
   createSchedulePlansBatch,
+  updateSchedulePlansStatusBatch,
 };

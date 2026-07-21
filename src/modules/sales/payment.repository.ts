@@ -1,9 +1,66 @@
-import type { Deposit, DepositStatus, Settlement } from '@prisma/client';
+import type { Deposit, DepositStatus, Prisma, Settlement } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+
+export interface DepositListFilter {
+  status?: DepositStatus;
+  search?: string;
+}
+
+export interface DepositListParams extends DepositListFilter {
+  skip: number;
+  take: number;
+}
+
+const depositListInclude = {
+  order: {
+    select: {
+      orderCode: true,
+      eventName: true,
+      eventType: true,
+      customer: { select: { customerName: true, phone: true } },
+    },
+  },
+} satisfies Prisma.DepositInclude;
+
+export type DepositWithOrder = Prisma.DepositGetPayload<{ include: typeof depositListInclude }>;
+
+function buildDepositWhere(filter: DepositListFilter): Prisma.DepositWhereInput {
+  const where: Prisma.DepositWhereInput = {};
+  if (filter.status) where.status = filter.status;
+  if (filter.search) {
+    const q = filter.search;
+    where.OR = [
+      { depositCode: { contains: q } },
+      { order: { orderCode: { contains: q } } },
+      { order: { customer: { customerName: { contains: q } } } },
+      { order: { customer: { phone: { contains: q } } } },
+    ];
+  }
+  return where;
+}
 
 export const paymentRepository = {
   findDepositById(depositId: string): Promise<Deposit | null> {
     return prisma.deposit.findUnique({ where: { depositId } });
+  },
+
+  async findManyDeposits(params: DepositListParams) {
+    const where = buildDepositWhere(params);
+    const [rows, totalItems] = await Promise.all([
+      prisma.deposit.findMany({
+        where,
+        skip: params.skip,
+        take: params.take,
+        orderBy: { createdAt: 'desc' },
+        include: depositListInclude,
+      }),
+      prisma.deposit.count({ where }),
+    ]);
+    return { rows, totalItems };
+  },
+
+  deleteDeposit(depositId: string): Promise<Deposit> {
+    return prisma.deposit.delete({ where: { depositId } });
   },
 
   // Khi status -> SUCCESS: set approvedBy/approvedAt/paymentDate VÀ cập nhật orders.payment_status =

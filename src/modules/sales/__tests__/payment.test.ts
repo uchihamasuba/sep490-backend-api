@@ -11,6 +11,8 @@ jest.mock('../payment.repository', () => ({
     updateStatus: jest.fn(),
     findSettlementById: jest.fn(),
     confirmSettlement: jest.fn(),
+    findManyDeposits: jest.fn(),
+    deleteDeposit: jest.fn(),
   },
 }));
 
@@ -164,5 +166,92 @@ describe('HTTP routes', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('CONFIRMED');
+  });
+});
+
+describe('GET /api/v1/deposits', () => {
+  it('returns a paginated list joined with order/customer info', async () => {
+    mockedPaymentRepo.findManyDeposits.mockResolvedValue({
+      rows: [
+        {
+          ...fakeDeposit(),
+          order: { orderCode: 'ORD-001', eventName: 'Tech Summit 2026', eventType: 'CONFERENCE', customer: { customerName: 'Tech Corp', phone: '0911111111' } },
+        },
+      ],
+      totalItems: 1,
+    } as never);
+
+    const res = await request(app).get('/api/v1/deposits').set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data[0]).toMatchObject({
+      depositId: 'dep-1',
+      orderCode: 'ORD-001',
+      customerName: 'Tech Corp',
+      customerPhone: '0911111111',
+      eventName: 'Tech Summit 2026',
+    });
+    expect(res.body.meta).toEqual({ page: 1, limit: 10, totalItems: 1, totalPages: 1 });
+  });
+
+  it('falls back to eventType when eventName is null', async () => {
+    mockedPaymentRepo.findManyDeposits.mockResolvedValue({
+      rows: [
+        {
+          ...fakeDeposit(),
+          order: { orderCode: 'ORD-002', eventName: null, eventType: 'WEDDING', customer: { customerName: 'A', phone: '0900000000' } },
+        },
+      ],
+      totalItems: 1,
+    } as never);
+
+    const res = await request(app).get('/api/v1/deposits').set('Authorization', authHeader());
+
+    expect(res.body.data[0].eventName).toBe('WEDDING');
+  });
+
+  it('rejects an invalid status filter with 400', async () => {
+    const res = await request(app).get('/api/v1/deposits').query({ status: 'NOT_A_STATUS' }).set('Authorization', authHeader());
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects unauthenticated requests with 401', async () => {
+    const res = await request(app).get('/api/v1/deposits');
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('DELETE /api/v1/deposits/:depositId', () => {
+  it('deletes a PENDING deposit', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'PENDING' }) as never);
+    mockedPaymentRepo.deleteDeposit.mockResolvedValue(fakeDeposit() as never);
+
+    const res = await request(app).delete('/api/v1/deposits/dep-1').set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(mockedPaymentRepo.deleteDeposit).toHaveBeenCalledWith('dep-1');
+  });
+
+  it('rejects deleting a SUCCESS deposit with 400', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'SUCCESS' }) as never);
+
+    const res = await request(app).delete('/api/v1/deposits/dep-1').set('Authorization', authHeader());
+
+    expect(res.status).toBe(400);
+    expect(mockedPaymentRepo.deleteDeposit).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 when the deposit does not exist', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(null);
+
+    const res = await request(app).delete('/api/v1/deposits/ghost').set('Authorization', authHeader());
+
+    expect(res.status).toBe(404);
+  });
+
+  it('is forbidden for non-Manager roles', async () => {
+    const res = await request(app).delete('/api/v1/deposits/dep-1').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(403);
   });
 });
