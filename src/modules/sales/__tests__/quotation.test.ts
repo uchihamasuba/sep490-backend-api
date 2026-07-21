@@ -212,22 +212,6 @@ describe('quotationService.createQuotationForCustomer', () => {
 });
 
 describe('quotationService.updateQuotation', () => {
-  it('blocks editing when the quotation is not DRAFT', async () => {
-    const itemsById = new Map([['item-1', fakeItem()]]);
-    mockedQuotationRepo.findById.mockResolvedValue(
-      buildQuotationRow({ status: 'APPROVED', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }], itemsById }) as never,
-    );
-
-    await expect(
-      quotationService.updateQuotation('quo-1', {
-        version: 'v2',
-        items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }],
-      }),
-    ).rejects.toMatchObject({ status: 400 });
-
-    expect(mockedQuotationRepo.replaceItems).not.toHaveBeenCalled();
-  });
-
   it('allows editing when the quotation is DRAFT', async () => {
     const itemsById = new Map([['item-1', fakeItem()]]);
     mockedQuotationRepo.findById.mockResolvedValue(
@@ -246,6 +230,61 @@ describe('quotationService.updateQuotation', () => {
 
     expect(result.version).toBe('v2');
     expect(result.totalAmount).toBe(500);
+  });
+
+  it('allows editing an APPROVED quotation that has not been linked to an order', async () => {
+    const itemsById = new Map([['item-1', fakeItem()]]);
+    mockedQuotationRepo.findById.mockResolvedValue(
+      buildQuotationRow({ status: 'APPROVED', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }], itemsById }) as never,
+    );
+    mockedQuotationRepo.getLinkedOrderId.mockResolvedValue(null);
+    mockedQuotationRepo.findItemsByIds.mockResolvedValue([fakeItem()]);
+    mockedQuotationRepo.replaceItems.mockResolvedValue(
+      buildQuotationRow({ status: 'APPROVED', version: 'v2', items: [{ itemId: 'item-1', quantity: 5, price: 100, discount: 0 }], itemsById }) as never,
+    );
+
+    const result = await quotationService.updateQuotation('quo-1', {
+      version: 'v2',
+      items: [{ itemId: 'item-1', quantity: 5, price: 100, discount: 0 }],
+    });
+
+    expect(result.version).toBe('v2');
+    expect(result.totalAmount).toBe(500);
+    expect(result.status).toBe('approved');
+  });
+
+  it('blocks editing an APPROVED quotation that has already been linked to an order', async () => {
+    const itemsById = new Map([['item-1', fakeItem()]]);
+    mockedQuotationRepo.findById.mockResolvedValue(
+      buildQuotationRow({ status: 'APPROVED', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }], itemsById }) as never,
+    );
+    mockedQuotationRepo.getLinkedOrderId.mockResolvedValue({ orderId: 'order-1' } as never);
+
+    await expect(
+      quotationService.updateQuotation('quo-1', {
+        version: 'v2',
+        items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    expect(mockedQuotationRepo.replaceItems).not.toHaveBeenCalled();
+  });
+
+  it('blocks editing a REJECTED quotation', async () => {
+    const itemsById = new Map([['item-1', fakeItem()]]);
+    mockedQuotationRepo.findById.mockResolvedValue(
+      buildQuotationRow({ status: 'REJECTED', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }], itemsById }) as never,
+    );
+
+    await expect(
+      quotationService.updateQuotation('quo-1', {
+        version: 'v2',
+        items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }],
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+
+    expect(mockedQuotationRepo.replaceItems).not.toHaveBeenCalled();
+    expect(mockedQuotationRepo.getLinkedOrderId).not.toHaveBeenCalled();
   });
 });
 

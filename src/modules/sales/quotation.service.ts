@@ -265,8 +265,16 @@ async function createQuotationForCustomer(
 
 async function updateQuotation(quotationId: string, body: UpdateQuotationBody): Promise<QuotationDetailDTO> {
   const existing = await findQuotationOrThrow(quotationId);
-  if (existing.status !== 'DRAFT') {
-    throw AppError.badRequest('Chỉ có thể sửa báo giá khi còn ở trạng thái nháp (DRAFT)');
+
+  if (existing.status === 'REJECTED') {
+    throw AppError.badRequest('Không thể sửa báo giá đã bị từ chối');
+  }
+
+  if (existing.status === 'APPROVED') {
+    const linkedOrder = await quotationRepository.getLinkedOrderId(quotationId);
+    if (linkedOrder) {
+      throw AppError.badRequest('Không thể sửa báo giá đã được chuyển thành đơn hàng');
+    }
   }
 
   const { itemsById } = await resolveAndValidateLines(body.items);
