@@ -43,8 +43,18 @@ export const updateEmployeeStatusBodySchema = z.object({
   status: employeeStatusEnum,
 });
 
+// Mời nhân viên (invite): khác createEmployeeBodySchema ở chỗ email là bắt buộc (mật khẩu tạm được
+// gửi qua email nên bắt buộc phải có nơi để gửi tới).
+export const inviteEmployeeBodySchema = z.object({
+  email: z.string().trim().min(1, 'email is required').email('email is invalid'),
+  fullName: z.string().trim().min(1, 'fullName is required'),
+  phone: z.string().trim().min(1, 'phone is required'),
+  roleId: z.enum(jobTitleIds, { message: 'roleId must be one of the known employee roles' }),
+});
+
 export type EmployeeIdParam = z.infer<typeof employeeIdParamSchema>;
 export type ListEmployeesQuery = z.infer<typeof listEmployeesQuerySchema>;
 export type CreateEmployeeBody = z.infer<typeof createEmployeeBodySchema>;
 export type UpdateEmployeeBody = z.infer<typeof updateEmployeeBodySchema>;
 export type UpdateEmployeeStatusBody = z.infer<typeof updateEmployeeStatusBodySchema>;
+export type InviteEmployeeBody = z.infer<typeof inviteEmployeeBodySchema>;

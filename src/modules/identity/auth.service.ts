@@ -4,6 +4,8 @@ import type { User, UserRole, UserStatus } from '@prisma/client';
 import { env } from '../../config/env';
 import { AppError } from '../../utils/AppError';
 import { logger } from '../../utils/logger';
+import { sendEmail } from '../../utils/mailer';
+import { generateTempPassword } from '../../utils/password';
 import { userRepository } from './user.repository';
 import type { ChangePasswordBody, LoginBody, UpdateProfileBody } from './auth.validators';
 
@@ -104,6 +106,26 @@ async function forgotPassword(username: string): Promise<void> {
   }
 }
 
+function buildResetPasswordEmailHtml(username: string, newPassword: string): string {
+  return `
+    <p>Xin chào ${username},</p>
+    <p>Mật khẩu mới của bạn là: <strong>${newPassword}</strong></p>
+    <p>Vui lòng đăng nhập và đổi mật khẩu ngay sau khi truy cập.</p>
+  `;
+}
+
+// Reset mật khẩu qua email: sinh mật khẩu ngẫu nhiên mới, hash và cập nhật DB, rồi gửi email.
+// Luôn resolve thành công dù email có tồn tại hay không (tránh dò tài khoản qua boundary timing/lỗi).
+async function resetPassword(email: string): Promise<void> {
+  const user = await userRepository.findByEmail(email);
+  if (!user) return;
+
+  const newPassword = generateTempPassword();
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  await userRepository.updatePasswordHash(user.userId, passwordHash);
+  await sendEmail(email, 'Mật khẩu mới của bạn', buildResetPasswordEmailHtml(user.username, newPassword));
+}
+
 async function getProfile(userId: string): Promise<AuthProfileDTO> {
   const user = await userRepository.findById(userId);
   if (!user) throw AppError.notFound('User not found');
@@ -140,6 +162,7 @@ async function changePassword(userId: string, body: ChangePasswordBody): Promise
 export const authService = {
   login,
   forgotPassword,
+  resetPassword,
   getProfile,
   updateProfile,
   changePassword,

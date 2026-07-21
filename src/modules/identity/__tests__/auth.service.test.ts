@@ -2,18 +2,25 @@ import bcrypt from 'bcrypt';
 import type { User, UserRole, UserStatus } from '@prisma/client';
 import { userRepository } from '../user.repository';
 import { authService } from '../auth.service';
+import { sendEmail } from '../../../utils/mailer';
 import type { ChangePasswordBody, LoginBody, UpdateProfileBody } from '../auth.validators';
 
 jest.mock('../user.repository', () => ({
   userRepository: {
     findByUsername: jest.fn(),
     findById: jest.fn(),
+    findByEmail: jest.fn(),
     update: jest.fn(),
     updatePasswordHash: jest.fn(),
   },
 }));
 
+jest.mock('../../../utils/mailer', () => ({
+  sendEmail: jest.fn(),
+}));
+
 const mockedRepo = userRepository as jest.Mocked<typeof userRepository>;
+const mockedSendEmail = sendEmail as jest.MockedFunction<typeof sendEmail>;
 
 const PLAIN_PASSWORD = '123456';
 let PASSWORD_HASH: string;
@@ -98,6 +105,52 @@ describe('authService.forgotPassword', () => {
 
     mockedRepo.findByUsername.mockResolvedValueOnce(null);
     await expect(authService.forgotPassword('ghost')).resolves.toBeUndefined();
+  });
+});
+
+describe('authService.resetPassword', () => {
+  beforeEach(() => {
+    mockedSendEmail.mockResolvedValue(undefined);
+  });
+
+  it('resolves without hashing/updating/emailing when the email does not exist (no enumeration)', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(null);
+
+    await expect(authService.resetPassword('ghost@bnw.com')).resolves.toBeUndefined();
+
+    expect(mockedRepo.updatePasswordHash).not.toHaveBeenCalled();
+    expect(mockedSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('generates a new password, hashes and stores it, and emails it to the user', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(baseUser());
+    mockedRepo.updatePasswordHash.mockResolvedValue(baseUser());
+
+    await authService.resetPassword('manager@bnw.com');
+
+    expect(mockedRepo.updatePasswordHash).toHaveBeenCalledTimes(1);
+    const [userId, storedHash] = mockedRepo.updatePasswordHash.mock.calls[0];
+    expect(userId).toBe('u1');
+    expect(storedHash).not.toBe(PASSWORD_HASH);
+
+    expect(mockedSendEmail).toHaveBeenCalledTimes(1);
+    const [to, subject, html] = mockedSendEmail.mock.calls[0];
+    expect(to).toBe('manager@bnw.com');
+    expect(subject).toContain('Mật khẩu mới');
+
+    // The email body must contain the same plaintext password that was hashed and stored.
+    const newPasswordMatch = /<strong>([0-9a-f]+)<\/strong>/.exec(html);
+    expect(newPasswordMatch).not.toBeNull();
+    await expect(bcrypt.compare(newPasswordMatch![1], storedHash)).resolves.toBe(true);
+  });
+
+  it('propagates the error when sending the reset email fails, after the password has already been updated', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(baseUser());
+    mockedRepo.updatePasswordHash.mockResolvedValue(baseUser());
+    mockedSendEmail.mockRejectedValue(new Error('SMTP connection refused'));
+
+    await expect(authService.resetPassword('manager@bnw.com')).rejects.toThrow('SMTP connection refused');
+    expect(mockedRepo.updatePasswordHash).toHaveBeenCalledTimes(1);
   });
 });
 

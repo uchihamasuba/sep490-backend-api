@@ -2,9 +2,16 @@ import { randomBytes, randomUUID } from 'crypto';
 import bcrypt from 'bcrypt';
 import type { User } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import { sendEmail } from '../../utils/mailer';
+import { generateTempPassword } from '../../utils/password';
 import { employeeRepository } from './employee.repository';
 import { jobTitleById, roleOptionByJobTitle, type EmployeeRoleOption } from './employeeRole.constants';
-import type { CreateEmployeeBody, ListEmployeesQuery, UpdateEmployeeBody } from './employee.validators';
+import type {
+  CreateEmployeeBody,
+  InviteEmployeeBody,
+  ListEmployeesQuery,
+  UpdateEmployeeBody,
+} from './employee.validators';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -25,6 +32,10 @@ export interface EmployeeDTO {
 export interface EmployeeCreatedDTO extends EmployeeDTO {
   username: string;
   tempPassword: string;
+}
+
+export interface EmployeeInvitedDTO extends EmployeeDTO {
+  username: string;
 }
 
 export interface EmployeeListMeta {
@@ -97,8 +108,16 @@ async function generateUniqueUsername(phone: string): Promise<string> {
   return `${base}${randomBytes(3).toString('hex')}`;
 }
 
-function generateTempPassword(): string {
-  return randomBytes(6).toString('hex');
+function buildInviteEmailHtml(fullName: string, username: string, tempPassword: string): string {
+  return `
+    <p>Xin chào ${fullName},</p>
+    <p>Tài khoản nhân viên của bạn tại BNW EMS đã được tạo. Thông tin đăng nhập:</p>
+    <ul>
+      <li>Tên đăng nhập: <strong>${username}</strong></li>
+      <li>Mật khẩu tạm thời: <strong>${tempPassword}</strong></li>
+    </ul>
+    <p>Vui lòng đăng nhập và đổi mật khẩu ngay trong lần sử dụng đầu tiên.</p>
+  `;
 }
 
 async function createEmployee(body: CreateEmployeeBody): Promise<EmployeeCreatedDTO> {
@@ -124,6 +143,42 @@ async function createEmployee(body: CreateEmployeeBody): Promise<EmployeeCreated
   });
 
   return { ...mapEmployee(created), username, tempPassword };
+}
+
+// Mời nhân viên: giống createEmployee nhưng email là bắt buộc (mật khẩu tạm được gửi qua email thay
+// vì trả thẳng trong response — tránh lộ mật khẩu qua log FE/API một khi đã có kênh email đáng tin cậy).
+async function inviteEmployee(body: InviteEmployeeBody): Promise<EmployeeInvitedDTO> {
+  const roleOption = jobTitleById(body.roleId);
+  if (!roleOption) throw AppError.badRequest('Unknown roleId');
+
+  const [existingByEmail, existingByPhone] = await Promise.all([
+    employeeRepository.findByEmail(body.email),
+    employeeRepository.findByPhone(body.phone),
+  ]);
+  if (existingByEmail) throw AppError.conflict('Email đã được sử dụng');
+  if (existingByPhone) throw AppError.conflict('Số điện thoại đã được sử dụng');
+
+  const username = await generateUniqueUsername(body.phone);
+  const tempPassword = generateTempPassword();
+  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+  const employeeCode = await employeeRepository.generateNextEmployeeCode();
+
+  const created = await employeeRepository.create({
+    userId: randomUUID(),
+    username,
+    passwordHash,
+    fullName: body.fullName,
+    phone: body.phone,
+    email: body.email,
+    role: 'TECHNICAL',
+    status: 'ACTIVE',
+    jobTitle: roleOption.name,
+    employeeCode,
+  });
+
+  await sendEmail(body.email, 'Tài khoản nhân viên BNW EMS của bạn', buildInviteEmailHtml(body.fullName, username, tempPassword));
+
+  return { ...mapEmployee(created), username };
 }
 
 async function updateEmployee(userId: string, body: UpdateEmployeeBody): Promise<EmployeeDTO> {
@@ -157,6 +212,7 @@ export const employeeService = {
   listEmployees,
   getEmployeeById,
   createEmployee,
+  inviteEmployee,
   updateEmployee,
   updateEmployeeStatus,
 };

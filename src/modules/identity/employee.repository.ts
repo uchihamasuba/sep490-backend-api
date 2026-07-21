@@ -61,6 +61,17 @@ export const employeeRepository = {
     return prisma.user.findUnique({ where: { username } });
   },
 
+  // email/phone không có unique constraint ở DB (chỉ username/employeeCode) — kiểm tra trùng ở tầng
+  // application trước khi tạo tài khoản invite. Quét toàn bộ `users`, không giới hạn EMPLOYEE_ROLES,
+  // vì ADMIN/MANAGER cũng dùng chung bảng này và không được trùng email/phone với nhân viên mới.
+  findByEmail(email: string): Promise<User | null> {
+    return prisma.user.findFirst({ where: { email } });
+  },
+
+  findByPhone(phone: string): Promise<User | null> {
+    return prisma.user.findFirst({ where: { phone } });
+  },
+
   // Không có DB sequence dành riêng cho employee_code (Hướng A giữ nguyên bảng users) — dùng cùng kiểu
   // đếm-rồi-cộng-1 đã áp dụng nhất quán ở catalogRepository.generateNextItemCode/
   // customerRepository.generateNextCustomerCode trong repo này (chấp nhận race condition hiếm gặp,

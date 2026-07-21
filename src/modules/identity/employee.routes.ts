@@ -6,6 +6,7 @@ import { employeeController } from './employee.controller';
 import {
   createEmployeeBodySchema,
   employeeIdParamSchema,
+  inviteEmployeeBodySchema,
   listEmployeesQuerySchema,
   updateEmployeeBodySchema,
   updateEmployeeStatusBodySchema,
@@ -29,6 +30,13 @@ router.post(
   requireRole('ADMIN'),
   validate(createEmployeeBodySchema, 'body'),
   asyncHandler(employeeController.create),
+);
+
+router.post(
+  '/invite',
+  requireRole('ADMIN'),
+  validate(inviteEmployeeBodySchema, 'body'),
+  asyncHandler(employeeController.invite),
 );
 
 router.get(
