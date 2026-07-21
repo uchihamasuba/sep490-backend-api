@@ -4,6 +4,7 @@ import { employeeService } from './employee.service';
 import type {
   CreateEmployeeBody,
   EmployeeIdParam,
+  InviteEmployeeBody,
   ListEmployeesQuery,
   UpdateEmployeeBody,
   UpdateEmployeeStatusBody,
@@ -27,6 +28,12 @@ async function create(req: Request, res: Response) {
   created(res, employee);
 }
 
+async function invite(req: Request, res: Response) {
+  const body = req.body as InviteEmployeeBody;
+  const employee = await employeeService.inviteEmployee(body);
+  created(res, employee);
+}
+
 async function update(req: Request, res: Response) {
   const { id } = req.params as unknown as EmployeeIdParam;
   const body = req.body as UpdateEmployeeBody;
@@ -45,6 +52,7 @@ export const employeeController = {
   list,
   getById,
   create,
+  invite,
   update,
   updateStatus,
 };

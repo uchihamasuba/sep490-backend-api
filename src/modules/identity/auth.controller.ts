@@ -2,7 +2,13 @@ import type { Request, Response } from 'express';
 import { AppError } from '../../utils/AppError';
 import { ok } from '../../utils/response';
 import { authService } from './auth.service';
-import type { ChangePasswordBody, ForgotPasswordBody, LoginBody, UpdateProfileBody } from './auth.validators';
+import type {
+  ChangePasswordBody,
+  ForgotPasswordBody,
+  LoginBody,
+  ResetPasswordBody,
+  UpdateProfileBody,
+} from './auth.validators';
 
 async function login(req: Request, res: Response) {
   const body = req.body as LoginBody;
@@ -14,6 +20,12 @@ async function forgotPassword(req: Request, res: Response) {
   const body = req.body as ForgotPasswordBody;
   await authService.forgotPassword(body.username);
   ok(res, null);
+}
+
+async function resetPassword(req: Request, res: Response) {
+  const body = req.body as ResetPasswordBody;
+  await authService.resetPassword(body.email);
+  ok(res, { message: 'Nếu email tồn tại trong hệ thống, mật khẩu mới đã được gửi tới email đó.' });
 }
 
 async function getProfile(req: Request, res: Response) {
@@ -39,6 +51,7 @@ async function changePassword(req: Request, res: Response) {
 export const authController = {
   login,
   forgotPassword,
+  resetPassword,
   getProfile,
   updateProfile,
   changePassword,

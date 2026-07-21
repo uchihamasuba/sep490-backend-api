@@ -26,6 +26,14 @@ const envSchema = z.object({
   COMPANY_BANK_NAME: z.string().optional(),
   COMPANY_BANK_ACCOUNT_NUMBER: z.string().optional(),
   COMPANY_BANK_ACCOUNT_NAME: z.string().optional(),
+
+  // SMTP (Gmail App Password) dùng cho mời nhân viên & reset mật khẩu qua email. Optional: chỉ các
+  // tính năng gửi email phụ thuộc, không chặn boot server khi chưa cấu hình.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
 function loadEnv() {

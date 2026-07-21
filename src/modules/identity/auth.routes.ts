@@ -7,6 +7,7 @@ import {
   changePasswordBodySchema,
   forgotPasswordBodySchema,
   loginBodySchema,
+  resetPasswordBodySchema,
   updateProfileBodySchema,
 } from './auth.validators';
 
@@ -18,6 +19,12 @@ router.post(
   '/forgot-password',
   validate(forgotPasswordBodySchema, 'body'),
   asyncHandler(authController.forgotPassword),
+);
+
+router.post(
+  '/reset-password',
+  validate(resetPasswordBodySchema, 'body'),
+  asyncHandler(authController.resetPassword),
 );
 
 router.get('/profile', requireAuth, asyncHandler(authController.getProfile));

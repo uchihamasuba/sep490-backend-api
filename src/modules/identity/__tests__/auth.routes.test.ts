@@ -10,9 +10,14 @@ jest.mock('../user.repository', () => ({
   userRepository: {
     findByUsername: jest.fn(),
     findById: jest.fn(),
+    findByEmail: jest.fn(),
     update: jest.fn(),
     updatePasswordHash: jest.fn(),
   },
+}));
+
+jest.mock('../../../utils/mailer', () => ({
+  sendEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
 const mockedRepo = userRepository as jest.Mocked<typeof userRepository>;
@@ -102,6 +107,35 @@ describe('POST /api/v1/auth/forgot-password', () => {
     const notFound = await request(app).post('/api/v1/auth/forgot-password').send({ username: 'ghost' });
     expect(notFound.status).toBe(200);
     expect(notFound.body.data).toBeNull();
+  });
+});
+
+describe('POST /api/v1/auth/reset-password', () => {
+  it('returns 200 with a generic message and updates the password when the email exists', async () => {
+    mockedRepo.findByEmail.mockResolvedValueOnce(baseUser());
+    mockedRepo.updatePasswordHash.mockResolvedValueOnce(baseUser());
+
+    const res = await request(app).post('/api/v1/auth/reset-password').send({ email: 'manager@bnw.com' });
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.data.message).toBe('string');
+    expect(mockedRepo.updatePasswordHash).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 200 with the same generic message when the email does not exist (no enumeration)', async () => {
+    mockedRepo.findByEmail.mockResolvedValueOnce(null);
+
+    const res = await request(app).post('/api/v1/auth/reset-password').send({ email: 'ghost@bnw.com' });
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.data.message).toBe('string');
+    expect(mockedRepo.updatePasswordHash).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an invalid email', async () => {
+    const res = await request(app).post('/api/v1/auth/reset-password').send({ email: 'not-an-email' });
+    expect(res.status).toBe(400);
+    expect(mockedRepo.findByEmail).not.toHaveBeenCalled();
   });
 });
 

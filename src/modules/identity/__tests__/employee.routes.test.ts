@@ -12,6 +12,8 @@ jest.mock('../employee.repository', () => ({
     countAll: jest.fn(),
     findById: jest.fn(),
     findByUsername: jest.fn(),
+    findByEmail: jest.fn(),
+    findByPhone: jest.fn(),
     generateNextEmployeeCode: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -20,6 +22,10 @@ jest.mock('../employee.repository', () => ({
 
 jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed'),
+}));
+
+jest.mock('../../../utils/mailer', () => ({
+  sendEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
 const mockedRepo = employeeRepository as jest.Mocked<typeof employeeRepository>;
@@ -123,6 +129,67 @@ describe('POST /api/v1/employees', () => {
       .post('/api/v1/employees')
       .set('Authorization', authHeader('MANAGER'))
       .send({ name: 'Nguyen Van B', phone: '0912345678', roleId: 'ky-thuat' });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/v1/employees/invite', () => {
+  it('creates the account, emails the credentials, and returns 201 without a plaintext tempPassword', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(null);
+    mockedRepo.findByPhone.mockResolvedValue(null);
+    mockedRepo.findByUsername.mockResolvedValue(null);
+    mockedRepo.generateNextEmployeeCode.mockResolvedValue('NV003');
+    mockedRepo.create.mockResolvedValue(
+      baseUser({ userId: 'u3', email: 'new.employee@bnw.com', employeeCode: 'NV003' }),
+    );
+
+    const res = await request(app)
+      .post('/api/v1/employees/invite')
+      .set('Authorization', authHeader())
+      .send({ email: 'new.employee@bnw.com', fullName: 'Nguyen Van C', phone: '0911111111', roleId: 'ky-thuat' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ id: 'u3', employeeCode: 'NV003' });
+    expect(res.body.data.tempPassword).toBeUndefined();
+  });
+
+  it('rejects an invalid email with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/employees/invite')
+      .set('Authorization', authHeader())
+      .send({ email: 'not-an-email', fullName: 'Nguyen Van C', phone: '0911111111', roleId: 'ky-thuat' });
+
+    expect(res.status).toBe(400);
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a payload missing required fields with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/employees/invite')
+      .set('Authorization', authHeader())
+      .send({ email: 'new.employee@bnw.com' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a duplicate email with 409', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(baseUser());
+
+    const res = await request(app)
+      .post('/api/v1/employees/invite')
+      .set('Authorization', authHeader())
+      .send({ email: 'new.employee@bnw.com', fullName: 'Nguyen Van C', phone: '0911111111', roleId: 'ky-thuat' });
+
+    expect(res.status).toBe(409);
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('is forbidden for non-admin roles', async () => {
+    const res = await request(app)
+      .post('/api/v1/employees/invite')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ email: 'new.employee@bnw.com', fullName: 'Nguyen Van C', phone: '0911111111', roleId: 'ky-thuat' });
+
     expect(res.status).toBe(403);
   });
 });
