@@ -27,7 +27,7 @@ const orderItemInputSchema = z.object({
   quantity: z.coerce.number().int().positive('quantity must be > 0'),
   unitPrice: z.coerce.number().nonnegative('unitPrice must be >= 0'),
   source: orderItemSourceEnum.default('INTERNAL'),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export const createOrderBodySchema = z.object({
@@ -39,7 +39,7 @@ export const createOrderBodySchema = z.object({
   location: z.string().trim().min(1, 'location is required'),
   guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'guestCount is too large').optional(),
   items: z.array(orderItemInputSchema).min(1, 'items must contain at least 1 line'),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export const updateOrderStatusBodySchema = z
@@ -63,7 +63,7 @@ export const updateOrderItemBodySchema = z
     unitPrice: z.coerce.number().nonnegative('unitPrice must be >= 0').optional(),
     source: orderItemSourceEnum.optional(),
     preparedQty: z.coerce.number().int().nonnegative().optional(),
-    notes: z.string().trim().min(1).optional(),
+    notes: z.string().trim().optional(),
   })
   .refine((data) => Object.values(data).some((v) => v !== undefined), {
     message: 'At least one field must be provided',
@@ -83,7 +83,7 @@ export const updateOrderQuotationBodySchema = z.object({
 });
 
 export const closeOrderBodySchema = z.object({
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 const confirmPreparedItemSchema = z.object({
@@ -100,7 +100,7 @@ export const createDepositBodySchema = z.object({
   dueDate: z.coerce.date().optional(),
   paymentMethod: z.string().trim().min(1).optional(),
   qrCodeUrl: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export const createSettlementBodySchema = z.object({
@@ -109,7 +109,7 @@ export const createSettlementBodySchema = z.object({
   discount: z.coerce.number().nonnegative().default(0),
   paymentMethod: z.string().trim().min(1).optional(),
   qrCodeUrl: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 const exportStatusEnum = z.enum(['PENDING', 'EXPORTED']);

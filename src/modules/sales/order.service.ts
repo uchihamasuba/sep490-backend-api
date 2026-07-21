@@ -283,7 +283,7 @@ async function createOrder(body: CreateOrderBody, createdByUserId: string): Prom
     eventDate: body.eventDate,
     location: body.location,
     guestCount: body.guestCount ?? null,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     createdBy: createdByUserId,
     itemInputs: body.items,
   });
@@ -475,7 +475,7 @@ async function createDeposit(orderId: string, body: CreateDepositBody, requested
     dueDate: body.dueDate ?? null,
     paymentMethod: body.paymentMethod ?? null,
     qrCodeUrl: body.qrCodeUrl ?? null,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     requestedBy,
   });
   return mapDeposit(created);
@@ -502,7 +502,7 @@ async function createSettlement(orderId: string, body: CreateSettlementBody, req
     finalAmount,
     paymentMethod: body.paymentMethod ?? null,
     qrCodeUrl: body.qrCodeUrl ?? null,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     requestedBy,
   };
 

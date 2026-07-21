@@ -26,7 +26,7 @@ export const createSurveyReportBodySchema = z
     siteConstraints: z.string().trim().min(1).optional(),
     additionalRequests: z.string().trim().min(1).optional(),
     proposedItems: z.string().trim().min(1).optional(),
-    notes: z.string().trim().min(1).optional(),
+    notes: z.string().trim().optional(),
     evidenceId: z.string().trim().min(1).optional(),
   })
   // Kích thước mặt bằng (diện tích/dài/rộng) phải khai đủ bộ 3 hoặc bỏ hẳn — không chấp nhận khai nửa

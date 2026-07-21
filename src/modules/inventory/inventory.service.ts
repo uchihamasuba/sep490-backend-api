@@ -239,7 +239,7 @@ async function adjustInventory(body: AdjustInventoryBody, actorId: string): Prom
     movementType: 'ADJUSTMENT',
     quantity: body.deltaTotal,
     performedBy: actorId,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
   });
 
   return mapInventory(updated);
@@ -312,13 +312,13 @@ async function createReport(body: CreateReportBody, reportedBy: string): Promise
     reportType: body.reportType,
     transactionId: body.transactionId ?? null,
     reportedBy,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     items: body.items.map((line) => ({
       itemId: line.itemId,
       goodQuantity: line.goodQuantity,
       damagedQuantity: line.damagedQuantity,
       lostQuantity: line.lostQuantity,
-      notes: line.notes ?? null,
+      notes: line.notes || null,
     })),
   });
 

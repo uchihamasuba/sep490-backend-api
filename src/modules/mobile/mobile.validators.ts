@@ -11,7 +11,7 @@ const reportItemInputSchema = z.object({
   goodQuantity: z.coerce.number().int().nonnegative().default(0),
   damagedQuantity: z.coerce.number().int().nonnegative().default(0),
   lostQuantity: z.coerce.number().int().nonnegative().default(0),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 // POST /api/v1/mobile/orders/:id/collected-reports — orderId lấy từ path param, không nằm trong body
@@ -19,7 +19,7 @@ const reportItemInputSchema = z.object({
 export const createMobileReportBodySchema = z.object({
   reportType: reportTypeEnum.default('INTERNAL'),
   transactionId: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   items: z.array(reportItemInputSchema).min(1, 'items must contain at least 1 line'),
 });
 

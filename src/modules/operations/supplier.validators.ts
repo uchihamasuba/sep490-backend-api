@@ -25,7 +25,7 @@ export const createSupplierBodySchema = z.object({
   address: z.string().trim().min(1).optional(),
   contactPerson: z.string().trim().min(1).optional(),
   rating: z.coerce.number().min(0).max(5).optional(),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   status: activeStatusEnum.default('ACTIVE'),
 });
 
@@ -39,7 +39,7 @@ export const updateSupplierBodySchema = z
     address: z.string().trim().min(1).optional(),
     contactPerson: z.string().trim().min(1).optional(),
     rating: z.coerce.number().min(0).max(5).optional(),
-    notes: z.string().trim().min(1).optional(),
+    notes: z.string().trim().optional(),
     status: activeStatusEnum.optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' });

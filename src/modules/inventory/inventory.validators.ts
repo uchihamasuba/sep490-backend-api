@@ -40,14 +40,14 @@ export const createInventoryBodySchema = z.object({
 export const adjustInventoryBodySchema = z.object({
   itemId: z.string().trim().min(1, 'itemId is required'),
   deltaTotal: z.coerce.number().int().refine((v) => v !== 0, 'deltaTotal must not be 0'),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export const reserveInventoryBodySchema = z.object({
   itemId: z.string().trim().min(1, 'itemId is required'),
   quantity: z.coerce.number().int().positive('quantity must be > 0'),
   orderId: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export const releaseInventoryBodySchema = reserveInventoryBodySchema;
@@ -64,19 +64,19 @@ const reportItemInputSchema = z.object({
   goodQuantity: z.coerce.number().int().nonnegative().default(0),
   damagedQuantity: z.coerce.number().int().nonnegative().default(0),
   lostQuantity: z.coerce.number().int().nonnegative().default(0),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export const createReportBodySchema = z.object({
   orderId: z.string().trim().min(1, 'orderId is required'),
   reportType: reportTypeEnum,
   transactionId: z.string().trim().min(1).optional(),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   items: z.array(reportItemInputSchema).min(1, 'items must contain at least 1 line'),
 });
 
 export const confirmReportBodySchema = z.object({
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export type ItemIdParam = z.infer<typeof itemIdParamSchema>;

@@ -122,7 +122,7 @@ export const quotationRepository = {
   },
 
   getLinkedOrderId(quotationId: string) {
-    return prisma.order.findFirst({ where: { quotationId }, select: { orderId: true } });
+    return prisma.order.findFirst({ where: { quotationId }, select: { orderId: true, orderStatus: true } });
   },
 
   // Dùng cho điều kiện "hủy liên kết báo giá" ở docs/api/baogiavahopdong_api.md mục 1.2/2 #4 — khách

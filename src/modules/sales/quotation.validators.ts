@@ -33,13 +33,13 @@ const quotationItemInputSchema = z.object({
 
 export const createQuotationBodySchema = z.object({
   version: z.string().trim().min(1, 'version is required').default('v1'),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   items: z.array(quotationItemInputSchema).min(1, 'items must contain at least 1 line'),
 });
 
 export const updateQuotationBodySchema = z.object({
   version: z.string().trim().min(1, 'version is required'),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   items: z.array(quotationItemInputSchema).min(1, 'items must contain at least 1 line'),
 });
 

@@ -139,7 +139,7 @@ async function createSurveyReport(body: CreateSurveyReportBody, reportedBy: stri
     siteConstraints: body.siteConstraints ?? null,
     additionalRequests: body.additionalRequests ?? null,
     proposedItems: body.proposedItems ?? null,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     evidenceId: body.evidenceId ?? null,
     reportedBy,
   });

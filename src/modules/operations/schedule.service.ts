@@ -159,7 +159,7 @@ async function createSchedulePlan(body: CreateSchedulePlanBody, createdBy: strin
     startTime: body.startTime,
     endTime: body.endTime ?? null,
     location: body.location ?? null,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     createdBy,
     assignees: body.assignees,
   });
@@ -177,7 +177,7 @@ async function updateSchedulePlan(planId: string, body: UpdateSchedulePlanBody):
     startTime: body.startTime,
     endTime: body.endTime ?? null,
     location: body.location ?? null,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
   });
   return mapPlan(updated);
 }

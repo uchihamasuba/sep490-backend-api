@@ -1,4 +1,4 @@
-import type { Item, QuotationStatus } from '@prisma/client';
+import type { Item, OrderStatus, QuotationStatus } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
 import { customerRepository } from './customer.repository';
 import {
@@ -253,7 +253,7 @@ async function createQuotationForCustomer(
   const created = await quotationRepository.create({
     customerId,
     version: body.version,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     createdBy: createdByUserId,
     quotationCode,
     itemInputs: body.items,
@@ -263,6 +263,11 @@ async function createQuotationForCustomer(
   return mapDetail(created, null);
 }
 
+// Đơn ở 2 trạng thái này coi như đã "chốt" nghiệp vụ (đã hoàn tất/đã hủy) — sửa số liệu báo giá lúc này
+// không còn ý nghĩa, nên vẫn chặn. Các trạng thái khác (NEW/CONFIRMED/IN_PROGRESS) cho phép Manager sửa
+// số lượng/đơn giá/giảm giá của báo giá dù đã linkedOrderId.
+const ORDER_STATUSES_BLOCKING_QUOTATION_EDIT: ReadonlySet<OrderStatus> = new Set(['COMPLETED', 'CANCELLED']);
+
 async function updateQuotation(quotationId: string, body: UpdateQuotationBody): Promise<QuotationDetailDTO> {
   const existing = await findQuotationOrThrow(quotationId);
 
@@ -270,11 +275,11 @@ async function updateQuotation(quotationId: string, body: UpdateQuotationBody): 
     throw AppError.badRequest('Không thể sửa báo giá đã bị từ chối');
   }
 
-  if (existing.status === 'APPROVED') {
-    const linkedOrder = await quotationRepository.getLinkedOrderId(quotationId);
-    if (linkedOrder) {
-      throw AppError.badRequest('Không thể sửa báo giá đã được chuyển thành đơn hàng');
-    }
+  const linkedOrder = await quotationRepository.getLinkedOrderId(quotationId);
+  if (linkedOrder && ORDER_STATUSES_BLOCKING_QUOTATION_EDIT.has(linkedOrder.orderStatus)) {
+    throw AppError.badRequest(
+      'Không thể sửa báo giá vì đơn hàng liên kết đã hoàn tất hoặc đã hủy',
+    );
   }
 
   const { itemsById } = await resolveAndValidateLines(body.items);
@@ -282,12 +287,11 @@ async function updateQuotation(quotationId: string, body: UpdateQuotationBody): 
   const updated = await quotationRepository.replaceItems({
     quotationId,
     version: body.version,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     itemInputs: body.items,
     itemsById,
   });
 
-  const linkedOrder = await quotationRepository.getLinkedOrderId(quotationId);
   return mapDetail(updated, linkedOrder?.orderId ?? null);
 }
 

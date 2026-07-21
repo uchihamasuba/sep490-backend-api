@@ -39,7 +39,7 @@ export const createSchedulePlanBodySchema = z
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
-    notes: z.string().trim().min(1).optional(),
+    notes: z.string().trim().optional(),
     assignees: z.array(assigneeInputSchema).default([]),
   })
   .refine((data) => !data.endTime || data.endTime > data.startTime, {
@@ -52,7 +52,7 @@ export const updateSchedulePlanBodySchema = z
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
-    notes: z.string().trim().min(1).optional(),
+    notes: z.string().trim().optional(),
   })
   .refine((data) => !data.endTime || data.endTime > data.startTime, {
     message: 'endTime must be after startTime',
@@ -61,7 +61,7 @@ export const updateSchedulePlanBodySchema = z
 
 export const updateSchedulePlanStatusBodySchema = z.object({
   status: scheduleStatusEnum,
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
   evidenceId: z.string().trim().min(1).optional(),
 });
 
@@ -76,7 +76,7 @@ const batchPlanInputSchema = z
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
-    notes: z.string().trim().min(1).optional(),
+    notes: z.string().trim().optional(),
     assignees: z.array(assigneeInputSchema).default([]),
   })
   .refine((data) => !data.endTime || data.endTime > data.startTime, {
@@ -97,7 +97,7 @@ export const createSchedulePlansBatchBodySchema = z.object({
 export const batchUpdateSchedulePlanStatusBodySchema = z.object({
   planIds: z.array(z.string().trim().min(1)).min(1, 'planIds must contain at least 1 id'),
   status: z.enum(['CONFIRMED', 'CANCELLED']),
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().trim().optional(),
 });
 
 export type PlanIdParam = z.infer<typeof planIdParamSchema>;

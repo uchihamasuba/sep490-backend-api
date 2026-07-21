@@ -155,7 +155,7 @@ async function createSupplier(body: CreateSupplierBody): Promise<SupplierDTO> {
     address: body.address ?? null,
     contactPerson: body.contactPerson ?? null,
     rating: body.rating ?? null,
-    notes: body.notes ?? null,
+    notes: body.notes || null,
     status: body.status,
   });
   return mapSupplier(created, 0);
@@ -177,7 +177,7 @@ async function updateSupplier(supplierId: string, body: UpdateSupplierBody): Pro
     ...(body.address !== undefined ? { address: body.address } : {}),
     ...(body.contactPerson !== undefined ? { contactPerson: body.contactPerson } : {}),
     ...(body.rating !== undefined ? { rating: body.rating } : {}),
-    ...(body.notes !== undefined ? { notes: body.notes } : {}),
+    ...(body.notes !== undefined ? { notes: body.notes || null } : {}),
     ...(body.status !== undefined ? { status: body.status } : {}),
   });
 
