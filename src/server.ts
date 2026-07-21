@@ -16,7 +16,7 @@ async function main() {
     server.close(() => {
       prisma
         .$disconnect()
-        .catch((err) => logger.error({ err }, 'Error disconnecting Prisma'))
+        .catch((err: any) => logger.error({ err }, 'Error disconnecting Prisma'))
         .finally(() => process.exit(0));
     });
   };
@@ -25,7 +25,7 @@ async function main() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-main().catch((err) => {
+main().catch((err: any) => {
   logger.error({ err }, 'Failed to start server');
   process.exit(1);
 });
