@@ -30,11 +30,12 @@ router.get(
   asyncHandler(surveyController.getById),
 );
 
-// Tạo báo cáo: đã chốt là hành động của Leader Staff qua mobile, không còn nút trên web — endpoint vẫn
-// giữ nguyên cho mobile gọi (docs/api/khaosathientruong_api.md mục 0/5).
+// Tạo báo cáo: ban đầu chỉ Leader Staff qua mobile (docs/api/khaosathientruong_api.md mục 0/5), nhưng
+// người dùng đã yêu cầu thêm lại nút "+ Tạo báo cáo khảo sát" cho Manager trên web (2026-07-21) — nới
+// role cho cả MANAGER, giữ nguyên LEADER cho mobile.
 router.post(
   '/',
-  requireRole('LEADER'),
+  requireRole('LEADER', 'MANAGER'),
   validate(createSurveyReportBodySchema, 'body'),
   asyncHandler(surveyController.create),
 );

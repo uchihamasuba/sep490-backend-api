@@ -120,13 +120,17 @@ describe('HTTP routes — role permission matrix', () => {
     expect(res.status).toBe(201);
   });
 
-  it('POST /api/v1/survey-reports is forbidden for MANAGER (reporting is a Leader/mobile action)', async () => {
+  it('POST /api/v1/survey-reports succeeds for MANAGER (web "+ Tạo báo cáo khảo sát" nút, yêu cầu 2026-07-22)', async () => {
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'ord-1' });
+    mockedRepo.generateNextReportCode.mockResolvedValue('SUR-001');
+    mockedRepo.create.mockResolvedValue(fakeSurvey() as never);
+
     const res = await request(app)
       .post('/api/v1/survey-reports')
       .set('Authorization', authHeader('MANAGER'))
       .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
   });
 
   it('POST /api/v1/survey-reports is forbidden for TECHNICAL', async () => {
