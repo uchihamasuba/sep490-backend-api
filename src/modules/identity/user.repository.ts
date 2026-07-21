@@ -41,6 +41,10 @@ export const userRepository = {
     return { rows, totalItems };
   },
 
+  create(data: Prisma.UserCreateInput) {
+    return prisma.user.create({ data });
+  },
+
   update(userId: string, data: Prisma.UserUpdateInput) {
     return prisma.user.update({ where: { userId }, data });
   },
