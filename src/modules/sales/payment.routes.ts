@@ -7,6 +7,7 @@ import {
   confirmSettlementBodySchema,
   depositIdParamSchema,
   listDepositsQuerySchema,
+  markSettlementPaidBodySchema,
   settlementIdParamSchema,
   updateDepositStatusBodySchema,
 } from './payment.validators';
@@ -54,4 +55,14 @@ settlementRouter.put(
   validate(settlementIdParamSchema, 'params'),
   validate(confirmSettlementBodySchema, 'body'),
   asyncHandler(paymentController.confirmSettlement),
+);
+
+// Transition REQUESTED -> PAID (docs/api/api.md gap (n)) — role LEADER, Leader xác nhận đã thu tiền
+// tại hiện trường kèm ảnh bằng chứng.
+settlementRouter.put(
+  '/:settlementId/mark-paid',
+  requireRole('LEADER'),
+  validate(settlementIdParamSchema, 'params'),
+  validate(markSettlementPaidBodySchema, 'body'),
+  asyncHandler(paymentController.markSettlementPaid),
 );

@@ -95,4 +95,11 @@ export const paymentRepository = {
       data: { status: 'CONFIRMED', confirmedBy, confirmedAt: new Date() },
     });
   },
+
+  markSettlementPaid(settlementId: string, evidenceId: string): Promise<Settlement> {
+    return prisma.settlement.update({
+      where: { settlementId },
+      data: { status: 'PAID', paidAt: new Date(), evidenceId },
+    });
+  },
 };

@@ -4,13 +4,16 @@ import {
   supplierRepository,
   supplierTransactionRepository,
   type SupplierTransactionWithDetails,
+  type SupplierTransactionWithItems,
 } from './supplier.repository';
 import type {
   CreateSupplierBody,
   ListSupplierTransactionsQuery,
   ListSuppliersQuery,
+  ReceiveTransactionItemBody,
   UpdateSupplierBody,
 } from './supplier.validators';
+import type { Actor } from './schedule.service';
 
 export interface SupplierDTO {
   supplierId: string;
@@ -114,6 +117,54 @@ function mapTransaction(row: SupplierTransactionWithDetails): SupplierTransactio
   };
 }
 
+export interface SupplierTransactionItemDTO {
+  stItemId: string;
+  transactionId: string;
+  itemId: string | null;
+  itemName: string;
+  quantity: number;
+  unitCost: number;
+  subtotal: number;
+  receivedQuantity: number;
+  notes: string | null;
+}
+
+export interface SupplierTransactionDetailDTO extends SupplierTransactionDTO {
+  items: SupplierTransactionItemDTO[];
+}
+
+function mapTransactionItem(row: SupplierTransactionWithItems['items'][number]): SupplierTransactionItemDTO {
+  return {
+    stItemId: row.stItemId,
+    transactionId: row.transactionId,
+    itemId: row.itemId,
+    itemName: row.itemName,
+    quantity: row.quantity,
+    unitCost: toNumber(row.unitCost),
+    subtotal: toNumber(row.subtotal),
+    receivedQuantity: row.receivedQuantity,
+    notes: row.notes,
+  };
+}
+
+function mapTransactionDetail(row: SupplierTransactionWithItems): SupplierTransactionDetailDTO {
+  return {
+    ...mapTransaction(row),
+    items: row.items.map(mapTransactionItem),
+  };
+}
+
+// LEADER chỉ thao tác được trên transaction thuộc order của plan họ được phân công (docs/api/api.md
+// gap (h)/(i)) — MANAGER/ADMIN không bị giới hạn phạm vi này.
+async function assertActorCanAccessTransaction(actor: Actor, orderId: string): Promise<void> {
+  if (actor.role === 'LEADER') {
+    const assigned = await supplierTransactionRepository.isUserAssignedToOrder(actor.id, orderId);
+    if (!assigned) {
+      throw AppError.forbidden('Bạn không được phân công vào kế hoạch nào của đơn hàng này');
+    }
+  }
+}
+
 async function findSupplierOrThrow(supplierId: string): Promise<Supplier> {
   const supplier = await supplierRepository.findById(supplierId);
   if (!supplier) throw AppError.notFound('Supplier not found');
@@ -203,10 +254,46 @@ async function listSupplierTransactions(query: ListSupplierTransactionsQuery): P
   };
 }
 
+// GET /supplier-transactions/:id — chi tiết kèm items[] (docs/api/api.md gap (q)).
+async function getSupplierTransactionById(transactionId: string, actor: Actor): Promise<SupplierTransactionDetailDTO> {
+  const transaction = await supplierTransactionRepository.findById(transactionId);
+  if (!transaction) throw AppError.notFound('Supplier transaction not found');
+
+  await assertActorCanAccessTransaction(actor, transaction.orderId);
+  return mapTransactionDetail(transaction);
+}
+
+// PATCH /supplier-transactions/:transactionId/items/:stItemId — xác nhận nhận hàng từng dòng (docs/api/
+// api.md gap (i)). Không tự cộng inventory (INBOUND) khi PURCHASE nhận đủ — quyết định nghiệp vụ đó
+// chưa chốt (xem ghi chú gap (i)), Manager vẫn xử lý nhập kho riêng qua POST /inventory/adjust.
+async function receiveTransactionItem(
+  transactionId: string,
+  stItemId: string,
+  body: ReceiveTransactionItemBody,
+  actor: Actor,
+): Promise<SupplierTransactionItemDTO> {
+  const transaction = await supplierTransactionRepository.findById(transactionId);
+  if (!transaction) throw AppError.notFound('Supplier transaction not found');
+
+  await assertActorCanAccessTransaction(actor, transaction.orderId);
+
+  const item = transaction.items.find((i) => i.stItemId === stItemId);
+  if (!item) throw AppError.notFound('Supplier transaction item not found');
+
+  if (body.receivedQuantity > item.quantity) {
+    throw AppError.badRequest(`receivedQuantity không được vượt quá quantity đã đặt (${item.quantity})`);
+  }
+
+  const updated = await supplierTransactionRepository.updateItemReceivedQuantity(stItemId, body.receivedQuantity);
+  return mapTransactionItem(updated);
+}
+
 export const supplierService = {
   listSuppliers,
   createSupplier,
   getSupplierById,
   updateSupplier,
   listSupplierTransactions,
+  getSupplierTransactionById,
+  receiveTransactionItem,
 };

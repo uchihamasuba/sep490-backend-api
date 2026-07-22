@@ -96,7 +96,7 @@ async function confirmReport(req: Request, res: Response) {
   const actor = requireActor(req);
   const { reportId } = req.params as unknown as ReportIdParam;
   void (req.body as ConfirmReportBody);
-  const report = await inventoryService.confirmReport(reportId, actor.id);
+  const report = await inventoryService.confirmReport(reportId, actor);
   ok(res, report);
 }
 

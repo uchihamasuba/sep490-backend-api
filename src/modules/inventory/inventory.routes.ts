@@ -67,10 +67,11 @@ router.get(
 );
 
 // Thu hồi & hoàn kho: Leader (mobile) nộp biên bản, Manager xác nhận trên web — cùng mô hình đã dùng
-// cho survey-reports (operations module).
+// cho survey-reports (operations module). Nới thêm LEADER (docs/api/api.md gap (j)) để đọc lại báo
+// cáo đã nộp.
 router.get(
   '/collected-equipment-reports',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'LEADER'),
   validate(listReportsQuerySchema, 'query'),
   asyncHandler(inventoryController.listReports),
 );
@@ -89,9 +90,11 @@ router.get(
   asyncHandler(inventoryController.getReportById),
 );
 
+// Nới thêm LEADER (docs/api/api.md gap (k), đã chốt 2026-07-22) — Leader tự xác nhận "đã trả kho" trên
+// app, giới hạn ở tầng service theo order của plan họ được phân công (inventoryService.confirmReport).
 router.put(
   '/collected-equipment-reports/:reportId/confirm',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'LEADER'),
   validate(reportIdParamSchema, 'params'),
   validate(confirmReportBodySchema, 'body'),
   asyncHandler(inventoryController.confirmReport),
@@ -121,9 +124,10 @@ router.get(
   asyncHandler(inventoryController.getReportById),
 );
 
+// Nới thêm LEADER — cùng lý do đã ghi ở alias chính `/collected-equipment-reports/:reportId/confirm`.
 router.put(
   '/return-reports/:reportId/confirm',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'LEADER'),
   validate(reportIdParamSchema, 'params'),
   validate(confirmReportBodySchema, 'body'),
   asyncHandler(inventoryController.confirmReport),

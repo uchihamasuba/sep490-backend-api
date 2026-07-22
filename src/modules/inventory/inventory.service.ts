@@ -1,5 +1,9 @@
 import { AppError } from '../../utils/AppError';
+import { scheduleRepository } from '../operations/schedule.repository';
+import type { Actor } from '../operations/schedule.service';
+import type { WarehouseMovementBody } from '../operations/schedule.validators';
 import {
+  InsufficientFieldStockError,
   inventoryRepository,
   type InventoryWithItem,
   type MovementWithDetails,
@@ -325,10 +329,19 @@ async function createReport(body: CreateReportBody, reportedBy: string): Promise
   return mapReport(created);
 }
 
-async function confirmReport(reportId: string, confirmedBy: string): Promise<ReportDTO> {
+// docs/api/api.md gap (k), đã chốt 2026-07-22: Leader tự xác nhận "đã trả kho/NCC" trên app, giới hạn
+// theo order của plan họ được phân công (cùng mẫu assertActorCanAccessTransaction ở supplier.service.ts).
+async function confirmReport(reportId: string, actor: Actor): Promise<ReportDTO> {
   const report = await findReportOrThrow(reportId);
   if (report.status !== 'SUBMITTED') {
     throw AppError.badRequest(`Chỉ có thể xác nhận báo cáo đang ở trạng thái SUBMITTED (hiện tại: ${report.status})`);
+  }
+
+  if (actor.role === 'LEADER') {
+    const assigned = await inventoryRepository.isUserAssignedToOrder(actor.id, report.orderId);
+    if (!assigned) {
+      throw AppError.forbidden('Bạn không được phân công vào kế hoạch nào của đơn hàng này');
+    }
   }
 
   for (const line of report.items) {
@@ -347,7 +360,7 @@ async function confirmReport(reportId: string, confirmedBy: string): Promise<Rep
   const confirmed = await inventoryRepository.confirmReportAndApplyInventory(
     reportId,
     report.orderId,
-    confirmedBy,
+    actor.id,
     report.items.map((line) => ({
       itemId: line.itemId,
       goodQuantity: line.goodQuantity,
@@ -357,6 +370,43 @@ async function confirmReport(reportId: string, confirmedBy: string): Promise<Rep
   );
 
   return mapReport(confirmed);
+}
+
+// POST /schedule-plans/:planId/warehouse-movement (docs/api/api.md gap (g)) — Leader ghi nhận xuất kho
+// doanh nghiệp thực tế tại hiện trường (TSK-SETUP). Chỉ Leader giữ vai trò LEAD của đúng plan đó được
+// gọi (không phải mọi assignee) — khớp gate `isLead` phía FE (WarehouseMovementSection).
+async function recordFieldOutbound(planId: string, body: WarehouseMovementBody, actor: Actor): Promise<MovementDTO[]> {
+  const plan = await scheduleRepository.findById(planId);
+  if (!plan) throw AppError.notFound('Schedule plan not found');
+
+  const isLeadAssignee = plan.assignees.some((a) => a.userId === actor.id && a.role === 'LEAD');
+  if (!isLeadAssignee) {
+    throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch này mới được ghi nhận xuất kho');
+  }
+
+  for (const line of body.items) {
+    const item = await inventoryRepository.itemExists(line.itemId);
+    if (!item) throw AppError.notFound(`Item not found: ${line.itemId}`, { itemId: line.itemId });
+  }
+
+  try {
+    const movements = await inventoryRepository.recordFieldOutbound({
+      orderId: plan.orderId,
+      performedBy: actor.id,
+      notes: body.notes || null,
+      items: body.items,
+    });
+    return movements.map(mapMovement);
+  } catch (err) {
+    if (err instanceof InsufficientFieldStockError) {
+      throw AppError.badRequest(err.message, {
+        itemId: err.itemId,
+        quantityAvailable: err.quantityAvailable,
+        requested: err.requested,
+      });
+    }
+    throw err;
+  }
 }
 
 export const inventoryService = {
@@ -372,4 +422,5 @@ export const inventoryService = {
   getReportById,
   createReport,
   confirmReport,
+  recordFieldOutbound,
 };

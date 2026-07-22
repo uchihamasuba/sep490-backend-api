@@ -96,6 +96,13 @@ function buildTransactionWhere(filter: SupplierTransactionListFilter): Prisma.Su
   return where;
 }
 
+const transactionDetailInclude = {
+  ...transactionInclude,
+  items: true,
+} satisfies Prisma.SupplierTransactionInclude;
+
+export type SupplierTransactionWithItems = Prisma.SupplierTransactionGetPayload<{ include: typeof transactionDetailInclude }>;
+
 export const supplierTransactionRepository = {
   async findMany(params: SupplierTransactionListParams) {
     const where = buildTransactionWhere(params);
@@ -110,5 +117,30 @@ export const supplierTransactionRepository = {
       prisma.supplierTransaction.count({ where }),
     ]);
     return { rows, totalItems };
+  },
+
+  // GET /supplier-transactions/:id — chi tiết kèm items[] (docs/api/api.md gap (q), api-contracts.md
+  // mục 9), FE cần để hiển thị SupplierTransactionSection ở app Staff.
+  findById(transactionId: string): Promise<SupplierTransactionWithItems | null> {
+    return prisma.supplierTransaction.findUnique({ where: { transactionId }, include: transactionDetailInclude });
+  },
+
+  findItemById(stItemId: string) {
+    return prisma.supplierTransactionItem.findUnique({ where: { stItemId } });
+  },
+
+  updateItemReceivedQuantity(stItemId: string, receivedQuantity: number) {
+    return prisma.supplierTransactionItem.update({ where: { stItemId }, data: { receivedQuantity } });
+  },
+
+  // Giới hạn LEADER chỉ thao tác trên transaction thuộc order của plan họ được phân công (docs/api/
+  // api.md gap (h)/(i)) — kiểm tra tồn tại 1 dòng schedule_plan_assignees của user trên bất kỳ plan nào
+  // thuộc order đó.
+  async isUserAssignedToOrder(userId: string, orderId: string): Promise<boolean> {
+    const assignee = await prisma.schedulePlanAssignee.findFirst({
+      where: { userId, plan: { orderId } },
+      select: { assigneeId: true },
+    });
+    return assignee !== null;
   },
 };

@@ -15,6 +15,7 @@ import {
   planIdParamSchema,
   updateSchedulePlanBodySchema,
   updateSchedulePlanStatusBodySchema,
+  warehouseMovementBodySchema,
 } from './schedule.validators';
 
 // Mounted at /api/v1/schedule-plans
@@ -70,12 +71,13 @@ scheduleRouter.patch(
   asyncHandler(scheduleController.updateStatusBatch),
 );
 
-// Chỉ Manager (xác nhận/hủy kế hoạch) — đã chốt ở docs/api/more-require.md mục (ae) (2026-07-21):
-// IN_PROGRESS/COMPLETED không còn là transition Leader/Technical tự gọi tay qua endpoint này nữa, mà tự
-// suy ra ở tầng service khi assignee LEAD check-in/check-out (xem scheduleController.checkIn/checkOut).
+// Manager (xác nhận/hủy) + Leader (docs/api/api.md gap (c), đã chốt 2026-07-22: Leader tự xác nhận
+// CONFIRMED cho plan mình giữ vai trò LEAD; hủy CANCELLED vẫn chỉ Manager — ràng buộc chi tiết ở
+// scheduleService.updateSchedulePlanStatus). IN_PROGRESS/COMPLETED vẫn không qua đây (đã chốt ở
+// docs/api/more-require.md mục (ae)) — tự suy ra ở tầng service khi assignee LEAD check-in/check-out.
 scheduleRouter.patch(
   '/:planId/status',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'LEADER'),
   validate(planIdParamSchema, 'params'),
   validate(updateSchedulePlanStatusBodySchema, 'body'),
   asyncHandler(scheduleController.updateStatus),
@@ -120,6 +122,16 @@ scheduleRouter.patch(
   validate(planIdParamSchema, 'params'),
   validate(attachEvidenceBodySchema, 'body'),
   asyncHandler(scheduleController.attachEvidence),
+);
+
+// Leader ghi nhận xuất kho doanh nghiệp tại hiện trường (docs/api/api.md gap (g), TSK-SETUP) — chỉ
+// Leader giữ vai trò LEAD của đúng plan đó (guard chi tiết ở inventoryService.recordFieldOutbound).
+scheduleRouter.post(
+  '/:planId/warehouse-movement',
+  requireRole('LEADER'),
+  validate(planIdParamSchema, 'params'),
+  validate(warehouseMovementBodySchema, 'body'),
+  asyncHandler(scheduleController.recordWarehouseMovement),
 );
 
 // Mounted at /api/v1/work-tasks

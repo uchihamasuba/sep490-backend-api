@@ -20,6 +20,12 @@ export const confirmSettlementBodySchema = z.object({
   status: z.literal('CONFIRMED'),
 });
 
+// PUT /settlements/:settlementId/mark-paid — transition REQUESTED -> PAID (docs/api/api.md gap (n)),
+// Leader bấm "Xác nhận đã thu tiền" tại hiện trường kèm 1 ảnh bằng chứng.
+export const markSettlementPaidBodySchema = z.object({
+  evidenceId: z.string().trim().min(1, 'evidenceId is required'),
+});
+
 // GET /deposits (gộp toàn hệ thống) — gap chính đã ghi ở docs/api/datcoc_api.md mục 1.2/8.
 const depositStatusEnum = z.enum(['PENDING', 'SUCCESS', 'OVERDUE', 'CANCELLED']);
 
@@ -34,4 +40,5 @@ export type DepositIdParam = z.infer<typeof depositIdParamSchema>;
 export type SettlementIdParam = z.infer<typeof settlementIdParamSchema>;
 export type UpdateDepositStatusBody = z.infer<typeof updateDepositStatusBodySchema>;
 export type ConfirmSettlementBody = z.infer<typeof confirmSettlementBodySchema>;
+export type MarkSettlementPaidBody = z.infer<typeof markSettlementPaidBodySchema>;
 export type ListDepositsQuery = z.infer<typeof listDepositsQuerySchema>;

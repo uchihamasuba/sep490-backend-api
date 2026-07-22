@@ -5,6 +5,7 @@ import { paymentService } from './payment.service';
 import type {
   DepositIdParam,
   ListDepositsQuery,
+  MarkSettlementPaidBody,
   SettlementIdParam,
   UpdateDepositStatusBody,
 } from './payment.validators';
@@ -24,6 +25,14 @@ async function confirmSettlement(req: Request, res: Response) {
   ok(res, settlement);
 }
 
+async function markSettlementPaid(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { settlementId } = req.params as unknown as SettlementIdParam;
+  const body = req.body as MarkSettlementPaidBody;
+  const settlement = await paymentService.markSettlementPaid(settlementId, body);
+  ok(res, settlement);
+}
+
 async function listDeposits(req: Request, res: Response) {
   const query = req.query as unknown as ListDepositsQuery;
   const result = await paymentService.listDeposits(query);
@@ -39,6 +48,7 @@ async function deleteDeposit(req: Request, res: Response) {
 export const paymentController = {
   updateDepositStatus,
   confirmSettlement,
+  markSettlementPaid,
   listDeposits,
   deleteDeposit,
 };
