@@ -250,4 +250,69 @@ export const inventoryRepository = {
     if (!report) throw new Error('Report not found after confirm — should be unreachable');
     return report;
   },
+
+  // Giới hạn LEADER chỉ confirm được report thuộc order của plan họ được phân công (docs/api/api.md
+  // gap (k)) — cùng mẫu với supplierTransactionRepository.isUserAssignedToOrder.
+  async isUserAssignedToOrder(userId: string, orderId: string): Promise<boolean> {
+    const assignee = await prisma.schedulePlanAssignee.findFirst({
+      where: { userId, plan: { orderId } },
+      select: { assigneeId: true },
+    });
+    return assignee !== null;
+  },
+
+  // POST /schedule-plans/:planId/warehouse-movement (docs/api/api.md gap (g)) — Leader ghi nhận xuất
+  // kho doanh nghiệp thực tế tại hiện trường. Cùng hiệu ứng tồn kho với export-equipment
+  // (order.repository.ts#exportEquipment): quantityAvailable -= quantity, quantityReserved += quantity,
+  // ghi 1 dòng inventory_movements OUTBOUND/item. Guard đủ hàng bằng `updateMany` có điều kiện
+  // (count=0 nghĩa là không đủ available) NGAY TRONG transaction để tránh race condition giữa nhiều
+  // request ghi đồng thời — ném `InsufficientFieldStockError` (không phải AppError, giữ đúng lớp
+  // repository thuần Prisma) để service tầng trên dịch lại thành lỗi 400.
+  async recordFieldOutbound(params: {
+    orderId: string;
+    performedBy: string;
+    notes: string | null;
+    items: { itemId: string; quantity: number }[];
+  }): Promise<MovementWithDetails[]> {
+    const movementIds = await prisma.$transaction(async (tx) => {
+      const created: string[] = [];
+      for (const line of params.items) {
+        const updated = await tx.inventory.updateMany({
+          where: { itemId: line.itemId, quantityAvailable: { gte: line.quantity } },
+          data: { quantityAvailable: { decrement: line.quantity }, quantityReserved: { increment: line.quantity } },
+        });
+        if (updated.count === 0) {
+          const inv = await tx.inventory.findUnique({ where: { itemId: line.itemId }, select: { quantityAvailable: true } });
+          throw new InsufficientFieldStockError(line.itemId, inv?.quantityAvailable ?? 0, line.quantity);
+        }
+
+        const movement = await tx.inventoryMovement.create({
+          data: {
+            itemId: line.itemId,
+            orderId: params.orderId,
+            reportId: null,
+            movementType: 'OUTBOUND',
+            quantity: line.quantity,
+            performedBy: params.performedBy,
+            notes: params.notes,
+          },
+          select: { movementId: true },
+        });
+        created.push(movement.movementId);
+      }
+      return created;
+    });
+
+    return prisma.inventoryMovement.findMany({ where: { movementId: { in: movementIds } }, include: movementInclude });
+  },
 };
+
+export class InsufficientFieldStockError extends Error {
+  constructor(
+    readonly itemId: string,
+    readonly quantityAvailable: number,
+    readonly requested: number,
+  ) {
+    super('Không đủ tồn kho khả dụng để xuất tại hiện trường');
+  }
+}

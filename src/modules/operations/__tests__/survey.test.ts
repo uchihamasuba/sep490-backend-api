@@ -286,9 +286,18 @@ describe('HTTP routes — role permission matrix', () => {
     expect(res.status).toBe(403);
   });
 
-  it('GET /api/v1/survey-reports is forbidden for LEADER (web list is Manager/Admin only)', async () => {
-    const res = await request(app).get('/api/v1/survey-reports').set('Authorization', authHeader('LEADER'));
+  it('GET /api/v1/survey-reports is forbidden for TECHNICAL (mobile list is Leader/Manager/Admin only)', async () => {
+    const res = await request(app).get('/api/v1/survey-reports').set('Authorization', authHeader('TECHNICAL'));
     expect(res.status).toBe(403);
+  });
+
+  it('GET /api/v1/survey-reports succeeds for LEADER (mobile reads back its own submitted reports)', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [fakeSurvey()], totalItems: 1 } as never);
+    mockedRepo.countByStatusGlobal.mockResolvedValue({ all: 1, draft: 0, needsReview: 1, submitted: 0, confirmed: 0 });
+
+    const res = await request(app).get('/api/v1/survey-reports').set('Authorization', authHeader('LEADER'));
+
+    expect(res.status).toBe(200);
   });
 
   it('GET /api/v1/survey-reports succeeds for ADMIN with tab counts in meta', async () => {

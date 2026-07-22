@@ -8,6 +8,7 @@ export interface SchedulePlanListFilter {
   taskId?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  assigneeUserId?: string;
 }
 
 export interface SchedulePlanListParams extends SchedulePlanListFilter {
@@ -22,10 +23,14 @@ const detailInclude = {
       eventName: true,
       eventDate: true,
       location: true,
-      customer: { select: { customerName: true } },
+      // customer.phone/address (docs/api/api.md gap (o)) — Staff app cần hiển thị số điện thoại/địa
+      // chỉ khách hàng ở mọi loại việc, không chỉ SETUP/COLLECT.
+      customer: { select: { customerName: true, phone: true, address: true } },
     },
   },
-  task: { select: { taskId: true, taskName: true } },
+  // taskCode (docs/api/api.md gap (o)) — Staff app cần biết loại việc (TSK-SURVEY/SETUP/TEARDOWN/
+  // COLLECT) để gate UI theo đúng section, không chỉ hiển thị taskName.
+  task: { select: { taskId: true, taskCode: true, taskName: true } },
   assignees: {
     include: {
       user: { select: { userId: true, fullName: true, role: true, phone: true } },
@@ -40,6 +45,7 @@ function buildWhere(filter: SchedulePlanListFilter, dateMatchedOrderIds?: string
   const where: Prisma.SchedulePlanWhereInput = {};
   if (filter.status) where.status = filter.status;
   if (filter.taskId) where.taskId = filter.taskId;
+  if (filter.assigneeUserId) where.assignees = { some: { userId: filter.assigneeUserId } };
 
   // orderId tường minh (trang chi tiết 1 đơn) VÀ orderId lọc theo cửa sổ ngày (tab timeline/lịch điều
   // phối đa đơn) có thể cùng xuất hiện — kết hợp bằng AND thay vì ghi đè lẫn nhau.

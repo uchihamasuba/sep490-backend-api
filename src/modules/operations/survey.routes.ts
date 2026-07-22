@@ -14,18 +14,18 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Đọc danh sách/chi tiết: đúng 2 trang web đã tài liệu hóa (Manager vận hành, Admin audit) —
-// docs/api/khaosathientruong_api.md mục 0.
+// Đọc danh sách/chi tiết: Manager vận hành, Admin audit (docs/api/khaosathientruong_api.md mục 0) —
+// nới thêm LEADER (docs/api/api.md gap (e)) để Leader mobile đọc lại báo cáo khảo sát chính mình đã nộp.
 router.get(
   '/',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'LEADER'),
   validate(listSurveyReportsQuerySchema, 'query'),
   asyncHandler(surveyController.list),
 );
 
 router.get(
   '/:surveyId',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'LEADER'),
   validate(surveyIdParamSchema, 'params'),
   asyncHandler(surveyController.getById),
 );

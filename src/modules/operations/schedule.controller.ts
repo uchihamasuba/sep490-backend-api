@@ -14,6 +14,7 @@ import type {
   PlanIdParam,
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
+  WarehouseMovementBody,
 } from './schedule.validators';
 
 function requireActor(req: Request) {
@@ -115,6 +116,14 @@ async function updateStatusBatch(req: Request, res: Response) {
   ok(res, plans);
 }
 
+async function recordWarehouseMovement(req: Request, res: Response) {
+  const actor = requireActor(req);
+  const { planId } = req.params as unknown as PlanIdParam;
+  const body = req.body as WarehouseMovementBody;
+  const movements = await scheduleService.recordWarehouseMovement(planId, body, actor);
+  created(res, movements);
+}
+
 export const scheduleController = {
   list,
   getById,
@@ -130,4 +139,5 @@ export const scheduleController = {
   remove,
   createBatch,
   updateStatusBatch,
+  recordWarehouseMovement,
 };

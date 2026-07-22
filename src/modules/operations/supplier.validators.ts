@@ -54,8 +54,26 @@ export const listSupplierTransactionsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
 
+export const transactionIdParamSchema = z.object({
+  id: z.string().trim().min(1, 'id is required'),
+});
+
+export const transactionItemParamSchema = z.object({
+  transactionId: z.string().trim().min(1, 'transactionId is required'),
+  stItemId: z.string().trim().min(1, 'stItemId is required'),
+});
+
+// PATCH /supplier-transactions/:transactionId/items/:stItemId — xác nhận nhận hàng (docs/api/api.md
+// gap (i)). Giá trị tuyệt đối (không cộng dồn) — khớp cách FE gửi lại toàn bộ số đã nhận sau mỗi lần sửa.
+export const receiveTransactionItemBodySchema = z.object({
+  receivedQuantity: z.coerce.number().int().min(0, 'receivedQuantity must be >= 0'),
+});
+
 export type SupplierIdParam = z.infer<typeof supplierIdParamSchema>;
 export type ListSuppliersQuery = z.infer<typeof listSuppliersQuerySchema>;
 export type CreateSupplierBody = z.infer<typeof createSupplierBodySchema>;
 export type UpdateSupplierBody = z.infer<typeof updateSupplierBodySchema>;
 export type ListSupplierTransactionsQuery = z.infer<typeof listSupplierTransactionsQuerySchema>;
+export type TransactionIdParam = z.infer<typeof transactionIdParamSchema>;
+export type TransactionItemParam = z.infer<typeof transactionItemParamSchema>;
+export type ReceiveTransactionItemBody = z.infer<typeof receiveTransactionItemBodySchema>;

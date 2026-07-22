@@ -19,6 +19,9 @@ export const listSchedulePlansQuerySchema = z
     taskId: z.string().trim().min(1).optional(),
     dateFrom: z.coerce.date().optional(),
     dateTo: z.coerce.date().optional(),
+    // Lọc "chỉ plan của tôi" (docs/api/api.md gap (b)) — Leader/Technical gọi kèm assigneeUserId =
+    // chính user.id đang đăng nhập thay vì tải toàn bộ hệ thống về lọc client-side.
+    assigneeUserId: z.string().trim().min(1).optional(),
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().max(500).optional(),
   })
@@ -117,7 +120,21 @@ export const batchUpdateSchedulePlanStatusBodySchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+// POST /schedule-plans/:planId/warehouse-movement (docs/api/api.md gap (g)) — Leader ghi nhận danh sách
+// thiết bị kho doanh nghiệp đã thực xuất tại hiện trường (TSK-SETUP), có thể khác/nhiều hơn
+// order_items gốc nếu đổi/bổ sung thiết bị ngay tại chỗ.
+const warehouseMovementLineSchema = z.object({
+  itemId: z.string().trim().min(1, 'itemId is required'),
+  quantity: z.coerce.number().int().positive('quantity must be > 0'),
+});
+
+export const warehouseMovementBodySchema = z.object({
+  items: z.array(warehouseMovementLineSchema).min(1, 'items must contain at least 1 line'),
+  notes: z.string().trim().optional(),
+});
+
 export type CheckInBody = z.infer<typeof checkInBodySchema>;
+export type WarehouseMovementBody = z.infer<typeof warehouseMovementBodySchema>;
 export type AttachEvidenceBody = z.infer<typeof attachEvidenceBodySchema>;
 export type PlanIdParam = z.infer<typeof planIdParamSchema>;
 export type BatchUpdateSchedulePlanStatusBody = z.infer<typeof batchUpdateSchedulePlanStatusBodySchema>;

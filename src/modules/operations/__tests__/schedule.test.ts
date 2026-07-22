@@ -132,14 +132,35 @@ describe('scheduleService.createSchedulePlan', () => {
 
 describe('scheduleService.updateSchedulePlanStatus — permission + transition rules', () => {
   const manager: Actor = { id: 'mgr-1', role: 'MANAGER' };
+  // docs/api/api.md gap (c), đã chốt 2026-07-22: Leader được tự xác nhận (CONFIRMED) kế hoạch của
+  // chính mình, chỉ khi giữ vai trò LEAD trong đúng plan đó — CANCELLED vẫn luôn thuộc về Manager.
   const leader: Actor = { id: 'leader-1', role: 'LEADER' };
+  const otherLeader: Actor = { id: 'leader-2', role: 'LEADER' };
 
-  it('forbids a non-Manager from confirming a plan', async () => {
+  it('allows the LEAD assignee (Leader) to confirm their own PENDING plan', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({ status: 'PENDING' }, [fakeAssignee()]) as never);
+    mockedRepo.updateStatus.mockResolvedValue(fakePlan({ status: 'CONFIRMED' }, [fakeAssignee()]) as never);
+
+    const result = await scheduleService.updateSchedulePlanStatus('plan-1', { status: 'CONFIRMED' } as never, leader);
+    expect(result.status).toBe('CONFIRMED');
+  });
+
+  it('forbids a Leader who is not the LEAD assignee of the plan from confirming it', async () => {
     mockedRepo.findById.mockResolvedValue(fakePlan({ status: 'PENDING' }, [fakeAssignee()]) as never);
 
     await expect(
-      scheduleService.updateSchedulePlanStatus('plan-1', { status: 'CONFIRMED' } as never, leader),
+      scheduleService.updateSchedulePlanStatus('plan-1', { status: 'CONFIRMED' } as never, otherLeader),
     ).rejects.toMatchObject({ status: 403 });
+    expect(mockedRepo.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('forbids a Leader (even the LEAD assignee) from cancelling a plan', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({ status: 'PENDING' }, [fakeAssignee()]) as never);
+
+    await expect(
+      scheduleService.updateSchedulePlanStatus('plan-1', { status: 'CANCELLED' } as never, leader),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(mockedRepo.updateStatus).not.toHaveBeenCalled();
   });
 
   it('allows a Manager to confirm a PENDING plan', async () => {
@@ -156,13 +177,6 @@ describe('scheduleService.updateSchedulePlanStatus — permission + transition r
     await expect(
       scheduleService.updateSchedulePlanStatus('plan-1', { status: 'CONFIRMED' } as never, manager),
     ).rejects.toMatchObject({ status: 400 });
-  });
-
-  it('forbids a Leader from cancelling a plan (IN_PROGRESS/COMPLETED no longer go through this endpoint)', async () => {
-    await expect(
-      scheduleService.updateSchedulePlanStatus('plan-1', { status: 'CANCELLED' } as never, leader),
-    ).rejects.toMatchObject({ status: 403 });
-    expect(mockedRepo.findById).not.toHaveBeenCalled();
   });
 });
 

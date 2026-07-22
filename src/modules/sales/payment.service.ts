@@ -1,7 +1,7 @@
 import type { Deposit, DepositStatus, Settlement } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
 import { paymentRepository, type DepositWithOrder } from './payment.repository';
-import type { ListDepositsQuery, UpdateDepositStatusBody } from './payment.validators';
+import type { ListDepositsQuery, MarkSettlementPaidBody, UpdateDepositStatusBody } from './payment.validators';
 
 const OPEN_DEPOSIT_STATUSES: DepositStatus[] = ['PENDING', 'OVERDUE'];
 // Chỉ xóa được khoản cọc còn ở trạng thái khởi tạo — SUCCESS/OVERDUE/CANCELLED đều đã có tác động
@@ -157,6 +157,21 @@ async function confirmSettlement(settlementId: string, confirmedBy: string): Pro
   return mapSettlement(updated);
 }
 
+// PUT /settlements/:settlementId/mark-paid — docs/api/api.md gap (n): Leader xác nhận đã thu tiền tại
+// hiện trường kèm ảnh, chuyển REQUESTED -> PAID. Chỉ hợp lệ từ đúng trạng thái REQUESTED (DRAFT/AGREED
+// chưa gửi yêu cầu, PAID/CONFIRMED đã kết thúc giai đoạn thu tiền).
+async function markSettlementPaid(settlementId: string, body: MarkSettlementPaidBody): Promise<SettlementDTO> {
+  const settlement = await paymentRepository.findSettlementById(settlementId);
+  if (!settlement) throw AppError.notFound('Settlement not found');
+
+  if (settlement.status !== 'REQUESTED') {
+    throw AppError.badRequest(`Bản quyết toán đang ở trạng thái ${settlement.status}, chỉ chuyển được PAID từ REQUESTED`);
+  }
+
+  const updated = await paymentRepository.markSettlementPaid(settlementId, body.evidenceId);
+  return mapSettlement(updated);
+}
+
 // GET /deposits — endpoint gộp toàn hệ thống, gap chính ghi ở docs/api/datcoc_api.md mục 1.2/8 (trước
 // đây chỉ có GET /orders/:orderId/deposits, buộc FE phải N+1 để dựng bảng danh sách).
 async function listDeposits(query: ListDepositsQuery): Promise<DepositListResult> {
@@ -195,6 +210,7 @@ async function deleteDeposit(depositId: string): Promise<void> {
 export const paymentService = {
   updateDepositStatus,
   confirmSettlement,
+  markSettlementPaid,
   listDeposits,
   deleteDeposit,
 };

@@ -104,31 +104,34 @@ router.get(
   asyncHandler(orderController.survey),
 );
 
+// Nới thêm LEADER (docs/api/api.md gap (f)) để Leader mobile ghi/xem cọc tại hiện trường khảo sát.
 router.get(
   '/:orderId/deposits',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'LEADER'),
   validate(orderIdParamSchema, 'params'),
   asyncHandler(orderController.deposits),
 );
 
 router.post(
   '/:orderId/deposits',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'LEADER'),
   validate(orderIdParamSchema, 'params'),
   validate(createDepositBodySchema, 'body'),
   asyncHandler(orderController.createDeposit),
 );
 
+// Nới thêm LEADER (docs/api/api.md gap (m)) để Leader mobile tạo/xem yêu cầu quyết toán tại hiện
+// trường khi thu hồi thiết bị xong.
 router.get(
   '/:orderId/settlement',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'LEADER'),
   validate(orderIdParamSchema, 'params'),
   asyncHandler(orderController.settlement),
 );
 
 router.post(
   '/:orderId/settlement',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'LEADER'),
   validate(orderIdParamSchema, 'params'),
   validate(createSettlementBodySchema, 'body'),
   asyncHandler(orderController.createSettlement),

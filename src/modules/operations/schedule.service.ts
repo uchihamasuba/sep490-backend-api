@@ -1,5 +1,6 @@
 import type { PlanMemberRole, ScheduleStatus } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import { inventoryService, type MovementDTO } from '../inventory/inventory.service';
 import { scheduleRepository, type SchedulePlanWithDetails } from './schedule.repository';
 import type {
   AddAssigneeBody,
@@ -9,6 +10,7 @@ import type {
   ListSchedulePlansQuery,
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
+  WarehouseMovementBody,
 } from './schedule.validators';
 
 export interface Actor {
@@ -23,6 +25,9 @@ export interface AssigneeDTO {
   phone: string | null;
   checkInAt: string | null;
   checkOutAt: string | null;
+  // docs/api/api.md gap (p) — Staff app cần đọc lại ảnh check-in đã chụp; FE tự gọi thêm
+  // GET /evidence/:id với giá trị này để lấy fileUrl.
+  checkInEvidenceId: string | null;
 }
 
 export interface SchedulePlanDTO {
@@ -31,10 +36,17 @@ export interface SchedulePlanDTO {
   orderId: string;
   orderCode: string;
   customerName: string;
+  // docs/api/api.md gap (o) — Staff app hiển thị "Thông tin khách hàng" (số điện thoại + nút gọi, địa
+  // chỉ) cho mọi loại việc, không chỉ SETUP/COLLECT.
+  customerPhone: string;
+  customerAddress: string | null;
   eventName: string | null;
   eventDate: string;
   orderLocation: string;
   taskId: string;
+  // docs/api/api.md gap (o) — dùng để gate UI theo loại việc (SurveyReportSection/
+  // WarehouseMovementSection/...) thay vì phải tự map taskId qua catalog GET /work-tasks.
+  taskCode: string;
   taskName: string;
   startTime: string;
   endTime: string | null;
@@ -59,7 +71,7 @@ function mapAssignee(a: {
   userId: string;
   role: PlanMemberRole;
   user: { fullName: string; phone: string | null };
-  attendance: { checkInAt: Date | null; checkOutAt: Date | null } | null;
+  attendance: { checkInAt: Date | null; checkOutAt: Date | null; checkInEvidenceId: string | null } | null;
 }): AssigneeDTO {
   return {
     userId: a.userId,
@@ -68,6 +80,7 @@ function mapAssignee(a: {
     phone: a.user.phone,
     checkInAt: a.attendance?.checkInAt ? a.attendance.checkInAt.toISOString() : null,
     checkOutAt: a.attendance?.checkOutAt ? a.attendance.checkOutAt.toISOString() : null,
+    checkInEvidenceId: a.attendance?.checkInEvidenceId ?? null,
   };
 }
 
@@ -78,10 +91,13 @@ function mapPlan(row: SchedulePlanWithDetails): SchedulePlanDTO {
     orderId: row.orderId,
     orderCode: row.order.orderCode,
     customerName: row.order.customer.customerName,
+    customerPhone: row.order.customer.phone,
+    customerAddress: row.order.customer.address,
     eventName: row.order.eventName,
     eventDate: row.order.eventDate.toISOString(),
     orderLocation: row.order.location,
     taskId: row.taskId,
+    taskCode: row.task.taskCode,
     taskName: row.task.taskName,
     startTime: row.startTime.toISOString(),
     endTime: row.endTime ? row.endTime.toISOString() : null,
@@ -137,6 +153,7 @@ async function listSchedulePlans(
     taskId: query.taskId,
     dateFrom: query.dateFrom,
     dateTo: query.dateTo,
+    assigneeUserId: query.assigneeUserId,
     skip,
     take,
   });
@@ -195,20 +212,31 @@ async function updateSchedulePlan(planId: string, body: UpdateSchedulePlanBody):
   return mapPlan(updated);
 }
 
-// Ranh giới vai trò đã chốt ở docs/api/more-require.md mục (ae) (2026-07-21): endpoint này giờ CHỈ còn
-// 2 transition Manager tự gọi tay trên web (CONFIRMED/CANCELLED — validator đã chặn IN_PROGRESS/
-// COMPLETED ở tầng schema). Chuyển IN_PROGRESS/COMPLETED không còn qua đây nữa — service tự suy ra từ
-// chấm công của assignee LEAD khi gọi checkIn/checkOut bên dưới.
+// Ranh giới vai trò: Manager tự gọi tay CONFIRMED/CANCELLED trên web (đã chốt ở docs/api/
+// more-require.md mục (ae), 2026-07-21). Nới thêm cho LEADER (docs/api/api.md gap (c), đã chốt lại
+// 2026-07-22): Leader được TỰ xác nhận kế hoạch của chính mình (CONFIRMED) ngay trên app, nhưng KHÔNG
+// được tự hủy (CANCELLED vẫn chỉ Manager) và chỉ áp dụng cho plan họ giữ vai trò LEAD (không phải mọi
+// assignee). Chuyển IN_PROGRESS/COMPLETED không qua đây — service tự suy ra từ chấm công của assignee
+// LEAD khi gọi checkIn/checkOut bên dưới.
 async function updateSchedulePlanStatus(
   planId: string,
   body: UpdateSchedulePlanStatusBody,
   actor: Actor,
 ): Promise<SchedulePlanDTO> {
-  if (actor.role !== 'MANAGER') {
-    throw AppError.forbidden('Chỉ Manager được xác nhận hoặc hủy kế hoạch');
+  const existing = await findPlanOrThrow(planId);
+
+  if (actor.role === 'LEADER') {
+    if (body.status !== 'CONFIRMED') {
+      throw AppError.forbidden('Leader chỉ được tự xác nhận kế hoạch (CONFIRMED) — hủy kế hoạch thuộc về Manager');
+    }
+    const isLeadAssignee = existing.assignees.some((a) => a.userId === actor.id && a.role === 'LEAD');
+    if (!isLeadAssignee) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch này mới được tự xác nhận');
+    }
+  } else if (actor.role !== 'MANAGER') {
+    throw AppError.forbidden('Chỉ Manager hoặc Leader (vai trò LEAD của kế hoạch) được xác nhận hoặc hủy kế hoạch');
   }
 
-  const existing = await findPlanOrThrow(planId);
   if (body.status === 'CONFIRMED' && existing.status !== 'PENDING') {
     throw AppError.badRequest('Chỉ có thể xác nhận kế hoạch đang ở trạng thái PENDING');
   }
@@ -410,6 +438,13 @@ export function computeAggregateStatus(statuses: ScheduleStatus[]): AggregateSch
   return 'PENDING';
 }
 
+// POST /schedule-plans/:planId/warehouse-movement (docs/api/api.md gap (g)) — chỉ delegate sang
+// inventoryService (nghiệp vụ + hiệu ứng tồn kho thuộc domain Inventory), giữ đúng layering: controller
+// chỉ gọi service của module mình, composition liên module nằm ở tầng service (giống mobile.service.ts).
+function recordWarehouseMovement(planId: string, body: WarehouseMovementBody, actor: Actor): Promise<MovementDTO[]> {
+  return inventoryService.recordFieldOutbound(planId, body, actor);
+}
+
 export const scheduleService = {
   listSchedulePlans,
   getSchedulePlanById,
@@ -425,4 +460,5 @@ export const scheduleService = {
   deleteSchedulePlan,
   createSchedulePlansBatch,
   updateSchedulePlansStatusBatch,
+  recordWarehouseMovement,
 };
