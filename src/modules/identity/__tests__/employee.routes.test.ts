@@ -49,6 +49,7 @@ function baseUser(overrides: Partial<User> = {}): User {
     avatarUrl: null,
     employeeCode: 'NV001',
     jobTitle: 'Kỹ thuật',
+    deviceToken: null,
     createdAt: new Date('2026-01-10T00:00:00Z'),
     updatedAt: new Date('2026-01-10T00:00:00Z'),
     ...overrides,

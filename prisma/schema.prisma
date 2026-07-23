@@ -207,6 +207,7 @@ model User {
   employeeCode String?    @unique @map("employee_code") @db.VarChar(10)
   /// Vai trò chuyên môn (Bếp trưởng/MC.../ độc lập với role RBAC) — mục 3.2 cùng tài liệu trên.
   jobTitle     String?    @map("job_title") @db.VarChar(100)
+  deviceToken  String?    @map("device_token") @db.VarChar(255)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 

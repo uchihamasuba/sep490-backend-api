@@ -17,6 +17,7 @@ import catalogCategoryRoutes from './modules/shared/catalogCategory.routes';
 import catalogTypeRoutes from './modules/shared/catalogType.routes';
 import policyRoutes from './modules/shared/policy.routes';
 import evidenceRoutes from './modules/shared/evidence.routes';
+import notificationRoutes from './modules/shared/notification.routes';
 import settingsRoutes from './modules/shared/settings.routes';
 import mobileOrderRoutes from './modules/mobile/mobile.routes';
 
@@ -46,6 +47,7 @@ api.use('/catalog/categories', catalogCategoryRoutes);
 api.use('/catalog/types', catalogTypeRoutes);
 api.use('/policies', policyRoutes);
 api.use('/evidence', evidenceRoutes);
+api.use('/notifications', notificationRoutes);
 api.use('/settings', settingsRoutes);
 api.use('/mobile/orders', mobileOrderRoutes);
 

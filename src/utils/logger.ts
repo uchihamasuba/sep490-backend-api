@@ -6,3 +6,7 @@ export const logger = pino({
   base: { env: env.NODE_ENV },
   timestamp: pino.stdTimeFunctions.isoTime,
 });
+
+export const logDeveloper = (msg: string, data?: any) => {
+  logger.debug(data || {}, `[DEVELOPER LOG] ${msg}`);
+};

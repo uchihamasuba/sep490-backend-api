@@ -1,4 +1,5 @@
 import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 import { getStorage } from 'firebase-admin/storage';
 import { AppError } from '../utils/AppError';
 import { env } from './env';
@@ -32,4 +33,8 @@ function getFirebaseApp(): App {
 
 export function getEvidenceBucket() {
   return getStorage(getFirebaseApp()).bucket();
+}
+
+export function getFirebaseMessaging() {
+  return getMessaging(getFirebaseApp());
 }

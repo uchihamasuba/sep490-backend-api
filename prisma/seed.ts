@@ -65,10 +65,10 @@ async function main() {
 
   await prisma.user.createMany({
     data: [
-      { userId: adminId, username: 'admin', passwordHash, fullName: 'System Admin', role: 'ADMIN', email: 'admin@bnw.com', phone: '0900000001' },
-      { userId: managerId, username: 'manager', passwordHash, fullName: 'Project Manager', role: 'MANAGER', email: 'manager@bnw.com', phone: '0900000002' },
-      { userId: leaderId, username: 'leader', passwordHash, fullName: 'Team Leader', role: 'LEADER', email: 'leader@bnw.com', phone: '0900000003' },
-      { userId: techId, username: 'tech', passwordHash, fullName: 'Technician', role: 'TECHNICAL', email: 'tech@bnw.com', phone: '0900000004' },
+      { userId: adminId, username: 'admin', passwordHash, fullName: 'System Admin', role: 'ADMIN', email: 'admin@bnw.com', phone: '0900000001', deviceToken: 'dummy-device-token-admin' },
+      { userId: managerId, username: 'manager', passwordHash, fullName: 'Project Manager', role: 'MANAGER', email: 'manager@bnw.com', phone: '0900000002', deviceToken: 'dummy-device-token-manager' },
+      { userId: leaderId, username: 'leader', passwordHash, fullName: 'Team Leader', role: 'LEADER', email: 'leader@bnw.com', phone: '0900000003', deviceToken: 'dummy-device-token-leader' },
+      { userId: techId, username: 'tech', passwordHash, fullName: 'Technician', role: 'TECHNICAL', email: 'tech@bnw.com', phone: '0900000004', deviceToken: 'dummy-device-token-tech' },
     ],
   });
 
