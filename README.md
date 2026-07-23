@@ -248,15 +248,43 @@ Tất cả đều yêu cầu header `Authorization: Bearer <token>` (login qua `
 **Chạy ở đâu, khi nào — đọc trước khi bắt đầu:**
 - **Cần `npm run dev` đang chạy trước** (mục 2, Bước 5). Các lệnh `curl` bên dưới gọi tới `http://localhost:3001` — nếu server chưa chạy, curl sẽ báo lỗi `Failed to connect to localhost port 3001` / `Connection refused`. Cứ để `npm run dev` chạy nền suốt lúc test, **không tắt**.
 - **Dùng 2 cửa sổ terminal riêng biệt**: 1 cửa sổ để chạy `npm run dev` (giữ nguyên, terminal này chỉ hiện log server, không gõ lệnh khác vào đó), 1 cửa sổ **mới** để gõ các lệnh `curl` bên dưới.
-- Terminal chạy `curl` **không cần đứng ở thư mục backend** — `curl` chỉ gửi HTTP request qua mạng tới `localhost:3001`, không đọc file trong project, nên mở ở bất kỳ thư mục nào (Git Bash, PowerShell, CMD, terminal của VSCode...) đều chạy được.
+- Terminal chạy `curl` **không cần đứng ở thư mục backend** — `curl` chỉ gửi HTTP request qua mạng tới `localhost:3001`, không đọc file trong project, nên mở ở bất kỳ thư mục nào.
+- **Dùng Git Bash** cho các lệnh dưới đây (mở bằng "Git Bash Here" hoặc terminal tích hợp VSCode chọn Git Bash). ⚠️ **Không dùng Windows PowerShell mặc định** — xem lý do và cách khắc phục ở khung cảnh báo ngay dưới.
+
+> ⚠️ **Đang dùng PowerShell thay vì Git Bash?** Có 2 vấn đề cần biết:
+> 1. Gõ `curl` trong PowerShell thực ra chạy `Invoke-WebRequest` (PowerShell tự alias sẵn), **không hiểu** các cờ `-X`/`-H`/`-d` như curl thật → phải gõ **`curl.exe`** (rõ đuôi `.exe`) để gọi đúng bản curl thật. Nếu chạy nhầm `curl` (không có `.exe`), PowerShell sẽ báo lỗi kiểu `Invoke-WebRequest : Cannot bind parameter 'Headers'...`.
+> 2. PowerShell tự ý xoá dấu `"` bên trong chuỗi `-d '...'` trước khi đưa cho curl, làm hỏng JSON. Có 1 cách né: dùng `--%` (stop-parsing) + escape `\"` — **nhưng `--%` cũng chặn luôn việc chèn biến `$jwt`/`$userId`**, chỉ dùng được khi body không có biến (như Lệnh 1). Từ Lệnh 2 trở đi cần chèn JWT/userId lấy được từ lệnh trước, nên **cách đáng tin cậy hơn là ghi JSON ra file tạm rồi trỏ `-d @file`** — cách này đã test thật và chạy đúng.
+>
+> Toàn bộ 5 lệnh bên dưới, viết sẵn cho PowerShell (copy-paste, chạy tuần tự — sau Lệnh 1 nhớ dán `token`/`userId` vào 2 biến `$jwt`/`$userId` trước khi chạy tiếp):
+> ```powershell
+> # 1. Đăng nhập lấy JWT (không có biến nên dùng --% được)
+> curl.exe --% -X POST http://localhost:3001/api/v1/auth/login -H "Content-Type: application/json" -d "{\"username\":\"tech\",\"password\":\"123456\"}"
+>
+> # Copy "token" và "user.userId" từ kết quả Lệnh 1 rồi dán vào đây trước khi chạy tiếp:
+> $jwt = "<dán token JWT>"
+> $userId = "<dán userId>"
+>
+> # 2. Đăng ký device token (thay <deviceToken> = token thật lấy từ Frontend, mục 6.2 Bước A-D)
+> '{"deviceToken":"<deviceToken>"}' | Set-Content "$env:TEMP\device-token-body.json" -Encoding utf8
+> curl.exe -s -X POST http://localhost:3001/api/v1/notifications/device-token -H "Authorization: Bearer $jwt" -H "Content-Type: application/json" -d "@$env:TEMP\device-token-body.json"
+>
+> # 3. Gửi thử thông báo
+> ('{"userId":"' + $userId + '","title":"Hello","content":"Test push"}') | Set-Content "$env:TEMP\test-send-body.json" -Encoding utf8
+> curl.exe -s -X POST http://localhost:3001/api/v1/notifications/test-send -H "Authorization: Bearer $jwt" -H "Content-Type: application/json" -d "@$env:TEMP\test-send-body.json"
+>
+> # 4. Xem lại danh sách thông báo (không có body nên không cần file)
+> curl.exe -s -X GET http://localhost:3001/api/v1/notifications -H "Authorization: Bearer $jwt"
+>
+> # 5. Đánh dấu đã đọc (thay <notificationId> = notificationId lấy từ kết quả Lệnh 3 hoặc 4)
+> curl.exe -s -X PATCH http://localhost:3001/api/v1/notifications/<notificationId>/read -H "Authorization: Bearer $jwt"
+> ```
+> Kết quả mong đợi của từng lệnh giống hệt phần Git Bash bên dưới — cứ đối chiếu theo đúng "Lệnh 1"–"Lệnh 5".
 
 Chạy **từng lệnh một, theo đúng thứ tự** — mỗi lệnh đều có ví dụ kết quả mong đợi ngay dưới để bạn đối chiếu. Nếu output không giống mẫu, đọc cột "Nếu sai" trước khi qua lệnh tiếp theo.
 
 **Lệnh 1 — Đăng nhập lấy JWT:**
 ```bash
-curl -X POST http://localhost:3001/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"tech","password":"123456"}'
+curl -X POST http://localhost:3001/api/v1/auth/login -H "Content-Type: application/json" -d '{"username":"tech","password":"123456"}'
 ```
 ✅ Kết quả mong đợi (status `200`) — **copy giá trị `token` và `user.userId`, sẽ dùng ở các lệnh sau**:
 ```json
@@ -268,9 +296,7 @@ curl -X POST http://localhost:3001/api/v1/auth/login \
 
 **Lệnh 2 — Đăng ký device token** (thay `<jwt>` = `token` ở Lệnh 1, `<deviceToken>` = token thật lấy từ Frontend ở mục 6.2, Bước A-D):
 ```bash
-curl -X POST http://localhost:3001/api/v1/notifications/device-token \
-  -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
-  -d '{"deviceToken":"<deviceToken>"}'
+curl -X POST http://localhost:3001/api/v1/notifications/device-token -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" -d '{"deviceToken":"<deviceToken>"}'
 ```
 ✅ Kết quả mong đợi (status `200`) — trả lại đúng `userId` và `deviceToken` bạn vừa gửi:
 ```json
@@ -284,9 +310,7 @@ curl -X POST http://localhost:3001/api/v1/notifications/device-token \
 
 **Lệnh 3 — Gửi thử thông báo** (thay `<jwt>` như trên, `<userId>` = `user.userId` ở Lệnh 1):
 ```bash
-curl -X POST http://localhost:3001/api/v1/notifications/test-send \
-  -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" \
-  -d '{"userId":"<userId>","title":"Hello","content":"Test push"}'
+curl -X POST http://localhost:3001/api/v1/notifications/test-send -H "Authorization: Bearer <jwt>" -H "Content-Type: application/json" -d '{"userId":"<userId>","title":"Hello","content":"Test push"}'
 ```
 ✅ Kết quả mong đợi (status `201`) — có `notificationId` mới, `isRead: false`:
 ```json
@@ -310,8 +334,7 @@ curl http://localhost:3001/api/v1/notifications -H "Authorization: Bearer <jwt>"
 
 **Lệnh 5 — Đánh dấu đã đọc** (thay `<notificationId>` = giá trị lấy từ Lệnh 3 hoặc 4):
 ```bash
-curl -X PATCH http://localhost:3001/api/v1/notifications/<notificationId>/read \
-  -H "Authorization: Bearer <jwt>"
+curl -X PATCH http://localhost:3001/api/v1/notifications/<notificationId>/read -H "Authorization: Bearer <jwt>"
 ```
 ✅ Kết quả mong đợi (status `200`) — `isRead` chuyển thành `true`, có `readAt`:
 ```json
