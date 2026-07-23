@@ -334,11 +334,6 @@ model Item {
   status         ItemStatus @default(ACTIVE)
   createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
-  // Baseline theo DB thật (docs/api/more-require.md mục (ag)) — cột đã tồn tại sẵn trên DB dùng chung,
-  // chưa có migration nào commit trước lượt này. Chưa có dữ liệu/shape thật (toàn bộ NULL) — dự phòng
-  // cho hướng BOM "1 item combo gồm nhiều item con" từng nêu ở docs/xemchitietbaogia_api.md mục 3.1
-  // (chưa chốt shape JSON cụ thể, chưa có code nào đọc/ghi cột này).
-  components     Json?      @db.Json
 
   type                          ItemType                       @relation(fields: [typeId], references: [typeId], onDelete: Restrict)
   quotationItems                QuotationItem[]
@@ -348,6 +343,8 @@ model Item {
   inventory                     Inventory?
   inventoryMovements            InventoryMovement[]
   collectedEquipmentReportItems CollectedEquipmentReportItem[]
+  components                    ItemComponent[]                @relation("ParentItem")
+  usedIn                        ItemComponent[]                @relation("ChildItem")
 
   @@index([typeId], map: "idx_items_type")
   @@index([status], map: "idx_items_status")
@@ -871,4 +868,19 @@ model CollectedEquipmentReportItem {
   @@index([reportId], map: "idx_cer_items_report")
   @@index([itemId], map: "idx_cer_items_item")
   @@map("collected_equipment_report_items")
+}
+
+model ItemComponent {
+  id       String @id @default(dbgenerated("(uuid())")) @map("id") @db.VarChar(36)
+  parentId String @map("parent_id") @db.VarChar(36)
+  childId  String @map("child_id") @db.VarChar(36)
+  quantity Int
+
+  parent Item @relation("ParentItem", fields: [parentId], references: [itemId], onDelete: Cascade)
+  child  Item @relation("ChildItem", fields: [childId], references: [itemId], onDelete: Cascade)
+
+  @@unique([parentId, childId])
+  @@index([parentId], map: "idx_item_components_parent")
+  @@index([childId], map: "idx_item_components_child")
+  @@map("item_components")
 }
