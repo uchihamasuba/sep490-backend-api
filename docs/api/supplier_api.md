@@ -1,5 +1,27 @@
 # API cho màn "Danh sách Nhà cung cấp đối tác" (`/manager/suppliers`, `/admin/suppliers`)
 
+> **Cập nhật 2026-07-21**: đã ghép FE thật với BE cho đúng màn này. Xác nhận qua curl trực tiếp với
+> backend đang chạy (`localhost:3001`): `GET/POST/PUT /api/v1/suppliers` và
+> `GET /api/v1/supplier-transactions?supplierId=X` **đều đã hoạt động** (trước đó 404 ở mục 6.0 —
+> route đã được mount trong lúc này). Đã xác nhận trực tiếp qua request thật, không chỉ đọc code:
+>
+> - `debtBalance` **được backend trả sẵn** trong mọi response `Supplier` (denormalized, không cần FE
+>   tự tính — mục 3.1 hướng (a) coi như đã chọn, không phải hướng (2) FE tự tổng hợp như khuyến nghị cũ).
+> - `PUT /suppliers/:id` chấp nhận **partial body** (vd chỉ `{status}`) — dùng chung cho Sửa và Khóa/Mở khóa.
+> - `email` gửi lên bị bỏ qua âm thầm, không lưu, không trả về — đúng như `AddSupplierModal.tsx` đã ghi chú.
+> - `GET /supplier-transactions` khớp đúng shape `types/procurement.ts` (`transactionType`
+>   RENTAL/PURCHASE, `status` PENDING/APPROVED/IN_PROGRESS/COMPLETED/CANCELLED), có thêm `orderCode` join
+>   sẵn (đã bổ sung vào type).
+> - `catalogItems[]` (mục 4.1) **vẫn chưa có API** — modal chi tiết mới (`SupplierProfileModal.tsx`) chỉ
+>   hiển thị trạng thái rỗng cho mục này, chưa xóa UI.
+>
+> FE đã đổi sang gọi `supplierApiService`/`procurementApiService` thật cho `/admin/suppliers` +
+> `/manager/suppliers` (`SupplierFormModal.tsx` viết lại theo `CreateSupplierPayload`/
+> `UpdateSupplierPayload`, `SupplierProfileModal.tsx` thay cho `SupplierDetailModal.tsx` ở 2 trang này).
+> `SupplierDetailModal.tsx`/`mocks/db/suppliers.ts` **vẫn giữ nguyên, chưa đổi** — chỉ dùng cho
+> `/admin|manager/suppliers/purchase-orders` (ngoài phạm vi tài liệu này, mục 6 header) nên không đụng
+> tới trong đợt này. `rating`/`notes` đã có UI thu thập trên form (trước đó chưa có, mục 5).
+>
 > Phạm vi tài liệu này: **chỉ** màn danh sách nhà cung cấp (ảnh mẫu người dùng cung cấp — thanh tìm
 > kiếm + lọc trạng thái, bảng chính 6 cột, nút "Thêm Đối Tác Mới", modal thêm/sửa, modal "Hồ sơ chi
 > tiết Đối tác"). **Không** bao gồm các màn liên quan nhưng tách route riêng: `/manager/suppliers/

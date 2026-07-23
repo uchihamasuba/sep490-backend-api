@@ -264,3 +264,22 @@ chỉ là tự động đủ số).
    của `schedule_plans` sớm nhất theo `start_time`. `docs/danhsachdondat_api.md` mục 4.1 đã được cập
    nhật cùng quyết định này (2026-07-20) — 2 tài liệu nhất quán, không còn lệch nhau.
 2. Toàn bộ tài liệu (mục 1-6) đã chốt, Backend có thể implement ngay không cần chờ thêm.
+
+## 8. Cập nhật 2026-07-21 — `picked_up_at` giờ còn được ghi bởi luồng "Xuất thiết bị từ báo giá"
+
+Ngoài endpoint `PUT /orders/:orderId/picklist/picked-up` của màn này (mục 5.2, giữ nguyên không đổi),
+cột `orders.picked_up_at`/`picked_up_by` giờ còn được set bởi **`POST /api/v1/orders/:orderId/
+export-equipment`** — luồng bấm "Xuất thiết bị" từ trang chi tiết báo giá, spec đầy đủ (phiên bản v2:
+đồng bộ đơn theo báo giá + xuất bù/thu hồi chênh lệch, **chạy lặp lại được**) ở
+[`docs/xuatthietbi_tubaogia_api.md`](xuatthietbi_tubaogia_api.md) mục 4. Ảnh hưởng tới màn Pick-list:
+
+1. **Ngữ nghĩa `picked_up_at` đổi từ "thời điểm xuất kho (1 lần duy nhất)" thành "lần xuất/đồng bộ
+   gần nhất"** — endpoint export-equipment v2 được phép ghi đè giá trị cũ mỗi lần chạy có phát sinh
+   movement. Badge "Đã xuất {ngày}" (mục 3.5) và KPI `exportedCount` (mục 1) không cần đổi công thức,
+   chỉ cần hiểu ngày hiển thị là lần gần nhất.
+2. Đơn có thể ở trạng thái "Đã xuất kho" trên bảng này **mà chưa từng đi qua nút "Đã xuất kho" của
+   màn Pick-list** (xuất thẳng từ báo giá khi đơn còn `NEW`, không cần `prepared_qty` đủ) — đây là
+   hành vi chủ đích, 2 luồng dùng chung 1 cờ để 2 màn không lệch số liệu.
+3. Điều kiện chặt của `picklist/picked-up` (mục 5.2: đúng trạng thái, chuẩn bị đủ, chưa xuất) giữ
+   nguyên cho màn này — riêng nó vẫn 409 khi `picked_up_at` đã có, vì bấm từ Pick-list không có ngữ
+   nghĩa "đồng bộ lại theo báo giá" như luồng kia.

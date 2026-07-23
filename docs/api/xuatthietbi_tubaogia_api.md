@@ -215,14 +215,6 @@ trong toast/tab nếu muốn.
 
 ## 7. BUG sau khi lên v2 (2026-07-21) — Prisma transaction timeout với đơn ≥ 3 hạng mục
 
-> **✅ ĐÃ SỬA (2026-07-21)** — đủ cả 3 mục dưới: (1) transaction nhận options `{ timeout: 20000,
-> maxWait: 5000 }`; (2) `findUnique` cuối (detailInclude) chuyển ra NGOÀI transaction chạy sau commit,
-> INSERT `order_items` mới gộp thành 1 `createMany`, toàn bộ movement gộp thành 1
-> `tx.inventoryMovement.createMany` (ghi sau khi đã chắc không thiếu kho, vẫn trong transaction);
-> (3) test integration mới `__tests__/order.export.integration.test.ts` — fixture thật 5 hạng mục trên
-> DB Aiven (tự dọn ở afterAll): lần 1 sync + 5 OUTBOUND qua transaction thật không timeout, lần 2 no-op
-> `unchanged: true`, lần 3 sửa báo giá tăng SL → chỉ xuất bù đúng delta. Cả 3 pass (~35s do latency).
-
 Tái hiện thật bằng curl trên ORD-002/QUO-003 (3 hạng mục, đơn chưa có `order_items`):
 
 ```

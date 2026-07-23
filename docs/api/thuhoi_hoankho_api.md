@@ -1,3 +1,14 @@
+> ⚠️ **CẢNH BÁO 2026-07-21 — toàn bộ nội dung bên dưới đã LỖI THỜI, đừng tin nguyên văn.** Tài liệu này
+> đối chiếu `D:\bnwems-backend-api` — SAI repo, đó là 1 backend cũ/khác, không phải backend đang chạy
+> thật ở cổng 3001 (backend thật là `D:\sep490-backend-api`, xem cảnh báo đầu `docs/more-require.md`).
+> Kết luận "chưa có bảng", "bug BigInt/UUID", "⛔ chưa cần Backend làm ngay" ở dưới đây đều SAI đối với
+> backend thật. Thực tế (xác nhận qua đọc code + curl + Playwright thật, browser thật, ngày 2026-07-21):
+> cả 4 endpoint đã hoạt động đầy đủ (`GET`/`POST /inventory/return-reports`, `GET .../:id`,
+> `PUT .../:id/confirm`), ID đều là string UUID (không phải BigInt), có phân quyền role đúng chuẩn
+> (POST chỉ LEADER, PUT confirm chỉ MANAGER). FE đã nối xong theo đúng thực tế này — xem
+> [`docs/more-require.md`](more-require.md) mục (af) để biết chi tiết đầy đủ, chính xác thay thế toàn bộ
+> nội dung bên dưới. Giữ lại nguyên văn phần dưới chỉ để tham khảo lịch sử, không dùng làm căn cứ.
+
 # API cho màn "Thu hồi & hoàn kho" (`/manager/inventory/returns`)
 
 > Phạm vi tài liệu này: trang danh sách `/manager/inventory/returns` (3 thẻ không có ở đây — trang này
