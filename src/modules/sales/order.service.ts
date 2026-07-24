@@ -1,5 +1,7 @@
 import type { Deposit, OrderStatus, Settlement } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import { changeRequestRepository } from './changeRequest.repository';
+import { changeRequestService, mapChangeRequest, type ChangeRequestDTO } from './changeRequest.service';
 import { customerRepository } from './customer.repository';
 import { quotationRepository } from './quotation.repository';
 import {
@@ -16,6 +18,7 @@ import {
 import type {
   CloseOrderBody,
   ConfirmPreparedItemsBody,
+  CreateChangeRequestBody,
   CreateDepositBody,
   CreateOrderBody,
   CreateSettlementBody,
@@ -483,17 +486,46 @@ async function createDeposit(orderId: string, body: CreateDepositBody, requested
   return mapDeposit(created);
 }
 
+// POST /orders/:orderId/change-requests — Leader báo thêm/bớt/đổi thiết bị tại hiện trường khi đơn đã
+// CONFIRMED. Chỉ ghi nhận sổ sách (status=pending, amount chưa tính) — KHÔNG đụng vào OrderItem/
+// Order.totalAmount, tiền phát sinh chỉ được tính khi Manager duyệt (changeRequest.service.ts,
+// approveChangeRequest) và cộng vào settlement cuối lúc tạo settlement (xem createSettlement bên dưới).
+async function createChangeRequest(orderId: string, body: CreateChangeRequestBody): Promise<ChangeRequestDTO> {
+  const existing = await findOrderOrThrow(orderId);
+  assertNotTerminal(existing);
+
+  const uniqueItemIds = Array.from(new Set(body.items.map((line) => line.catalogItemId)));
+  const foundItems = await orderRepository.findItemsByIds(uniqueItemIds);
+  const foundIds = new Set(foundItems.map((item) => item.itemId));
+  const missingIds = uniqueItemIds.filter((id) => !foundIds.has(id));
+  if (missingIds.length > 0) {
+    throw AppError.badRequest('Một hoặc nhiều hạng mục không tồn tại trong catalog', { itemIds: missingIds });
+  }
+
+  const created = await changeRequestRepository.create(orderId, body.type, body.items);
+  return mapChangeRequest(created);
+}
+
 // POST /orders/:orderId/settlement — backend tự tính finalAmount, không tin số FE gửi (docs/api/
-// tiendosukien_api.md mục 6): finalAmount = totalAmount + additionalFee + compensation - discount -
-// tổng deposit đã SUCCESS. Nếu đã có 1 settlement DRAFT cho đơn này thì cập nhật lại (điều chỉnh), thay
-// vì tạo thêm dòng mới mỗi lần Manager sửa số trước khi xác nhận.
+// tiendosukien_api.md mục 6): finalAmount = totalAmount + additionalFee + compensation +
+// changeRequestTotal - discount - tổng deposit đã SUCCESS. `changeRequestTotal` là tổng `amount` của mọi
+// ChangeRequest đã `approved` thuộc đơn này (yêu cầu cộng dồn vào settlement cuối) — luôn tính lại từ đầu
+// mỗi lần tạo/sửa DRAFT, không cộng dồn kiểu delta, khớp triết lý recompute-from-source đã dùng cho
+// Order.totalAmount. Nếu đã có 1 settlement DRAFT cho đơn này thì cập nhật lại (điều chỉnh), thay vì tạo
+// thêm dòng mới mỗi lần Manager sửa số trước khi xác nhận.
 async function createSettlement(orderId: string, body: CreateSettlementBody, requestedBy: string): Promise<{ settlementId: string }> {
   const existing = await findOrderOrThrow(orderId);
 
   const depositSum = await orderRepository.sumDepositsByStatus(orderId, 'SUCCESS');
   const successfulDeposits = toNumber(depositSum._sum.amount);
+  const changeRequestTotal = await changeRequestService.sumApprovedAmount(orderId);
   const finalAmount =
-    toNumber(existing.totalAmount) + body.additionalFee + body.compensation - body.discount - successfulDeposits;
+    toNumber(existing.totalAmount) +
+    body.additionalFee +
+    body.compensation +
+    changeRequestTotal -
+    body.discount -
+    successfulDeposits;
 
   const latest = await orderRepository.findLatestSettlement(orderId);
   const payload = {
@@ -730,6 +762,7 @@ export const orderService = {
   updateOrderQuotation,
   createDeposit,
   createSettlement,
+  createChangeRequest,
   closeOrder,
   confirmPreparedItems,
   exportEquipment,
