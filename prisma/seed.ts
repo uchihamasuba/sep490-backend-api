@@ -133,16 +133,16 @@ const USERS_SEED: UserSeed[] = [
   { username: 'manager', fullName: 'Lê Hoàng Nam', role: 'MANAGER', jobTitle: 'Trưởng phòng Kinh doanh', phone: '0902222001', email: 'manager@bnwevents.vn' },
   { username: 'manager2', fullName: 'Phạm Thị Hồng Nhung', role: 'MANAGER', jobTitle: 'Trưởng phòng Vận hành', phone: '0902222002', email: 'manager2@bnwevents.vn' },
   { username: 'manager3', fullName: 'Đỗ Minh Tuấn', role: 'MANAGER', jobTitle: 'Quản lý Tài chính', phone: '0902222003', email: 'manager3@bnwevents.vn' },
-  { username: 'leader', fullName: 'Vũ Đức Thắng', role: 'LEADER', jobTitle: 'Trưởng nhóm Kỹ thuật Âm thanh', phone: '0903333001', email: 'leader@bnwevents.vn' },
-  { username: 'leader2', fullName: 'Hoàng Văn Long', role: 'LEADER', jobTitle: 'Trưởng nhóm Ánh sáng - Sân khấu', phone: '0903333002', email: 'leader2@bnwevents.vn' },
-  { username: 'leader3', fullName: 'Ngô Thị Lan', role: 'LEADER', jobTitle: 'Trưởng nhóm Hậu cần', phone: '0903333003', email: 'leader3@bnwevents.vn' },
-  { username: 'leader4', fullName: 'Bùi Quang Huy', role: 'LEADER', jobTitle: 'Trưởng nhóm Dựng sân khấu', phone: '0903333004', email: 'leader4@bnwevents.vn' },
-  { username: 'tech', fullName: 'Đặng Văn Sơn', role: 'TECHNICAL', jobTitle: 'Kỹ thuật viên Âm thanh', phone: '0904444001', email: 'tech@bnwevents.vn' },
-  { username: 'tech2', fullName: 'Phan Thị Mai', role: 'TECHNICAL', jobTitle: 'Kỹ thuật viên Ánh sáng', phone: '0904444002', email: 'tech2@bnwevents.vn' },
-  { username: 'tech3', fullName: 'Trịnh Văn Hùng', role: 'TECHNICAL', jobTitle: 'Kỹ thuật viên Dựng sân khấu', phone: '0904444003', email: 'tech3@bnwevents.vn' },
-  { username: 'tech4', fullName: 'Lý Thị Thu', role: 'TECHNICAL', jobTitle: 'Kỹ thuật viên Màn hình LED', phone: '0904444004', email: 'tech4@bnwevents.vn' },
-  { username: 'tech5', fullName: 'Đinh Văn Phúc', role: 'TECHNICAL', jobTitle: 'Kỹ thuật viên Quay chụp', phone: '0904444005', email: 'tech5@bnwevents.vn' },
-  { username: 'tech6', fullName: 'Dương Thị Nga', role: 'TECHNICAL', jobTitle: 'Kỹ thuật viên Hậu cần', phone: '0904444006', email: 'tech6@bnwevents.vn' },
+  { username: 'staff1', fullName: 'Vũ Đức Thắng', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0903333001', email: 'staff1@bnwevents.vn' },
+  { username: 'staff2', fullName: 'Hoàng Văn Long', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0903333002', email: 'staff2@bnwevents.vn' },
+  { username: 'staff3', fullName: 'Ngô Thị Lan', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0903333003', email: 'staff3@bnwevents.vn' },
+  { username: 'staff4', fullName: 'Bùi Quang Huy', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0903333004', email: 'staff4@bnwevents.vn' },
+  { username: 'staff5', fullName: 'Đặng Văn Sơn', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0904444001', email: 'staff5@bnwevents.vn' },
+  { username: 'staff6', fullName: 'Phan Thị Mai', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0904444002', email: 'staff6@bnwevents.vn' },
+  { username: 'staff7', fullName: 'Trịnh Văn Hùng', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0904444003', email: 'staff7@bnwevents.vn' },
+  { username: 'staff8', fullName: 'Lý Thị Thu', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0904444004', email: 'staff8@bnwevents.vn' },
+  { username: 'staff9', fullName: 'Đinh Văn Phúc', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0904444005', email: 'staff9@bnwevents.vn' },
+  { username: 'staff10', fullName: 'Dương Thị Nga', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0904444006', email: 'staff10@bnwevents.vn' },
 ];
 
 interface PolicySeed {
@@ -389,8 +389,6 @@ const SUPPLIERS_SEED: SupplierSeed[] = [
 const WORK_TASKS_SEED = [
   { code: 'SURVEY', name: 'Khảo sát hiện trường' },
   { code: 'SETUP', name: 'Lắp đặt thiết bị' },
-  { code: 'OPERATE', name: 'Vận hành sự kiện' },
-  { code: 'TEARDOWN', name: 'Tháo dỡ thiết bị' },
   { code: 'COLLECT', name: 'Thu hồi thiết bị' },
 ];
 
@@ -489,7 +487,7 @@ async function main(): Promise<void> {
   const passwordHash = await bcrypt.hash('123456', BCRYPT_ROUNDS);
   let employeeSeq = 0;
   const usersData = USERS_SEED.map((u) => {
-    const isOperational = u.role === 'LEADER' || u.role === 'TECHNICAL';
+    const isOperational = u.role === 'STAFF';
     if (isOperational) employeeSeq += 1;
     return {
       userId: genId(),
@@ -509,10 +507,8 @@ async function main(): Promise<void> {
   const allUsers: CreatedUser[] = usersData.map((u) => ({ userId: u.userId, username: u.username, role: u.role }));
   const admins = allUsers.filter((u) => u.role === 'ADMIN');
   const managers = allUsers.filter((u) => u.role === 'MANAGER');
-  const leaders = allUsers.filter((u) => u.role === 'LEADER');
-  const technicals = allUsers.filter((u) => u.role === 'TECHNICAL');
-  const operationalPool = [...leaders, ...technicals];
-  console.log(`  - ${allUsers.length} users (admin=${admins.length}, manager=${managers.length}, leader=${leaders.length}, tech=${technicals.length})`);
+  const operationalPool = allUsers.filter((u) => u.role === 'STAFF');
+  console.log(`  - ${allUsers.length} users (admin=${admins.length}, manager=${managers.length}, staff=${operationalPool.length})`);
 
   // ==========================================================================
   // 2. BUSINESS POLICIES
@@ -758,7 +754,7 @@ async function main(): Promise<void> {
     const eventDate = eventDateForStatus(status);
     const guestCount = COMPLEX_EVENT_TYPES.has(eventType) ? randomInt(200, 800) : randomInt(30, 300);
     const creator = randomChoice(managers);
-    const leader = randomChoice(leaders);
+    const leader = randomChoice(operationalPool);
     const orderId = genId();
     const orderCode = `ORD-${pad(i + 1, 3)}`;
     const totalAmount = round2(q.items.reduce((s, it) => s + it.subtotal, 0));
@@ -812,7 +808,10 @@ async function main(): Promise<void> {
       totalAmount,
       items: q.items,
       leaderId: leader.userId,
-      technicalIds: sample(technicals, randomInt(1, 3)).map((t) => t.userId),
+      technicalIds: sample(
+        operationalPool.filter((u) => u.userId !== leader.userId),
+        randomInt(1, 3),
+      ).map((t) => t.userId),
     });
   }
   console.log(`  - ${createdOrders.length} orders`);
@@ -851,16 +850,13 @@ async function main(): Promise<void> {
       case 'IN_PROGRESS':
         return [
           { taskCode: 'SURVEY', offsetDays: -14, hourOffset: 9, durationHours: 2, planStatus: 'COMPLETED' },
-          { taskCode: 'SETUP', offsetDays: -1, hourOffset: 14, durationHours: 5, planStatus: 'COMPLETED' },
-          { taskCode: 'OPERATE', offsetDays: 0, hourOffset: 8, durationHours: 6, planStatus: 'IN_PROGRESS' },
+          { taskCode: 'SETUP', offsetDays: -1, hourOffset: 14, durationHours: 5, planStatus: 'IN_PROGRESS' },
         ];
       case 'COMPLETED':
       default:
         return [
           { taskCode: 'SURVEY', offsetDays: -14, hourOffset: 9, durationHours: 2, planStatus: 'COMPLETED' },
           { taskCode: 'SETUP', offsetDays: -1, hourOffset: 14, durationHours: 5, planStatus: 'COMPLETED' },
-          { taskCode: 'OPERATE', offsetDays: 0, hourOffset: 8, durationHours: 6, planStatus: 'COMPLETED' },
-          { taskCode: 'TEARDOWN', offsetDays: 0, hourOffset: 22, durationHours: 3, planStatus: 'COMPLETED' },
           { taskCode: 'COLLECT', offsetDays: 1, hourOffset: 9, durationHours: 2, planStatus: 'COMPLETED' },
         ];
     }
@@ -1030,9 +1026,9 @@ async function main(): Promise<void> {
       const depositAmount = round2(order.totalAmount * 0.3);
       let depositStatus: DepositStatus;
       if (order.status === 'CANCELLED') depositStatus = 'CANCELLED';
-      else if (order.status === 'CONFIRMED') depositStatus = Math.random() < 0.7 ? 'SUCCESS' : 'PENDING';
-      else depositStatus = 'SUCCESS';
-      const paymentDate = depositStatus === 'SUCCESS' ? addDays(order.eventDate, -randomInt(5, 20)) : null;
+      else if (order.status === 'CONFIRMED') depositStatus = Math.random() < 0.7 ? 'PAID' : 'UNPAID';
+      else depositStatus = 'PAID';
+      const paymentDate = depositStatus === 'PAID' ? addDays(order.eventDate, -randomInt(5, 20)) : null;
       const requester = randomChoice(managers);
       await prisma.deposit.create({
         data: {
@@ -1045,9 +1041,9 @@ async function main(): Promise<void> {
           paymentMethod: paymentDate ? randomChoice(['Chuyển khoản ngân hàng', 'Ví MoMo', 'Tiền mặt']) : null,
           qrCodeUrl: paymentDate ? `https://payments.bnwevents.vn/qr/${genId()}.png` : null,
           status: depositStatus,
-          evidenceId: depositStatus === 'SUCCESS' ? randomEvidence(0.7) ?? null : null,
+          evidenceId: depositStatus === 'PAID' ? randomEvidence(0.7) ?? null : null,
           requestedBy: requester.userId,
-          approvedBy: depositStatus === 'SUCCESS' ? randomChoice(managers).userId : null,
+          approvedBy: depositStatus === 'PAID' ? randomChoice(managers).userId : null,
           approvedAt: paymentDate,
           notes: `Đặt cọc theo chính sách ${depositPolicy.policyName}.`,
         },
@@ -1147,7 +1143,7 @@ async function main(): Promise<void> {
           qrCodeUrl: `https://payments.bnwevents.vn/qr/${genId()}.png`,
           paidAt: addDays(order.eventDate, 3),
           evidenceId: randomEvidence(0.7) ?? null,
-          status: 'CONFIRMED',
+          status: 'PAID',
           requestedBy: requester.userId,
           requestedAt: addDays(order.eventDate, 1),
           confirmedBy: confirmer.userId,
@@ -1165,7 +1161,7 @@ async function main(): Promise<void> {
           compensation: 0,
           discount: 0,
           finalAmount: order.totalAmount,
-          status: Math.random() < 0.5 ? 'DRAFT' : 'AGREED',
+          status: 'UNPAID',
           notes: 'Sự kiện đang diễn ra, chưa quyết toán cuối cùng.',
         },
       });
