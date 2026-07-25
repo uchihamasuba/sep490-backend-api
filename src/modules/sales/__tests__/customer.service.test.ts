@@ -138,6 +138,35 @@ describe('customerService.updateCustomer', () => {
       customerService.updateCustomer('missing', { customerName: 'A', phone: '090', status: 'active' } as UpdateCustomerBody),
     ).rejects.toMatchObject({ status: 404, code: 'NOT_FOUND' });
   });
+
+  it('throws 409 PHONE_ALREADY_EXISTS when the new phone belongs to another customer', async () => {
+    mockedRepo.findById.mockResolvedValue(baseCustomer() as never);
+    mockedRepo.findByPhone.mockResolvedValue(baseCustomer({ customerId: 'other-customer' }) as never);
+
+    await expect(
+      customerService.updateCustomer('c1', {
+        customerName: 'A',
+        phone: '0922222222',
+        status: 'active',
+      } as UpdateCustomerBody),
+    ).rejects.toMatchObject({ status: 409, code: 'PHONE_ALREADY_EXISTS' });
+    expect(mockedRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('allows keeping the same phone number on update', async () => {
+    mockedRepo.findById.mockResolvedValue(baseCustomer() as never);
+    mockedRepo.findByPhone.mockResolvedValue(baseCustomer() as never);
+    mockedRepo.update.mockResolvedValue(baseCustomer({ customerName: 'Updated' }) as never);
+    mockedRepo.getOrderStatsForCustomer.mockResolvedValue({ totalBookings: 0, totalSpent: 0 } as never);
+
+    const result = await customerService.updateCustomer('c1', {
+      customerName: 'Updated',
+      phone: baseCustomer().phone,
+      status: 'active',
+    } as UpdateCustomerBody);
+
+    expect(result.customerName).toBe('Updated');
+  });
 });
 
 describe('customerService.deleteCustomer', () => {

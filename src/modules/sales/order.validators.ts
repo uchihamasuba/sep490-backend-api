@@ -1,17 +1,19 @@
 import { z } from 'zod';
 
 export const orderIdParamSchema = z.object({
-  orderId: z.string().trim().min(1, 'orderId is required'),
+  orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
 });
 
 export const orderItemIdParamSchema = z.object({
-  orderId: z.string().trim().min(1, 'orderId is required'),
-  orderItemId: z.string().trim().min(1, 'orderItemId is required'),
+  orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
+  orderItemId: z.string().trim().min(1, 'Thiếu mã dòng hàng'),
 });
 
-const orderStatusEnum = z.enum(['NEW', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']);
-const paymentStatusEnum = z.enum(['UNPAID', 'DEPOSITED', 'PAID']);
-const orderItemSourceEnum = z.enum(['INTERNAL', 'SUPPLIER']);
+const orderStatusEnum = z.enum(['NEW', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], {
+  message: 'orderStatus không hợp lệ',
+});
+const paymentStatusEnum = z.enum(['UNPAID', 'DEPOSITED', 'PAID'], { message: 'paymentStatus không hợp lệ' });
+const orderItemSourceEnum = z.enum(['INTERNAL', 'SUPPLIER'], { message: 'source không hợp lệ, chỉ chấp nhận INTERNAL hoặc SUPPLIER' });
 
 export const listOrdersQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),
@@ -23,21 +25,21 @@ export const listOrdersQuerySchema = z.object({
 });
 
 const orderItemInputSchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
-  quantity: z.coerce.number().int().positive('quantity must be > 0'),
-  unitPrice: z.coerce.number().nonnegative('unitPrice must be >= 0'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
+  unitPrice: z.coerce.number().nonnegative('Đơn giá phải >= 0'),
   source: orderItemSourceEnum.default('INTERNAL'),
   notes: z.string().trim().optional(),
 });
 
 export const createOrderBodySchema = z.object({
-  customerId: z.string().trim().min(1, 'customerId is required'),
+  customerId: z.string().trim().min(1, 'Thiếu mã khách hàng'),
   quotationId: z.string().trim().min(1).nullable().optional(),
-  eventType: z.string().trim().min(1, 'eventType is required'),
+  eventType: z.string().trim().min(1, 'Vui lòng nhập loại sự kiện'),
   eventName: z.string().trim().min(1).optional(),
   eventDate: z.coerce.date(),
-  location: z.string().trim().min(1, 'location is required'),
-  guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'guestCount is too large').optional(),
+  location: z.string().trim().min(1, 'Vui lòng nhập địa điểm'),
+  guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'Số lượng khách quá lớn').optional(),
   items: z.array(orderItemInputSchema).default([]),
   notes: z.string().trim().optional(),
 });
@@ -48,25 +50,25 @@ export const updateOrderStatusBodySchema = z
     cancelReason: z.string().trim().min(1).optional(),
   })
   .refine((data) => data.orderStatus !== 'CANCELLED' || !!data.cancelReason, {
-    message: 'cancelReason is required when orderStatus is CANCELLED',
+    message: 'Vui lòng nhập lý do khi hủy đơn hàng',
     path: ['cancelReason'],
   });
 
 export const updateOrderItemsBodySchema = z.object({
-  items: z.array(orderItemInputSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(orderItemInputSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
 });
 
 // PATCH /orders/:orderId/items/:orderItemId — sửa 1 dòng đơn lẻ (khác PUT .../items thay toàn bộ mảng).
 export const updateOrderItemBodySchema = z
   .object({
-    quantity: z.coerce.number().int().positive('quantity must be > 0').optional(),
-    unitPrice: z.coerce.number().nonnegative('unitPrice must be >= 0').optional(),
+    quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0').optional(),
+    unitPrice: z.coerce.number().nonnegative('Đơn giá phải >= 0').optional(),
     source: orderItemSourceEnum.optional(),
     preparedQty: z.coerce.number().int().nonnegative().optional(),
     notes: z.string().trim().optional(),
   })
   .refine((data) => Object.values(data).some((v) => v !== undefined), {
-    message: 'At least one field must be provided',
+    message: 'Vui lòng cung cấp ít nhất một trường thông tin',
   });
 
 // Checklist Live Show (Mốc 4) — đã chốt hướng A ở docs/api/tiendosukien_api.md mục 5: nhận { key, checked }.
@@ -91,16 +93,16 @@ export const exportEquipmentBodySchema = z.object({
 });
 
 const confirmPreparedItemSchema = z.object({
-  orderItemId: z.string().trim().min(1, 'orderItemId is required'),
-  preparedQty: z.coerce.number().int().nonnegative('preparedQty must be >= 0'),
+  orderItemId: z.string().trim().min(1, 'Thiếu mã dòng hàng'),
+  preparedQty: z.coerce.number().int().nonnegative('Số lượng đã chuẩn bị phải >= 0'),
 });
 
 export const confirmPreparedItemsBodySchema = z.object({
-  items: z.array(confirmPreparedItemSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(confirmPreparedItemSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
 });
 
 export const createDepositBodySchema = z.object({
-  amount: z.coerce.number().positive('amount must be > 0'),
+  amount: z.coerce.number().positive('Số tiền phải lớn hơn 0'),
   dueDate: z.coerce.date().optional(),
   paymentMethod: z.string().trim().min(1).optional(),
   qrCodeUrl: z.string().trim().min(1).optional(),
@@ -116,7 +118,7 @@ export const createSettlementBodySchema = z.object({
   notes: z.string().trim().optional(),
 });
 
-const exportStatusEnum = z.enum(['PENDING', 'EXPORTED']);
+const exportStatusEnum = z.enum(['PENDING', 'EXPORTED'], { message: 'exportStatus không hợp lệ' });
 
 export const listPicklistsQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),

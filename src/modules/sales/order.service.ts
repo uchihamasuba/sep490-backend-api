@@ -225,7 +225,7 @@ async function validateItemsExist(items: OrderLineInput[]): Promise<void> {
 
 async function findOrderOrThrow(orderId: string): Promise<OrderWithDetails> {
   const order = await orderRepository.findById(orderId);
-  if (!order) throw AppError.notFound('Order not found');
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
   return order;
 }
 
@@ -266,11 +266,11 @@ async function getOrderById(orderId: string): Promise<OrderDetailDTO> {
 
 async function createOrder(body: CreateOrderBody, createdByUserId: string): Promise<CreateOrderResult> {
   const customer = await customerRepository.findById(body.customerId);
-  if (!customer) throw AppError.notFound('Customer not found');
+  if (!customer) throw AppError.notFound('Không tìm thấy khách hàng');
 
   if (body.quotationId) {
     const quotation = await quotationRepository.findById(body.quotationId);
-    if (!quotation) throw AppError.notFound('Quotation not found');
+    if (!quotation) throw AppError.notFound('Không tìm thấy báo giá');
   }
 
   await validateItemsExist(body.items);
@@ -416,7 +416,7 @@ async function updateOrderItem(orderId: string, orderItemId: string, body: Updat
   assertNotTerminal(existing);
 
   const item = await orderRepository.findOrderItem(orderId, orderItemId);
-  if (!item) throw AppError.notFound('Order item not found');
+  if (!item) throw AppError.notFound('Không tìm thấy dòng hàng trong đơn');
 
   const updated = await orderRepository.updateItem(orderId, orderItemId, body);
   return mapDetail(updated);
@@ -441,7 +441,7 @@ async function updateOrderQuotation(orderId: string, body: UpdateOrderQuotationB
 
   if (body.quotationId !== null) {
     const quotation = await quotationRepository.findById(body.quotationId);
-    if (!quotation) throw AppError.notFound('Quotation not found');
+    if (!quotation) throw AppError.notFound('Không tìm thấy báo giá');
     if (quotation.status !== 'APPROVED') {
       throw AppError.badRequest('Chỉ được liên kết báo giá đã ở trạng thái APPROVED');
     }

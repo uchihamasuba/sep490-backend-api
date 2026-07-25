@@ -199,6 +199,7 @@ describe('GET /api/v1/customers/:customerId', () => {
 describe('PUT /api/v1/customers/:customerId', () => {
   it('updates the customer and returns the mapped result', async () => {
     mockedRepo.findById.mockResolvedValue(baseCustomer() as never);
+    mockedRepo.findByPhone.mockResolvedValue(baseCustomer() as never);
     mockedRepo.update.mockResolvedValue(baseCustomer({ customerName: 'Updated', status: 'INACTIVE' }) as never);
     mockedRepo.getOrderStatsForCustomer.mockResolvedValue({ totalBookings: 0, totalSpent: 0 } as never);
 
@@ -209,6 +210,20 @@ describe('PUT /api/v1/customers/:customerId', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ customerName: 'Updated', status: 'inactive' });
+  });
+
+  it('returns 409 PHONE_ALREADY_EXISTS when the new phone belongs to a different customer', async () => {
+    mockedRepo.findById.mockResolvedValue(baseCustomer() as never);
+    mockedRepo.findByPhone.mockResolvedValue(baseCustomer({ customerId: 'other-customer' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/customers/c1')
+      .set('Authorization', authHeader())
+      .send({ customerName: 'Updated', phone: '0922222222', status: 'inactive' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('PHONE_ALREADY_EXISTS');
+    expect(mockedRepo.update).not.toHaveBeenCalled();
   });
 });
 

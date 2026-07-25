@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const depositIdParamSchema = z.object({
-  depositId: z.string().trim().min(1, 'depositId is required'),
+  depositId: z.string().trim().min(1, 'Thiếu mã khoản cọc'),
 });
 
 export const settlementIdParamSchema = z.object({
-  settlementId: z.string().trim().min(1, 'settlementId is required'),
+  settlementId: z.string().trim().min(1, 'Thiếu mã bản quyết toán'),
 });
 
 // PENDING không xuất hiện ở đây — đây là trạng thái khởi tạo, không phải đích chuyển tới qua endpoint
@@ -23,7 +23,7 @@ export const confirmSettlementBodySchema = z.object({
 // PUT /settlements/:settlementId/mark-paid — transition REQUESTED -> PAID (docs/api/api.md gap (n)),
 // Leader bấm "Xác nhận đã thu tiền" tại hiện trường kèm 1 ảnh bằng chứng.
 export const markSettlementPaidBodySchema = z.object({
-  evidenceId: z.string().trim().min(1, 'evidenceId is required'),
+  evidenceId: z.string().trim().min(1, 'Thiếu mã bằng chứng'),
 });
 
 // GET /deposits (gộp toàn hệ thống) — gap chính đã ghi ở docs/api/datcoc_api.md mục 1.2/8.
