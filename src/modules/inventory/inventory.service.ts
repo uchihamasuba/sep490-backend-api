@@ -159,7 +159,7 @@ function toMeta(page: number, limit: number, totalItems: number): ListMeta {
 
 async function findInventoryOrThrow(itemId: string): Promise<InventoryWithItem> {
   const row = await inventoryRepository.findByItemId(itemId);
-  if (!row) throw AppError.notFound('Inventory record not found for this item');
+  if (!row) throw AppError.notFound('Không tìm thấy hồ sơ tồn kho cho thiết bị này');
   return row;
 }
 
@@ -186,7 +186,7 @@ async function listMovements(query: ListMovementsQuery): Promise<{ data: Movemen
 
 async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
   const order = await inventoryRepository.orderExists(orderId);
-  if (!order) throw AppError.notFound('Order not found');
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   const rows = await inventoryRepository.findOrderItemsForPicklist(orderId);
   return rows.map((row) => ({
@@ -206,13 +206,13 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
 // cầu dòng đã tồn tại (findInventoryOrThrow).
 async function createInventory(body: CreateInventoryBody): Promise<InventoryDTO> {
   const item = await inventoryRepository.itemExists(body.itemId);
-  if (!item) throw AppError.notFound('Item not found');
+  if (!item) throw AppError.notFound('Không tìm thấy thiết bị');
 
   const existing = await inventoryRepository.findByItemId(body.itemId);
-  if (existing) throw AppError.conflict('Inventory record already exists for this item');
+  if (existing) throw AppError.conflict('Hồ sơ tồn kho cho thiết bị này đã tồn tại');
 
   if (body.quantityDamaged > body.quantityTotal) {
-    throw AppError.badRequest('quantityDamaged must not exceed quantityTotal');
+    throw AppError.badRequest('Số lượng hư hỏng không được vượt quá tổng số lượng');
   }
 
   const created = await inventoryRepository.create({
@@ -264,7 +264,7 @@ async function reserveInventory(body: ReserveInventoryBody, _actorId: string): P
 
   if (body.orderId) {
     const order = await inventoryRepository.orderExists(body.orderId);
-    if (!order) throw AppError.notFound('Order not found');
+    if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
   }
 
   const updated = await inventoryRepository.reserve(body.itemId, body.quantity);
@@ -293,7 +293,7 @@ async function listReports(query: ListReportsQuery): Promise<{ data: ReportDTO[]
 
 async function findReportOrThrow(reportId: string): Promise<ReportWithDetails> {
   const report = await inventoryRepository.findReportById(reportId);
-  if (!report) throw AppError.notFound('Collected equipment report not found');
+  if (!report) throw AppError.notFound('Không tìm thấy phiếu thu hồi thiết bị');
   return report;
 }
 
@@ -304,11 +304,11 @@ async function getReportById(reportId: string): Promise<ReportDTO> {
 
 async function createReport(body: CreateReportBody, reportedBy: string): Promise<ReportDTO> {
   const order = await inventoryRepository.orderExists(body.orderId);
-  if (!order) throw AppError.notFound('Order not found');
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   for (const line of body.items) {
     const item = await inventoryRepository.itemExists(line.itemId);
-    if (!item) throw AppError.notFound(`Item not found: ${line.itemId}`, { itemId: line.itemId });
+    if (!item) throw AppError.notFound(`Không tìm thấy thiết bị: ${line.itemId}`, { itemId: line.itemId });
   }
 
   const created = await inventoryRepository.createReport({
@@ -347,7 +347,7 @@ async function confirmReport(reportId: string, actor: Actor): Promise<ReportDTO>
   for (const line of report.items) {
     if (line.lostQuantity <= 0) continue;
     const inv = await inventoryRepository.findByItemId(line.itemId);
-    if (!inv) throw AppError.notFound(`Inventory record not found for item ${line.itemId}`);
+    if (!inv) throw AppError.notFound(`Không tìm thấy hồ sơ tồn kho cho thiết bị ${line.itemId}`);
     if (inv.quantityTotal < line.lostQuantity) {
       throw AppError.badRequest(`Số lượng thất lạc của "${inv.item.itemName}" vượt quá tổng tồn kho hiện có`, {
         itemId: line.itemId,
@@ -377,7 +377,7 @@ async function confirmReport(reportId: string, actor: Actor): Promise<ReportDTO>
 // gọi (không phải mọi assignee) — khớp gate `isLead` phía FE (WarehouseMovementSection).
 async function recordFieldOutbound(planId: string, body: WarehouseMovementBody, actor: Actor): Promise<MovementDTO[]> {
   const plan = await scheduleRepository.findById(planId);
-  if (!plan) throw AppError.notFound('Schedule plan not found');
+  if (!plan) throw AppError.notFound('Không tìm thấy kế hoạch lịch trình');
 
   const isLeadAssignee = plan.assignees.some((a) => a.userId === actor.id && a.role === 'LEAD');
   if (!isLeadAssignee) {
@@ -386,7 +386,7 @@ async function recordFieldOutbound(planId: string, body: WarehouseMovementBody, 
 
   for (const line of body.items) {
     const item = await inventoryRepository.itemExists(line.itemId);
-    if (!item) throw AppError.notFound(`Item not found: ${line.itemId}`, { itemId: line.itemId });
+    if (!item) throw AppError.notFound(`Không tìm thấy thiết bị: ${line.itemId}`, { itemId: line.itemId });
   }
 
   try {

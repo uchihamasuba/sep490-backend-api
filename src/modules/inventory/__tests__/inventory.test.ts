@@ -165,6 +165,7 @@ describe('Write endpoints — Admin must get 403 (read-only role, backend-enforc
       .set('Authorization', authHeader(adminId, 'ADMIN'))
       .send({ itemId: fixtureItemId, deltaTotal: 5 });
     expect(res.status).toBe(403);
+    expect(res.body.error.message).toBe('Bạn không đủ quyền để thực hiện thao tác này');
   });
 
   it('POST /api/v1/inventory/reserve is forbidden for ADMIN', async () => {
@@ -220,6 +221,7 @@ describe('Write endpoints — successful quantity updates (Manager), against a t
       .send({ itemId: fixtureItemId, quantity: 999999 });
 
     expect(res.status).toBe(400);
+    expect(res.body.error.message).toBe('Không đủ số lượng khả dụng để giữ chỗ');
   });
 
   it('POST /api/v1/inventory/release moves stock back from reserved to available (200)', async () => {
@@ -267,6 +269,7 @@ describe('Write endpoints — successful quantity updates (Manager), against a t
       .set('Authorization', authHeader(managerId, 'MANAGER'))
       .send({});
     expect(reconfirmRes.status).toBe(400);
+    expect(reconfirmRes.body.error.message).toContain('Chỉ có thể xác nhận báo cáo đang ở trạng thái SUBMITTED');
   });
 
   it('POST /api/v1/inventory creates the first inventory row for an item that has none yet (201)', async () => {
@@ -286,6 +289,7 @@ describe('Write endpoints — successful quantity updates (Manager), against a t
       .send({ itemId: fixtureItemId, quantityTotal: 5 });
 
     expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Hồ sơ tồn kho cho thiết bị này đã tồn tại');
   });
 
   it('POST /api/v1/inventory is forbidden for ADMIN', async () => {

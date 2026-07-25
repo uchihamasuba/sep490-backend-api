@@ -5,6 +5,7 @@ import type {
   Prisma,
 } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+import { AppError } from '../../utils/AppError';
 
 const inventoryItemInclude = {
   item: {
@@ -247,7 +248,7 @@ export const inventoryRepository = {
     });
 
     const report = await prisma.collectedEquipmentReport.findUnique({ where: { reportId }, include: reportInclude });
-    if (!report) throw new Error('Report not found after confirm — should be unreachable');
+    if (!report) throw AppError.internal('Không tìm thấy phiếu thu hồi thiết bị sau khi xác nhận');
     return report;
   },
 

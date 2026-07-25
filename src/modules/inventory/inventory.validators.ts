@@ -1,20 +1,26 @@
 import { z } from 'zod';
 
 export const itemIdParamSchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
 });
 
 export const orderIdParamSchema = z.object({
-  orderId: z.string().trim().min(1, 'orderId is required'),
+  orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
 });
 
 export const reportIdParamSchema = z.object({
-  reportId: z.string().trim().min(1, 'reportId is required'),
+  reportId: z.string().trim().min(1, 'Thiếu mã phiếu thu hồi thiết bị'),
 });
 
-const movementTypeEnum = z.enum(['OUTBOUND', 'INBOUND', 'ADJUSTMENT']);
-const reportTypeEnum = z.enum(['INTERNAL', 'SUPPLIER']);
-const reportStatusEnum = z.enum(['SUBMITTED', 'CONFIRMED']);
+const movementTypeEnum = z.enum(['OUTBOUND', 'INBOUND', 'ADJUSTMENT'], {
+  message: 'movementType không hợp lệ, chỉ chấp nhận OUTBOUND, INBOUND hoặc ADJUSTMENT',
+});
+const reportTypeEnum = z.enum(['INTERNAL', 'SUPPLIER'], {
+  message: 'reportType không hợp lệ, chỉ chấp nhận INTERNAL hoặc SUPPLIER',
+});
+const reportStatusEnum = z.enum(['SUBMITTED', 'CONFIRMED'], {
+  message: 'status không hợp lệ, chỉ chấp nhận SUBMITTED hoặc CONFIRMED',
+});
 
 export const listInventoryQuerySchema = z.object({
   itemId: z.string().trim().min(1).optional(),
@@ -32,20 +38,20 @@ export const listMovementsQuerySchema = z.object({
 });
 
 export const createInventoryBodySchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
   quantityTotal: z.coerce.number().int().nonnegative().default(0),
   quantityDamaged: z.coerce.number().int().nonnegative().default(0),
 });
 
 export const adjustInventoryBodySchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
-  deltaTotal: z.coerce.number().int().refine((v) => v !== 0, 'deltaTotal must not be 0'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
+  deltaTotal: z.coerce.number().int().refine((v) => v !== 0, 'Số lượng điều chỉnh không được bằng 0'),
   notes: z.string().trim().optional(),
 });
 
 export const reserveInventoryBodySchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
-  quantity: z.coerce.number().int().positive('quantity must be > 0'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
   orderId: z.string().trim().min(1).optional(),
   notes: z.string().trim().optional(),
 });
@@ -60,7 +66,7 @@ export const listReportsQuerySchema = z.object({
 });
 
 const reportItemInputSchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
   goodQuantity: z.coerce.number().int().nonnegative().default(0),
   damagedQuantity: z.coerce.number().int().nonnegative().default(0),
   lostQuantity: z.coerce.number().int().nonnegative().default(0),
@@ -68,11 +74,11 @@ const reportItemInputSchema = z.object({
 });
 
 export const createReportBodySchema = z.object({
-  orderId: z.string().trim().min(1, 'orderId is required'),
+  orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
   reportType: reportTypeEnum,
   transactionId: z.string().trim().min(1).optional(),
   notes: z.string().trim().optional(),
-  items: z.array(reportItemInputSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(reportItemInputSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
 });
 
 export const confirmReportBodySchema = z.object({
