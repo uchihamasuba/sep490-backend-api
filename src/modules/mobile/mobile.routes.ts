@@ -8,7 +8,7 @@ import { createMobileReportBodySchema, mobileOrderIdParamSchema } from './mobile
 // Mounted at /api/v1/mobile/orders.
 //
 // Chỉ implement 2 endpoint có hợp đồng rõ trong docs/api: `GET /mobile/orders/:id` (đọc chi tiết đơn
-// cho Leader/Technical hiện trường — đối xứng an toàn, dùng lại orderService.getOrderById) và
+// cho Staff hiện trường — đối xứng an toàn, dùng lại orderService.getOrderById) và
 // `POST /mobile/orders/:id/collected-reports` (docs/api/thuhoi_hoankho_api.md mục 3, comment đầu
 // src/types/collectedEquipmentReport.ts phía FE — Leader Staff ghi nhận thu hồi thiết bị qua mobile).
 //
@@ -22,14 +22,14 @@ router.use(requireAuth);
 
 router.get(
   '/:id',
-  requireRole('LEADER', 'TECHNICAL', 'MANAGER', 'ADMIN'),
+  requireRole('STAFF', 'MANAGER', 'ADMIN'),
   validate(mobileOrderIdParamSchema, 'params'),
   asyncHandler(mobileController.getOrder),
 );
 
 router.post(
   '/:id/collected-reports',
-  requireRole('LEADER'),
+  requireRole('STAFF'),
   validate(mobileOrderIdParamSchema, 'params'),
   validate(createMobileReportBodySchema, 'body'),
   asyncHandler(mobileController.submitCollectedReport),

@@ -16,7 +16,7 @@ jest.mock('../../inventory/inventory.service', () => ({
 const mockedOrderService = orderService as jest.Mocked<typeof orderService>;
 const mockedInventoryService = inventoryService as jest.Mocked<typeof inventoryService>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'LEADER', id = 'leader-1') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'STAFF', id = 'leader-1') {
   const token = jwt.sign({ id, role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -38,19 +38,19 @@ describe('GET /api/v1/mobile/orders/:id', () => {
 });
 
 describe('POST /api/v1/mobile/orders/:id/collected-reports', () => {
-  it('submits a report using the authenticated Leader as reportedBy, defaulting reportType to INTERNAL', async () => {
+  it('submits a report using the authenticated Staff as actor, defaulting reportType to INTERNAL', async () => {
     mockedInventoryService.createReport.mockResolvedValue({ reportId: 'report-1', status: 'SUBMITTED' } as never);
 
     const res = await request(app)
       .post('/api/v1/mobile/orders/order-1/collected-reports')
-      .set('Authorization', authHeader('LEADER', 'leader-1'))
+      .set('Authorization', authHeader('STAFF', 'leader-1'))
       .send({ items: [{ itemId: 'item-1', goodQuantity: 2, damagedQuantity: 0, lostQuantity: 0 }] });
 
     expect(res.status).toBe(201);
     expect(res.body.data).toMatchObject({ reportId: 'report-1', status: 'SUBMITTED' });
     expect(mockedInventoryService.createReport).toHaveBeenCalledWith(
       expect.objectContaining({ orderId: 'order-1', reportType: 'INTERNAL' }),
-      'leader-1',
+      { id: 'leader-1', role: 'STAFF' },
     );
   });
 
@@ -63,10 +63,10 @@ describe('POST /api/v1/mobile/orders/:id/collected-reports', () => {
     expect(mockedInventoryService.createReport).not.toHaveBeenCalled();
   });
 
-  it('is forbidden for non-Leader roles', async () => {
+  it('is forbidden for non-Staff roles', async () => {
     const res = await request(app)
       .post('/api/v1/mobile/orders/order-1/collected-reports')
-      .set('Authorization', authHeader('TECHNICAL'))
+      .set('Authorization', authHeader('ADMIN'))
       .send({ items: [{ itemId: 'item-1', goodQuantity: 1 }] });
     expect(res.status).toBe(403);
   });

@@ -18,7 +18,7 @@ jest.mock('../schedule.repository', () => ({
 
 const mockedRepo = scheduleRepository as jest.Mocked<typeof scheduleRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL', userId = 'user-1') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF', userId = 'user-1') {
   const token = jwt.sign({ id: userId, role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -61,7 +61,7 @@ describe('scheduleService.deleteSchedulePlan', () => {
   });
 
   it('DELETE /api/v1/schedule-plans/:planId is forbidden for non-Manager roles', async () => {
-    const res = await request(app).delete('/api/v1/schedule-plans/plan-1').set('Authorization', authHeader('LEADER'));
+    const res = await request(app).delete('/api/v1/schedule-plans/plan-1').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 
@@ -135,7 +135,7 @@ describe('scheduleService.createSchedulePlansBatch', () => {
   it('POST /api/v1/schedule-plans/batch is forbidden for non-Manager roles', async () => {
     const res = await request(app)
       .post('/api/v1/schedule-plans/batch')
-      .set('Authorization', authHeader('TECHNICAL'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', plans: [{ taskId: 'task-1', startTime: '2026-08-14T07:00:00Z', assignees: [] }] });
 
     expect(res.status).toBe(403);

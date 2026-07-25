@@ -7,10 +7,11 @@ export const employeeIdParamSchema = z.object({
   id: z.string().trim().min(1, 'Thiếu mã nhân viên'),
 });
 
-// Nhân sự vận hành (Hướng A) chỉ là tài khoản LEADER/TECHNICAL trong `users` — không cho tạo
-// ADMIN/MANAGER qua endpoint này (2 role đó quản lý qua /users, ngoài phạm vi màn "Nhân viên").
-const employeeAccountRoleEnum = z.enum(['LEADER', 'TECHNICAL'], {
-  message: 'role không hợp lệ, chỉ chấp nhận LEADER hoặc TECHNICAL',
+// Nhân sự vận hành (Hướng A) chỉ là tài khoản STAFF trong `users` — không cho tạo ADMIN/MANAGER qua
+// endpoint này (2 role đó quản lý qua /users, ngoài phạm vi màn "Nhân viên"). Leader/Technical không
+// còn là role hệ thống — vai trò đó nay gán theo từng dự án qua PlanMemberRole (schedule_plan_assignees).
+const employeeAccountRoleEnum = z.enum(['STAFF'], {
+  message: 'role không hợp lệ, chỉ chấp nhận STAFF',
 });
 // Đã chốt (docs/api/admin_danhsachnguoidung__api.md mục 1): status tĩnh 2 giá trị, không có SUSPENDED
 // ở phạm vi màn nhân sự (khác users.status 3 giá trị đầy đủ).
@@ -30,7 +31,7 @@ export const createEmployeeBodySchema = z.object({
   phone: z.string().trim().min(1, 'Vui lòng nhập số điện thoại'),
   email: z.string().trim().email('Email không đúng định dạng').optional(),
   roleId: z.enum(jobTitleIds, { message: 'roleId không hợp lệ, vui lòng chọn vai trò chuyên môn hợp lệ' }),
-  role: employeeAccountRoleEnum.default('TECHNICAL'),
+  role: employeeAccountRoleEnum.default('STAFF'),
   status: employeeStatusEnum.default('ACTIVE'),
 });
 

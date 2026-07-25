@@ -28,7 +28,7 @@ jest.mock('../customer.repository', () => ({
 
 const mockedRepo = customerRepository as jest.Mocked<typeof customerRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -83,7 +83,7 @@ describe('GET /api/v1/customers', () => {
   });
 
   it('rejects roles outside manager/admin with 403', async () => {
-    const res = await request(app).get('/api/v1/customers').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/customers').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 });
@@ -107,7 +107,7 @@ describe('GET /api/v1/customers/next-code', () => {
   });
 
   it('rejects roles outside manager/admin with 403', async () => {
-    const res = await request(app).get('/api/v1/customers/next-code').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/customers/next-code').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 });

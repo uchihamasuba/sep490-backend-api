@@ -29,7 +29,7 @@ jest.mock('../schedule.repository', () => ({
 
 const mockedRepo = scheduleRepository as jest.Mocked<typeof scheduleRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL', userId = 'user-1') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF', userId = 'user-1') {
   const token = jwt.sign({ id: userId, role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -78,7 +78,7 @@ function fakeAssignee(overrides: Partial<FakeAssignee> = {}): FakeAssignee {
 }
 
 function fakeUser(overrides: Record<string, unknown> = {}) {
-  return { userId: 'leader-1', fullName: 'Le Van Leader', role: 'LEADER', ...overrides };
+  return { userId: 'leader-1', fullName: 'Le Van Leader', role: 'STAFF', ...overrides };
 }
 
 describe('scheduleService.createSchedulePlan', () => {
@@ -111,7 +111,7 @@ describe('scheduleService.createSchedulePlan', () => {
     ).rejects.toMatchObject({ status: 404, message: 'Không tìm thấy người dùng: ghost-user' });
   });
 
-  it('throws 400 when the assignee user has an ineligible role (not LEADER/TECHNICAL)', async () => {
+  it('throws 400 when the assignee user has an ineligible role (not STAFF)', async () => {
     mockedRepo.orderExists.mockResolvedValue({ orderId: 'ord-1' });
     mockedRepo.taskExists.mockResolvedValue({ taskId: 'task-1' } as never);
     mockedRepo.findUserById.mockResolvedValue(fakeUser({ role: 'MANAGER' }) as never);
@@ -134,8 +134,8 @@ describe('scheduleService.updateSchedulePlanStatus — permission + transition r
   const manager: Actor = { id: 'mgr-1', role: 'MANAGER' };
   // docs/api/api.md gap (c), đã chốt 2026-07-22: Leader được tự xác nhận (CONFIRMED) kế hoạch của
   // chính mình, chỉ khi giữ vai trò LEAD trong đúng plan đó — CANCELLED vẫn luôn thuộc về Manager.
-  const leader: Actor = { id: 'leader-1', role: 'LEADER' };
-  const otherLeader: Actor = { id: 'leader-2', role: 'LEADER' };
+  const leader: Actor = { id: 'leader-1', role: 'STAFF' };
+  const otherLeader: Actor = { id: 'leader-2', role: 'STAFF' };
 
   it('allows the LEAD assignee (Leader) to confirm their own PENDING plan', async () => {
     mockedRepo.findById.mockResolvedValue(fakePlan({ status: 'PENDING' }, [fakeAssignee()]) as never);
@@ -213,7 +213,7 @@ describe('scheduleService.addAssignee', () => {
     mockedRepo.findById.mockResolvedValue(
       fakePlan({ status: 'PENDING' }, [fakeAssignee({ userId: 'leader-1' })]) as never,
     );
-    mockedRepo.findUserById.mockResolvedValue(fakeUser({ userId: 'leader-2', role: 'LEADER' }) as never);
+    mockedRepo.findUserById.mockResolvedValue(fakeUser({ userId: 'leader-2', role: 'STAFF' }) as never);
 
     await expect(
       scheduleService.addAssignee('plan-1', { userId: 'leader-2', role: 'LEAD' } as never),
@@ -226,7 +226,7 @@ describe('scheduleService.createSchedulePlan — max 1 LEAD/plan', () => {
   it('rejects creating a plan with 2 assignees having role LEAD', async () => {
     mockedRepo.orderExists.mockResolvedValue({ orderId: 'ord-1' });
     mockedRepo.taskExists.mockResolvedValue({ taskId: 'task-1' } as never);
-    mockedRepo.findUserById.mockResolvedValue(fakeUser({ role: 'LEADER' }) as never);
+    mockedRepo.findUserById.mockResolvedValue(fakeUser({ role: 'STAFF' }) as never);
 
     await expect(
       scheduleService.createSchedulePlan(
@@ -247,8 +247,8 @@ describe('scheduleService.createSchedulePlan — max 1 LEAD/plan', () => {
 });
 
 describe('scheduleService.checkIn / checkOut', () => {
-  const leader: Actor = { id: 'leader-1', role: 'LEADER' };
-  const technical: Actor = { id: 'tech-1', role: 'TECHNICAL' };
+  const leader: Actor = { id: 'leader-1', role: 'STAFF' };
+  const technical: Actor = { id: 'tech-1', role: 'STAFF' };
 
   it('forbids checking in on behalf of someone else', async () => {
     await expect(scheduleService.checkIn('plan-1', 'someone-else', leader)).rejects.toMatchObject({ status: 403 });
@@ -345,8 +345,8 @@ describe('scheduleService.checkIn / checkOut', () => {
 });
 
 describe('scheduleService.attachEvidence — gắn evidenceId độc lập với status (docs/api/more-require.md mục (ag))', () => {
-  const technical: Actor = { id: 'tech-1', role: 'TECHNICAL' };
-  const outsider: Actor = { id: 'someone-else', role: 'TECHNICAL' };
+  const technical: Actor = { id: 'tech-1', role: 'STAFF' };
+  const outsider: Actor = { id: 'someone-else', role: 'STAFF' };
 
   it('forbids a user who is not an assignee of this plan', async () => {
     mockedRepo.findById.mockResolvedValue(
@@ -374,17 +374,17 @@ describe('scheduleService.attachEvidence — gắn evidenceId độc lập với
 });
 
 describe('HTTP routes — role permission matrix', () => {
-  it('GET /api/v1/schedule-plans is reachable by any authenticated role (e.g. TECHNICAL)', async () => {
+  it('GET /api/v1/schedule-plans is reachable by any authenticated role (e.g. STAFF)', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [fakePlan()], totalItems: 1 } as never);
 
-    const res = await request(app).get('/api/v1/schedule-plans').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/schedule-plans').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(200);
   });
 
-  it('POST /api/v1/schedule-plans is forbidden for LEADER (Manager-only action)', async () => {
+  it('POST /api/v1/schedule-plans is forbidden for STAFF (Manager-only action)', async () => {
     const res = await request(app)
       .post('/api/v1/schedule-plans')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', taskId: 'task-1', startTime: '2026-08-14T07:00:00Z', assignees: [] });
 
     expect(res.status).toBe(403);
@@ -410,7 +410,7 @@ describe('HTTP routes — role permission matrix', () => {
   it('PATCH /api/v1/schedule-plans/:planId/evidence rejects a missing evidenceId with 400', async () => {
     const res = await request(app)
       .patch('/api/v1/schedule-plans/plan-1/evidence')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({});
 
     expect(res.status).toBe(400);
@@ -426,10 +426,10 @@ describe('HTTP routes — role permission matrix', () => {
     expect(res.status).toBe(403);
   });
 
-  it('PATCH /api/v1/schedule-plans/:planId/status is forbidden for LEADER (Manager-only, docs/api/more-require.md mục (ae))', async () => {
+  it('PATCH /api/v1/schedule-plans/:planId/status is forbidden for STAFF who is not the LEAD assignee (docs/api/more-require.md mục (ae))', async () => {
     const res = await request(app)
       .patch('/api/v1/schedule-plans/plan-1/status')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ status: 'CONFIRMED' });
 
     expect(res.status).toBe(403);
@@ -548,7 +548,7 @@ describe('PATCH /api/v1/schedule-plans/batch/status', () => {
   it('is forbidden for non-Manager roles', async () => {
     const res = await request(app)
       .patch('/api/v1/schedule-plans/batch/status')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ planIds: ['plan-1'], status: 'CANCELLED' });
 
     expect(res.status).toBe(403);

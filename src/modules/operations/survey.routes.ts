@@ -15,27 +15,27 @@ const router = Router();
 router.use(requireAuth);
 
 // Đọc danh sách/chi tiết: Manager vận hành, Admin audit (docs/api/khaosathientruong_api.md mục 0) —
-// nới thêm LEADER (docs/api/api.md gap (e)) để Leader mobile đọc lại báo cáo khảo sát chính mình đã nộp.
+// nới thêm STAFF (docs/api/api.md gap (e)) để Leader mobile đọc lại báo cáo khảo sát chính mình đã nộp.
 router.get(
   '/',
-  requireRole('MANAGER', 'ADMIN', 'LEADER'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(listSurveyReportsQuerySchema, 'query'),
   asyncHandler(surveyController.list),
 );
 
 router.get(
   '/:surveyId',
-  requireRole('MANAGER', 'ADMIN', 'LEADER'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(surveyIdParamSchema, 'params'),
   asyncHandler(surveyController.getById),
 );
 
 // Tạo báo cáo: ban đầu chỉ Leader Staff qua mobile (docs/api/khaosathientruong_api.md mục 0/5), nhưng
 // người dùng đã yêu cầu thêm lại nút "+ Tạo báo cáo khảo sát" cho Manager trên web (2026-07-21) — nới
-// role cho cả MANAGER, giữ nguyên LEADER cho mobile.
+// role cho cả MANAGER, giữ nguyên STAFF cho mobile (giới hạn phải là LEAD của plan ở tầng service).
 router.post(
   '/',
-  requireRole('LEADER', 'MANAGER'),
+  requireRole('STAFF', 'MANAGER'),
   validate(createSurveyReportBodySchema, 'body'),
   asyncHandler(surveyController.create),
 );

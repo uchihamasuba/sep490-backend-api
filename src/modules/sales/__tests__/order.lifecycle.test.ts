@@ -2,9 +2,12 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { app } from '../../../app';
 import { env } from '../../../config/env';
+import type { Actor } from '../../operations/schedule.service';
 import { orderRepository } from '../order.repository';
 import { orderService } from '../order.service';
 import { quotationRepository } from '../quotation.repository';
+
+const manager: Actor = { id: 'user-1', role: 'MANAGER' };
 
 jest.mock('../quotation.repository', () => {
   const actual = jest.requireActual('../quotation.repository');
@@ -183,7 +186,7 @@ describe('orderService.getOrderDeposits / getOrderSettlement', () => {
         paymentDate: null,
         paymentMethod: null,
         qrCodeUrl: null,
-        status: 'PENDING',
+        status: 'UNPAID',
         evidenceId: null,
         requestedBy: 'user-1',
         approvedBy: null,
@@ -195,7 +198,7 @@ describe('orderService.getOrderDeposits / getOrderSettlement', () => {
     ] as never);
 
     const result = await orderService.getOrderDeposits('ord-1');
-    expect(result).toEqual([expect.objectContaining({ depositId: 'dep-1', amount: 800000, status: 'PENDING' })]);
+    expect(result).toEqual([expect.objectContaining({ depositId: 'dep-1', amount: 800000, status: 'UNPAID' })]);
   });
 
   it('returns null settlement when none exists', async () => {
@@ -307,7 +310,7 @@ describe('orderService.createDeposit / createSettlement', () => {
       paymentDate: null,
       paymentMethod: null,
       qrCodeUrl: null,
-      status: 'PENDING',
+      status: 'UNPAID',
       evidenceId: null,
       requestedBy: 'user-1',
       approvedBy: null,
@@ -317,7 +320,7 @@ describe('orderService.createDeposit / createSettlement', () => {
       updatedAt: new Date('2026-07-20T00:00:00Z'),
     } as never);
 
-    const result = await orderService.createDeposit('ord-1', { amount: 800000 } as never, 'user-1');
+    const result = await orderService.createDeposit('ord-1', { amount: 800000 } as never, manager);
     expect(result).toMatchObject({ depositId: 'dep-2', depositCode: 'DEP-002', amount: 800000 });
   });
 
@@ -336,13 +339,13 @@ describe('orderService.createDeposit / createSettlement', () => {
     mockedOrderRepo.sumDepositsByStatus.mockResolvedValue({ _sum: { amount: 800000 } } as never);
     mockedOrderRepo.findLatestSettlement.mockResolvedValue(null);
     (mockedOrderRepo.createSettlement as jest.Mock).mockImplementation((data: Record<string, unknown>) =>
-      Promise.resolve({ settlementId: 'set-1', ...data, status: 'DRAFT' }),
+      Promise.resolve({ settlementId: 'set-1', ...data, status: 'UNPAID' }),
     );
 
     const result = await orderService.createSettlement(
       'ord-1',
       { additionalFee: 100000, compensation: 0, discount: 50000 } as never,
-      'user-1',
+      manager,
     );
 
     expect(result).toEqual({ settlementId: 'set-1' });
@@ -351,13 +354,13 @@ describe('orderService.createDeposit / createSettlement', () => {
     );
   });
 
-  it('updates an existing DRAFT settlement instead of creating a new one', async () => {
+  it('updates an existing UNPAID settlement instead of creating a new one', async () => {
     mockedOrderRepo.findById.mockResolvedValue(buildOrderRow({ totalAmount: 1_600_000 }) as never);
     mockedOrderRepo.sumDepositsByStatus.mockResolvedValue({ _sum: { amount: 0 } } as never);
-    mockedOrderRepo.findLatestSettlement.mockResolvedValue({ settlementId: 'set-1', status: 'DRAFT' } as never);
-    mockedOrderRepo.updateSettlementDraft.mockResolvedValue({ settlementId: 'set-1', status: 'DRAFT' } as never);
+    mockedOrderRepo.findLatestSettlement.mockResolvedValue({ settlementId: 'set-1', status: 'UNPAID' } as never);
+    mockedOrderRepo.updateSettlementDraft.mockResolvedValue({ settlementId: 'set-1', status: 'UNPAID' } as never);
 
-    await orderService.createSettlement('ord-1', { additionalFee: 0, compensation: 0, discount: 0 } as never, 'user-1');
+    await orderService.createSettlement('ord-1', { additionalFee: 0, compensation: 0, discount: 0 } as never, manager);
 
     expect(mockedOrderRepo.updateSettlementDraft).toHaveBeenCalledWith('set-1', expect.any(Object));
     expect(mockedOrderRepo.createSettlement).not.toHaveBeenCalled();

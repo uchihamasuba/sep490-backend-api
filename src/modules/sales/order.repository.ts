@@ -272,7 +272,7 @@ export const orderRepository = {
     requestedBy: string;
   }) {
     return prisma.settlement.create({
-      data: { ...data, status: 'DRAFT', requestedAt: new Date() },
+      data: { ...data, status: 'UNPAID', requestedAt: new Date() },
     });
   },
 

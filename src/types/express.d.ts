@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'MANAGER' | 'LEADER' | 'TECHNICAL';
+export type UserRole = 'ADMIN' | 'MANAGER' | 'STAFF';
 
 export interface AuthPrincipal {
   id: string;

@@ -18,7 +18,7 @@ jest.mock('../catalog.repository', () => ({
 
 const mockedRepo = catalogRepository as jest.Mocked<typeof catalogRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }

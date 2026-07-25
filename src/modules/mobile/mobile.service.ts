@@ -3,6 +3,7 @@
 // logic nghiệp vụ đã có sẵn ở inventoryService/orderService (cùng 1 bảng collected_equipment_reports/
 // orders đứng sau, tránh phân kỳ 2 nguồn sự thật cho cùng 1 nghiệp vụ).
 import { inventoryService, type ReportDTO } from '../inventory/inventory.service';
+import type { Actor } from '../operations/schedule.service';
 import { orderService, type OrderDetailDTO } from '../sales/order.service';
 import type { CreateMobileReportBody } from './mobile.validators';
 
@@ -10,7 +11,7 @@ async function getAssignedOrder(orderId: string): Promise<OrderDetailDTO> {
   return orderService.getOrderById(orderId);
 }
 
-async function submitCollectedReport(orderId: string, body: CreateMobileReportBody, reportedBy: string): Promise<ReportDTO> {
+async function submitCollectedReport(orderId: string, body: CreateMobileReportBody, actor: Actor): Promise<ReportDTO> {
   return inventoryService.createReport(
     {
       orderId,
@@ -19,7 +20,7 @@ async function submitCollectedReport(orderId: string, body: CreateMobileReportBo
       notes: body.notes,
       items: body.items,
     },
-    reportedBy,
+    actor,
   );
 }
 

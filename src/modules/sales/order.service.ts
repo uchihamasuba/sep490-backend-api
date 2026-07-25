@@ -1,5 +1,7 @@
 import type { Deposit, OrderStatus, Settlement } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import { scheduleRepository } from '../operations/schedule.repository';
+import type { Actor } from '../operations/schedule.service';
 import { customerRepository } from './customer.repository';
 import { quotationRepository } from './quotation.repository';
 import {
@@ -465,9 +467,16 @@ async function updateOrderQuotation(orderId: string, body: UpdateOrderQuotationB
   return mapDetail(updated);
 }
 
-async function createDeposit(orderId: string, body: CreateDepositBody, requestedBy: string): Promise<DepositDTO> {
+async function createDeposit(orderId: string, body: CreateDepositBody, actor: Actor): Promise<DepositDTO> {
   const existing = await findOrderOrThrow(orderId);
   assertNotTerminal(existing);
+
+  if (actor.role === 'STAFF') {
+    const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, orderId);
+    if (!isLead) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được tạo khoản cọc');
+    }
+  }
 
   const depositCode = await orderRepository.generateNextDepositCode();
   const created = await orderRepository.createDeposit({
@@ -478,19 +487,26 @@ async function createDeposit(orderId: string, body: CreateDepositBody, requested
     paymentMethod: body.paymentMethod ?? null,
     qrCodeUrl: body.qrCodeUrl ?? null,
     notes: body.notes || null,
-    requestedBy,
+    requestedBy: actor.id,
   });
   return mapDeposit(created);
 }
 
 // POST /orders/:orderId/settlement — backend tự tính finalAmount, không tin số FE gửi (docs/api/
 // tiendosukien_api.md mục 6): finalAmount = totalAmount + additionalFee + compensation - discount -
-// tổng deposit đã SUCCESS. Nếu đã có 1 settlement DRAFT cho đơn này thì cập nhật lại (điều chỉnh), thay
+// tổng deposit đã PAID. Nếu đã có 1 settlement UNPAID cho đơn này thì cập nhật lại (điều chỉnh), thay
 // vì tạo thêm dòng mới mỗi lần Manager sửa số trước khi xác nhận.
-async function createSettlement(orderId: string, body: CreateSettlementBody, requestedBy: string): Promise<{ settlementId: string }> {
+async function createSettlement(orderId: string, body: CreateSettlementBody, actor: Actor): Promise<{ settlementId: string }> {
   const existing = await findOrderOrThrow(orderId);
 
-  const depositSum = await orderRepository.sumDepositsByStatus(orderId, 'SUCCESS');
+  if (actor.role === 'STAFF') {
+    const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, orderId);
+    if (!isLead) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được tạo yêu cầu quyết toán');
+    }
+  }
+
+  const depositSum = await orderRepository.sumDepositsByStatus(orderId, 'PAID');
   const successfulDeposits = toNumber(depositSum._sum.amount);
   const finalAmount =
     toNumber(existing.totalAmount) + body.additionalFee + body.compensation - body.discount - successfulDeposits;
@@ -505,11 +521,11 @@ async function createSettlement(orderId: string, body: CreateSettlementBody, req
     paymentMethod: body.paymentMethod ?? null,
     qrCodeUrl: body.qrCodeUrl ?? null,
     notes: body.notes || null,
-    requestedBy,
+    requestedBy: actor.id,
   };
 
   const settlement =
-    latest && latest.status === 'DRAFT'
+    latest && latest.status === 'UNPAID'
       ? await orderRepository.updateSettlementDraft(latest.settlementId, payload)
       : await orderRepository.createSettlement(payload);
 

@@ -1,5 +1,7 @@
 import type { SurveyStatus } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import { scheduleRepository } from './schedule.repository';
+import type { Actor } from './schedule.service';
 import { surveyRepository, type SurveyReportWithDetails } from './survey.repository';
 import type { CreateSurveyReportBody, ListSurveyReportsQuery } from './survey.validators';
 
@@ -116,9 +118,16 @@ async function getSurveyReportById(surveyId: string): Promise<SurveyReportDetail
   return mapDetail(survey);
 }
 
-async function createSurveyReport(body: CreateSurveyReportBody, reportedBy: string): Promise<SurveyReportDetailDTO> {
+async function createSurveyReport(body: CreateSurveyReportBody, actor: Actor): Promise<SurveyReportDetailDTO> {
   const order = await surveyRepository.orderExists(body.orderId);
   if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
+
+  if (actor.role === 'STAFF') {
+    const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, body.orderId);
+    if (!isLead) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được nộp báo cáo khảo sát');
+    }
+  }
 
   if (body.planId) {
     const plan = await surveyRepository.planExists(body.planId);
@@ -141,7 +150,7 @@ async function createSurveyReport(body: CreateSurveyReportBody, reportedBy: stri
     proposedItems: body.proposedItems ?? null,
     notes: body.notes || null,
     evidenceId: body.evidenceId ?? null,
-    reportedBy,
+    reportedBy: actor.id,
   });
 
   return mapDetail(created);

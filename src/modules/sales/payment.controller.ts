@@ -29,7 +29,7 @@ async function markSettlementPaid(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { settlementId } = req.params as unknown as SettlementIdParam;
   const body = req.body as MarkSettlementPaidBody;
-  const settlement = await paymentService.markSettlementPaid(settlementId, body);
+  const settlement = await paymentService.markSettlementPaid(settlementId, body, req.user);
   ok(res, settlement);
 }
 

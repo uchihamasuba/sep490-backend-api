@@ -1,12 +1,14 @@
 import type { Deposit, DepositStatus, Settlement } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import { scheduleRepository } from '../operations/schedule.repository';
+import type { Actor } from '../operations/schedule.service';
 import { paymentRepository, type DepositWithOrder } from './payment.repository';
 import type { ListDepositsQuery, MarkSettlementPaidBody, UpdateDepositStatusBody } from './payment.validators';
 
-const OPEN_DEPOSIT_STATUSES: DepositStatus[] = ['PENDING', 'OVERDUE'];
-// Chỉ xóa được khoản cọc còn ở trạng thái khởi tạo — SUCCESS/OVERDUE/CANCELLED đều đã có tác động
-// nghiệp vụ (đã set orders.payment_status hoặc đã kết thúc vòng đời), không cho xóa để giữ dấu vết.
-const DELETABLE_DEPOSIT_STATUSES: DepositStatus[] = ['PENDING'];
+const OPEN_DEPOSIT_STATUSES: DepositStatus[] = ['UNPAID'];
+// Chỉ xóa được khoản cọc còn ở trạng thái khởi tạo — PAID/CANCELLED đều đã có tác động nghiệp vụ (đã
+// set orders.payment_status hoặc đã kết thúc vòng đời), không cho xóa để giữ dấu vết.
+const DELETABLE_DEPOSIT_STATUSES: DepositStatus[] = ['UNPAID'];
 
 export interface DepositDTO {
   depositId: string;
@@ -128,8 +130,8 @@ function mapSettlement(row: Settlement): SettlementDTO {
 }
 
 // PUT /deposits/:depositId — docs/api/tiendosukien_api.md mục 3.1: nút "Xác nhận đã nhận cọc 50%".
-// Chỉ tác động được lên khoản cọc đang PENDING/OVERDUE — SUCCESS/CANCELLED là trạng thái cuối, không
-// cho sửa lại qua endpoint này (tránh xác nhận nhầm 2 lần hoặc hồi sinh 1 khoản đã hủy).
+// Chỉ tác động được lên khoản cọc đang UNPAID — PAID/CANCELLED là trạng thái cuối, không cho sửa lại
+// qua endpoint này (tránh xác nhận nhầm 2 lần hoặc hồi sinh 1 khoản đã hủy).
 async function updateDepositStatus(depositId: string, body: UpdateDepositStatusBody, actorId: string): Promise<DepositDTO> {
   const deposit = await paymentRepository.findDepositById(depositId);
   if (!deposit) throw AppError.notFound('Không tìm thấy khoản cọc');
@@ -149,7 +151,7 @@ async function confirmSettlement(settlementId: string, confirmedBy: string): Pro
   const settlement = await paymentRepository.findSettlementById(settlementId);
   if (!settlement) throw AppError.notFound('Không tìm thấy bản quyết toán');
 
-  if (settlement.status === 'CONFIRMED') {
+  if (settlement.status === 'PAID') {
     throw AppError.badRequest('Bản quyết toán này đã được xác nhận trước đó');
   }
 
@@ -158,14 +160,21 @@ async function confirmSettlement(settlementId: string, confirmedBy: string): Pro
 }
 
 // PUT /settlements/:settlementId/mark-paid — docs/api/api.md gap (n): Leader xác nhận đã thu tiền tại
-// hiện trường kèm ảnh, chuyển REQUESTED -> PAID. Chỉ hợp lệ từ đúng trạng thái REQUESTED (DRAFT/AGREED
-// chưa gửi yêu cầu, PAID/CONFIRMED đã kết thúc giai đoạn thu tiền).
-async function markSettlementPaid(settlementId: string, body: MarkSettlementPaidBody): Promise<SettlementDTO> {
+// hiện trường kèm ảnh, chuyển UNPAID -> PAID. Chỉ hợp lệ từ đúng trạng thái UNPAID; PAID/CANCELLED đã
+// là trạng thái cuối.
+async function markSettlementPaid(settlementId: string, body: MarkSettlementPaidBody, actor: Actor): Promise<SettlementDTO> {
   const settlement = await paymentRepository.findSettlementById(settlementId);
   if (!settlement) throw AppError.notFound('Không tìm thấy bản quyết toán');
 
-  if (settlement.status !== 'REQUESTED') {
-    throw AppError.badRequest(`Bản quyết toán đang ở trạng thái ${settlement.status}, chỉ chuyển được PAID từ REQUESTED`);
+  if (settlement.status !== 'UNPAID') {
+    throw AppError.badRequest(`Bản quyết toán đang ở trạng thái ${settlement.status}, chỉ chuyển được PAID từ UNPAID`);
+  }
+
+  if (actor.role === 'STAFF') {
+    const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, settlement.orderId);
+    if (!isLead) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được xác nhận đã thu tiền');
+    }
   }
 
   const updated = await paymentRepository.markSettlementPaid(settlementId, body.evidenceId);
@@ -193,14 +202,14 @@ async function listDeposits(query: ListDepositsQuery): Promise<DepositListResult
 
 // DELETE /deposits/:depositId — chưa có trong đặc tả gốc (docs/api/datcoc_api.md mục 8 ghi "chưa kiểm
 // tra, chưa xác nhận có tồn tại hay không"), thêm theo yêu cầu để hỗ trợ luồng "xóa và tạo lại" khi
-// ghi nhận cọc sai — chỉ cho phép khi còn PENDING (guard trạng thái, xem ghi chú DELETABLE_DEPOSIT_STATUSES).
+// ghi nhận cọc sai — chỉ cho phép khi còn UNPAID (guard trạng thái, xem ghi chú DELETABLE_DEPOSIT_STATUSES).
 async function deleteDeposit(depositId: string): Promise<void> {
   const deposit = await paymentRepository.findDepositById(depositId);
   if (!deposit) throw AppError.notFound('Không tìm thấy khoản cọc');
 
   if (!DELETABLE_DEPOSIT_STATUSES.includes(deposit.status)) {
     throw AppError.badRequest(
-      `Không thể xóa khoản cọc đang ở trạng thái ${deposit.status} — chỉ xóa được khi đang PENDING`,
+      `Không thể xóa khoản cọc đang ở trạng thái ${deposit.status} — chỉ xóa được khi đang UNPAID`,
     );
   }
 

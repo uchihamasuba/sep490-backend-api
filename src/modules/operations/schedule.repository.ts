@@ -124,6 +124,17 @@ export const scheduleRepository = {
     return prisma.user.findUnique({ where: { userId }, select: { userId: true, fullName: true, role: true } });
   },
 
+  // Kiểm tra actor có giữ vai trò LEAD (PlanMemberRole) trên bất kỳ schedule plan nào của order —
+  // dùng để giới hạn phạm vi thao tác của STAFF theo từng dự án (Leader/Technical là vai trò theo
+  // project, không còn là role hệ thống). MANAGER/ADMIN không bị giới hạn bởi check này.
+  async isUserLeadOnOrder(userId: string, orderId: string): Promise<boolean> {
+    const assignee = await prisma.schedulePlanAssignee.findFirst({
+      where: { userId, role: 'LEAD', plan: { orderId } },
+      select: { assigneeId: true },
+    });
+    return assignee !== null;
+  },
+
   async create(params: {
     planCode: string;
     orderId: string;

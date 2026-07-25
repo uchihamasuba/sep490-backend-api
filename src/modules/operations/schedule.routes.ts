@@ -71,13 +71,13 @@ scheduleRouter.patch(
   asyncHandler(scheduleController.updateStatusBatch),
 );
 
-// Manager (xác nhận/hủy) + Leader (docs/api/api.md gap (c), đã chốt 2026-07-22: Leader tự xác nhận
+// Manager (xác nhận/hủy) + Staff (docs/api/api.md gap (c), đã chốt 2026-07-22: Leader tự xác nhận
 // CONFIRMED cho plan mình giữ vai trò LEAD; hủy CANCELLED vẫn chỉ Manager — ràng buộc chi tiết ở
 // scheduleService.updateSchedulePlanStatus). IN_PROGRESS/COMPLETED vẫn không qua đây (đã chốt ở
 // docs/api/more-require.md mục (ae)) — tự suy ra ở tầng service khi assignee LEAD check-in/check-out.
 scheduleRouter.patch(
   '/:planId/status',
-  requireRole('MANAGER', 'LEADER'),
+  requireRole('MANAGER', 'STAFF'),
   validate(planIdParamSchema, 'params'),
   validate(updateSchedulePlanStatusBodySchema, 'body'),
   asyncHandler(scheduleController.updateStatus),
@@ -100,7 +100,7 @@ scheduleRouter.delete(
 
 scheduleRouter.post(
   '/:planId/assignees/:userId/check-in',
-  requireRole('LEADER', 'TECHNICAL'),
+  requireRole('STAFF'),
   validate(assigneeParamSchema, 'params'),
   validate(checkInBodySchema, 'body'),
   asyncHandler(scheduleController.checkIn),
@@ -108,7 +108,7 @@ scheduleRouter.post(
 
 scheduleRouter.post(
   '/:planId/assignees/:userId/check-out',
-  requireRole('LEADER', 'TECHNICAL'),
+  requireRole('STAFF'),
   validate(assigneeParamSchema, 'params'),
   asyncHandler(scheduleController.checkOut),
 );
@@ -118,7 +118,7 @@ scheduleRouter.post(
 // không gắn với trạng thái nào — bất kỳ ai được phân công vào plan (LEAD/TECHNICAL) đều gắn được.
 scheduleRouter.patch(
   '/:planId/evidence',
-  requireRole('LEADER', 'TECHNICAL'),
+  requireRole('STAFF'),
   validate(planIdParamSchema, 'params'),
   validate(attachEvidenceBodySchema, 'body'),
   asyncHandler(scheduleController.attachEvidence),
@@ -128,7 +128,7 @@ scheduleRouter.patch(
 // Leader giữ vai trò LEAD của đúng plan đó (guard chi tiết ở inventoryService.recordFieldOutbound).
 scheduleRouter.post(
   '/:planId/warehouse-movement',
-  requireRole('LEADER'),
+  requireRole('STAFF'),
   validate(planIdParamSchema, 'params'),
   validate(warehouseMovementBodySchema, 'body'),
   asyncHandler(scheduleController.recordWarehouseMovement),

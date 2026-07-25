@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE `deposits` MODIFY `status` ENUM('UNPAID', 'PAID', 'CANCELLED') NOT NULL DEFAULT 'UNPAID';
+
+-- AlterTable
+ALTER TABLE `settlements` MODIFY `status` ENUM('UNPAID', 'PAID', 'CANCELLED') NOT NULL DEFAULT 'UNPAID';
+
+-- AlterTable
+ALTER TABLE `users` MODIFY `role` ENUM('ADMIN', 'MANAGER', 'STAFF') NOT NULL;
+

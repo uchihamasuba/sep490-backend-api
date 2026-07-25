@@ -177,7 +177,7 @@ async function inviteEmployee(body: InviteEmployeeBody): Promise<EmployeeInvited
     fullName: body.fullName,
     phone: body.phone,
     email: body.email,
-    role: 'TECHNICAL',
+    role: 'STAFF',
     status: 'ACTIVE',
     jobTitle: roleOption.name,
     employeeCode,

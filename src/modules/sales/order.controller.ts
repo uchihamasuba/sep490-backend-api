@@ -107,7 +107,7 @@ async function createDeposit(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { orderId } = req.params as unknown as OrderIdParam;
   const body = req.body as CreateDepositBody;
-  const deposit = await orderService.createDeposit(orderId, body, req.user.id);
+  const deposit = await orderService.createDeposit(orderId, body, req.user);
   created(res, deposit);
 }
 
@@ -115,7 +115,7 @@ async function createSettlement(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { orderId } = req.params as unknown as OrderIdParam;
   const body = req.body as CreateSettlementBody;
-  const result = await orderService.createSettlement(orderId, body, req.user.id);
+  const result = await orderService.createSettlement(orderId, body, req.user);
   created(res, result);
 }
 

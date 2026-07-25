@@ -2,6 +2,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { app } from '../../../app';
 import { env } from '../../../config/env';
+import { scheduleRepository } from '../../operations/schedule.repository';
 import { inventoryRepository } from '../inventory.repository';
 
 // Mock repository — KHÔNG chạm DB thật (trước đây file này là integration test query trực tiếp trên
@@ -25,14 +26,20 @@ jest.mock('../inventory.repository', () => ({
     findReportById: jest.fn(),
     createReport: jest.fn(),
     confirmReportAndApplyInventory: jest.fn(),
-    isUserAssignedToOrder: jest.fn(),
     recordFieldOutbound: jest.fn(),
   },
 }));
 
-const mockedRepo = inventoryRepository as jest.Mocked<typeof inventoryRepository>;
+jest.mock('../../operations/schedule.repository', () => ({
+  scheduleRepository: {
+    isUserLeadOnOrder: jest.fn(),
+  },
+}));
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL', userId = 'user-1') {
+const mockedRepo = inventoryRepository as jest.Mocked<typeof inventoryRepository>;
+const mockedScheduleRepo = scheduleRepository as jest.Mocked<typeof scheduleRepository>;
+
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF', userId = 'user-1') {
   const token = jwt.sign({ id: userId, role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -303,14 +310,15 @@ describe('Write endpoints — successful quantity updates (Manager)', () => {
     expect(res.body.data).toMatchObject({ quantityAvailable: 55, quantityReserved: 5 });
   });
 
-  it('creates a collected-equipment report as LEADER (201), confirming it as MANAGER applies inventory effects (200)', async () => {
+  it('creates a collected-equipment report as STAFF who is the LEAD assignee (201), confirming it as MANAGER applies inventory effects (200)', async () => {
     mockedRepo.orderExists.mockResolvedValue({ orderId: 'order-1' } as never);
     mockedRepo.itemExists.mockResolvedValue({ itemId: 'item-loa', itemName: 'Loa JBL 1000W' } as never);
     mockedRepo.createReport.mockResolvedValue(fakeReport({ status: 'SUBMITTED' }) as never);
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(true);
 
     const createRes = await request(app)
       .post('/api/v1/inventory/collected-equipment-reports')
-      .set('Authorization', authHeader('LEADER', 'leader-1'))
+      .set('Authorization', authHeader('STAFF', 'leader-1'))
       .send({
         orderId: 'order-1',
         reportType: 'INTERNAL',
@@ -385,14 +393,15 @@ describe('/return-reports — alias of /collected-equipment-reports, same underl
     expect(res.body.data[0]).toMatchObject({ orderCode: 'ORD-001', status: 'SUBMITTED' });
   });
 
-  it('creates a report via /return-reports as LEADER (201) and confirms via /return-reports/:id/confirm as MANAGER (200)', async () => {
+  it('creates a report via /return-reports as STAFF who is the LEAD assignee (201) and confirms via /return-reports/:id/confirm as MANAGER (200)', async () => {
     mockedRepo.orderExists.mockResolvedValue({ orderId: 'order-1' } as never);
     mockedRepo.itemExists.mockResolvedValue({ itemId: 'item-loa', itemName: 'Loa JBL 1000W' } as never);
     mockedRepo.createReport.mockResolvedValue(fakeReport({ reportId: 'report-2', status: 'SUBMITTED' }) as never);
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(true);
 
     const createRes = await request(app)
       .post('/api/v1/inventory/return-reports')
-      .set('Authorization', authHeader('LEADER', 'leader-1'))
+      .set('Authorization', authHeader('STAFF', 'leader-1'))
       .send({
         orderId: 'order-1',
         reportType: 'INTERNAL',

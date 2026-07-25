@@ -302,9 +302,16 @@ async function getReportById(reportId: string): Promise<ReportDTO> {
   return mapReport(report);
 }
 
-async function createReport(body: CreateReportBody, reportedBy: string): Promise<ReportDTO> {
+async function createReport(body: CreateReportBody, actor: Actor): Promise<ReportDTO> {
   const order = await inventoryRepository.orderExists(body.orderId);
   if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
+
+  if (actor.role === 'STAFF') {
+    const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, body.orderId);
+    if (!isLead) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được nộp báo cáo thu hồi thiết bị');
+    }
+  }
 
   for (const line of body.items) {
     const item = await inventoryRepository.itemExists(line.itemId);
@@ -315,7 +322,7 @@ async function createReport(body: CreateReportBody, reportedBy: string): Promise
     orderId: body.orderId,
     reportType: body.reportType,
     transactionId: body.transactionId ?? null,
-    reportedBy,
+    reportedBy: actor.id,
     notes: body.notes || null,
     items: body.items.map((line) => ({
       itemId: line.itemId,
@@ -337,10 +344,10 @@ async function confirmReport(reportId: string, actor: Actor): Promise<ReportDTO>
     throw AppError.badRequest(`Chỉ có thể xác nhận báo cáo đang ở trạng thái SUBMITTED (hiện tại: ${report.status})`);
   }
 
-  if (actor.role === 'LEADER') {
-    const assigned = await inventoryRepository.isUserAssignedToOrder(actor.id, report.orderId);
-    if (!assigned) {
-      throw AppError.forbidden('Bạn không được phân công vào kế hoạch nào của đơn hàng này');
+  if (actor.role === 'STAFF') {
+    const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, report.orderId);
+    if (!isLead) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được xác nhận báo cáo');
     }
   }
 

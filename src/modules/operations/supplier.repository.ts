@@ -133,14 +133,4 @@ export const supplierTransactionRepository = {
     return prisma.supplierTransactionItem.update({ where: { stItemId }, data: { receivedQuantity } });
   },
 
-  // Giới hạn LEADER chỉ thao tác trên transaction thuộc order của plan họ được phân công (docs/api/
-  // api.md gap (h)/(i)) — kiểm tra tồn tại 1 dòng schedule_plan_assignees của user trên bất kỳ plan nào
-  // thuộc order đó.
-  async isUserAssignedToOrder(userId: string, orderId: string): Promise<boolean> {
-    const assignee = await prisma.schedulePlanAssignee.findFirst({
-      where: { userId, plan: { orderId } },
-      select: { assigneeId: true },
-    });
-    return assignee !== null;
-  },
 };

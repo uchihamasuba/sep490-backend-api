@@ -15,7 +15,7 @@ import type {
 
 export interface Actor {
   id: string;
-  role: 'ADMIN' | 'MANAGER' | 'LEADER' | 'TECHNICAL';
+  role: 'ADMIN' | 'MANAGER' | 'STAFF';
 }
 
 export interface AssigneeDTO {
@@ -65,7 +65,7 @@ export interface WorkTaskDTO {
 }
 
 const TERMINAL_OR_LOCKED_STATUSES: ScheduleStatus[] = ['IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
-const ELIGIBLE_ASSIGNEE_USER_ROLES = ['LEADER', 'TECHNICAL'];
+const ELIGIBLE_ASSIGNEE_USER_ROLES = ['STAFF'];
 
 function mapAssignee(a: {
   userId: string;
@@ -120,7 +120,7 @@ async function validateAssigneeInputs(assignees: { userId: string; role: PlanMem
     const user = await scheduleRepository.findUserById(a.userId);
     if (!user) throw AppError.notFound(`Không tìm thấy người dùng: ${a.userId}`, { userId: a.userId });
     if (!ELIGIBLE_ASSIGNEE_USER_ROLES.includes(user.role)) {
-      throw AppError.badRequest(`User ${a.userId} không có vai trò LEADER/TECHNICAL, không thể phân công`, {
+      throw AppError.badRequest(`User ${a.userId} không có vai trò STAFF, không thể phân công`, {
         userId: a.userId,
         role: user.role,
       });
@@ -225,7 +225,7 @@ async function updateSchedulePlanStatus(
 ): Promise<SchedulePlanDTO> {
   const existing = await findPlanOrThrow(planId);
 
-  if (actor.role === 'LEADER') {
+  if (actor.role === 'STAFF') {
     if (body.status !== 'CONFIRMED') {
       throw AppError.forbidden('Leader chỉ được tự xác nhận kế hoạch (CONFIRMED) — hủy kế hoạch thuộc về Manager');
     }

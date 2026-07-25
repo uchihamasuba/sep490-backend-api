@@ -19,7 +19,7 @@ async function getById(req: Request, res: Response) {
 async function create(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const body = req.body as CreateSurveyReportBody;
-  const survey = await surveyService.createSurveyReport(body, req.user.id);
+  const survey = await surveyService.createSurveyReport(body, req.user);
   created(res, survey);
 }
 

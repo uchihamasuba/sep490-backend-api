@@ -195,7 +195,7 @@ describe('customerService.deleteCustomer', () => {
 });
 
 describe('customerService.getCustomerSummary', () => {
-  it('computes paidAmount from deposits(SUCCESS) + settlements(PAID/CONFIRMED), not orders.payment_status', async () => {
+  it('computes paidAmount from deposits(PAID) + settlements(PAID), not orders.payment_status', async () => {
     mockedRepo.findById.mockResolvedValue(baseCustomer() as never);
     mockedRepo.getOrderIdsForCustomer.mockResolvedValue(['o1', 'o2']);
     mockedRepo.getOrderStatsForCustomer.mockResolvedValue({ totalBookings: 2, totalSpent: 411000000 } as never);

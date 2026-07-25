@@ -133,14 +133,14 @@ export const customerRepository = {
 
   sumSuccessfulDeposits(orderIds: string[]) {
     if (orderIds.length === 0) return Promise.resolve<{ _sum: { amount: Prisma.Decimal | null } }>({ _sum: { amount: null } });
-    return prisma.deposit.aggregate({ where: { orderId: { in: orderIds }, status: 'SUCCESS' }, _sum: { amount: true } });
+    return prisma.deposit.aggregate({ where: { orderId: { in: orderIds }, status: 'PAID' }, _sum: { amount: true } });
   },
 
   sumSettledAmounts(orderIds: string[]) {
     if (orderIds.length === 0)
       return Promise.resolve<{ _sum: { finalAmount: Prisma.Decimal | null } }>({ _sum: { finalAmount: null } });
     return prisma.settlement.aggregate({
-      where: { orderId: { in: orderIds }, status: { in: ['PAID', 'CONFIRMED'] } },
+      where: { orderId: { in: orderIds }, status: 'PAID' },
       _sum: { finalAmount: true },
     });
   },

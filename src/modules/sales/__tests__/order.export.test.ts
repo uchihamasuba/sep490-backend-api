@@ -31,7 +31,7 @@ jest.mock('../quotation.repository', () => {
 const mockedOrderRepo = orderRepository as jest.Mocked<typeof orderRepository>;
 const mockedQuotationRepo = quotationRepository as jest.Mocked<typeof quotationRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }

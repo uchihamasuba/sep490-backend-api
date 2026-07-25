@@ -60,7 +60,7 @@ supplierTransactionRouter.use(requireAuth);
 // được phân công — TODO: lọc theo orderId của plan họ được phân công thay vì trả toàn hệ thống.
 supplierTransactionRouter.get(
   '/',
-  requireRole('MANAGER', 'ADMIN', 'LEADER'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(listSupplierTransactionsQuerySchema, 'query'),
   asyncHandler(supplierController.listTransactions),
 );
@@ -69,7 +69,7 @@ supplierTransactionRouter.get(
 // phân công ở tầng service (assertActorCanAccessTransaction), MANAGER/ADMIN không giới hạn.
 supplierTransactionRouter.get(
   '/:id',
-  requireRole('MANAGER', 'ADMIN', 'LEADER'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(transactionIdParamSchema, 'params'),
   asyncHandler(supplierController.getTransactionById),
 );
@@ -78,7 +78,7 @@ supplierTransactionRouter.get(
 // phân công (assertActorCanAccessTransaction); MANAGER hỗ trợ sửa lại trên web khi cần.
 supplierTransactionRouter.patch(
   '/:transactionId/items/:stItemId',
-  requireRole('LEADER', 'MANAGER'),
+  requireRole('STAFF', 'MANAGER'),
   validate(transactionItemParamSchema, 'params'),
   validate(receiveTransactionItemBodySchema, 'body'),
   asyncHandler(supplierController.receiveTransactionItem),

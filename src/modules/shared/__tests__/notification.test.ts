@@ -31,7 +31,7 @@ const mockedRepo = notificationRepository as jest.Mocked<typeof notificationRepo
 const mockedGetFirebaseMessaging = getFirebaseMessaging as jest.MockedFunction<typeof getFirebaseMessaging>;
 const mockedLogDeveloper = logDeveloper as jest.MockedFunction<typeof logDeveloper>;
 
-function authHeader(role: 'ADMIN' | 'MANAGER' | 'LEADER' | 'TECHNICAL', userId = 'user-1') {
+function authHeader(role: 'ADMIN' | 'MANAGER' | 'STAFF', userId = 'user-1') {
   const token = jwt.sign({ id: userId, role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -250,7 +250,7 @@ describe('HTTP routes', () => {
 
     const res = await request(app)
       .post('/api/v1/notifications/device-token')
-      .set('Authorization', authHeader('TECHNICAL'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ deviceToken: 'real-fcm-token' });
 
     expect(res.status).toBe(200);
@@ -261,7 +261,7 @@ describe('HTTP routes', () => {
   it('POST /api/v1/notifications/device-token rejects an empty deviceToken with 400', async () => {
     const res = await request(app)
       .post('/api/v1/notifications/device-token')
-      .set('Authorization', authHeader('TECHNICAL'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ deviceToken: '' });
 
     expect(res.status).toBe(400);

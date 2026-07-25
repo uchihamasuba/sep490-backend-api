@@ -68,10 +68,10 @@ describe('authService.login', () => {
     });
   });
 
-  it('maps LEADER/TECHNICAL role and SUSPENDED/INACTIVE status per the doc table', async () => {
-    mockedRepo.findByUsername.mockResolvedValue(baseUser({ role: 'LEADER', status: 'ACTIVE' }));
+  it('maps STAFF role and SUSPENDED/INACTIVE status per the doc table', async () => {
+    mockedRepo.findByUsername.mockResolvedValue(baseUser({ role: 'STAFF', status: 'ACTIVE' }));
     const result = await authService.login({ username: 'leader', password: PLAIN_PASSWORD } as LoginBody);
-    expect(result.user.role).toEqual({ roleId: 'role-leader', roleName: 'LEADER_STAFF' });
+    expect(result.user.role).toEqual({ roleId: 'role-staff', roleName: 'STAFF' });
   });
 
   it('rejects an unknown username with 401 (no account-enumeration hint)', async () => {

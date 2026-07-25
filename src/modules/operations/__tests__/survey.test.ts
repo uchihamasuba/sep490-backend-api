@@ -2,6 +2,8 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { app } from '../../../app';
 import { env } from '../../../config/env';
+import { scheduleRepository } from '../schedule.repository';
+import type { Actor } from '../schedule.service';
 import { surveyRepository } from '../survey.repository';
 import { surveyService } from '../survey.service';
 
@@ -18,9 +20,17 @@ jest.mock('../survey.repository', () => ({
   },
 }));
 
-const mockedRepo = surveyRepository as jest.Mocked<typeof surveyRepository>;
+jest.mock('../schedule.repository', () => ({
+  scheduleRepository: {
+    isUserLeadOnOrder: jest.fn(),
+  },
+}));
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL', userId = 'user-1') {
+const mockedRepo = surveyRepository as jest.Mocked<typeof surveyRepository>;
+const mockedScheduleRepo = scheduleRepository as jest.Mocked<typeof scheduleRepository>;
+const manager: Actor = { id: 'mgr-1', role: 'MANAGER' };
+
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF', userId = 'user-1') {
   const token = jwt.sign({ id: userId, role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -60,7 +70,7 @@ describe('surveyService.createSurveyReport', () => {
     await expect(
       surveyService.createSurveyReport(
         { orderId: 'missing', surveyDate: new Date(), location: 'Hall A' } as never,
-        'leader-1',
+        manager,
       ),
     ).rejects.toMatchObject({ status: 404, message: 'Không tìm thấy đơn hàng' });
   });
@@ -72,11 +82,11 @@ describe('surveyService.createSurveyReport', () => {
 
     const result = await surveyService.createSurveyReport(
       { orderId: 'ord-1', surveyDate: new Date(), location: 'Hall A' } as never,
-      'leader-1',
+      manager,
     );
 
     expect(result.status).toBe('NEEDS_REVIEW');
-    expect(mockedRepo.create).toHaveBeenCalledWith(expect.objectContaining({ reportedBy: 'leader-1' }));
+    expect(mockedRepo.create).toHaveBeenCalledWith(expect.objectContaining({ reportedBy: 'mgr-1' }));
   });
 });
 
@@ -107,14 +117,18 @@ describe('surveyService.confirmSurveyReport', () => {
 });
 
 describe('HTTP routes — role permission matrix', () => {
-  it('POST /api/v1/survey-reports succeeds for LEADER', async () => {
+  beforeEach(() => {
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(true);
+  });
+
+  it('POST /api/v1/survey-reports succeeds for STAFF who is the LEAD assignee of the order', async () => {
     mockedRepo.orderExists.mockResolvedValue({ orderId: 'ord-1' });
     mockedRepo.generateNextReportCode.mockResolvedValue('SUR-001');
     mockedRepo.create.mockResolvedValue(fakeSurvey() as never);
 
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(201);
@@ -133,10 +147,13 @@ describe('HTTP routes — role permission matrix', () => {
     expect(res.status).toBe(201);
   });
 
-  it('POST /api/v1/survey-reports is forbidden for TECHNICAL', async () => {
+  it('POST /api/v1/survey-reports is forbidden for STAFF who is not the LEAD assignee of the order', async () => {
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'ord-1' });
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(false);
+
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('TECHNICAL'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(403);
@@ -155,7 +172,7 @@ describe('HTTP routes — role permission matrix', () => {
   it('rejects a payload missing orderId with 400', async () => {
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(400);
@@ -166,7 +183,7 @@ describe('HTTP routes — role permission matrix', () => {
   it('rejects a payload missing location with 400', async () => {
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z' });
 
     expect(res.status).toBe(400);
@@ -179,7 +196,7 @@ describe('HTTP routes — role permission matrix', () => {
 
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'missing-order', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(404);
@@ -209,7 +226,7 @@ describe('HTTP routes — role permission matrix', () => {
 
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({
         orderId: 'ord-1',
         planId: 'plan-1',
@@ -247,7 +264,7 @@ describe('HTTP routes — role permission matrix', () => {
 
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', planId: 'missing-plan', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(404);
@@ -258,7 +275,7 @@ describe('HTTP routes — role permission matrix', () => {
   it('rejects partial dimension data (area without length/width) with 400', async () => {
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A', area: 50 });
 
     expect(res.status).toBe(400);
@@ -273,31 +290,26 @@ describe('HTTP routes — role permission matrix', () => {
 
     const res = await request(app)
       .post('/api/v1/survey-reports')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ orderId: 'ord-1', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A', area: 50, length: 10, width: 5 });
 
     expect(res.status).toBe(201);
   });
 
-  it('PUT /api/v1/survey-reports/:id/confirm is forbidden for LEADER (confirming is Manager-only)', async () => {
+  it('PUT /api/v1/survey-reports/:id/confirm is forbidden for STAFF (confirming is Manager-only)', async () => {
     const res = await request(app)
       .put('/api/v1/survey-reports/sur-1/confirm')
-      .set('Authorization', authHeader('LEADER'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ status: 'CONFIRMED' });
 
     expect(res.status).toBe(403);
   });
 
-  it('GET /api/v1/survey-reports is forbidden for TECHNICAL (mobile list is Leader/Manager/Admin only)', async () => {
-    const res = await request(app).get('/api/v1/survey-reports').set('Authorization', authHeader('TECHNICAL'));
-    expect(res.status).toBe(403);
-  });
-
-  it('GET /api/v1/survey-reports succeeds for LEADER (mobile reads back its own submitted reports)', async () => {
+  it('GET /api/v1/survey-reports succeeds for STAFF (mobile reads back its own submitted reports)', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [fakeSurvey()], totalItems: 1 } as never);
     mockedRepo.countByStatusGlobal.mockResolvedValue({ all: 1, draft: 0, needsReview: 1, submitted: 0, confirmed: 0 });
 
-    const res = await request(app).get('/api/v1/survey-reports').set('Authorization', authHeader('LEADER'));
+    const res = await request(app).get('/api/v1/survey-reports').set('Authorization', authHeader('STAFF'));
 
     expect(res.status).toBe(200);
   });

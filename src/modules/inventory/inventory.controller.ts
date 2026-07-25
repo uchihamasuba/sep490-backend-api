@@ -88,7 +88,7 @@ async function getReportById(req: Request, res: Response) {
 async function createReport(req: Request, res: Response) {
   const actor = requireActor(req);
   const body = req.body as CreateReportBody;
-  const report = await inventoryService.createReport(body, actor.id);
+  const report = await inventoryService.createReport(body, actor);
   created(res, report);
 }
 

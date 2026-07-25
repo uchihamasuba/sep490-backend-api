@@ -30,7 +30,7 @@ jest.mock('../../../utils/mailer', () => ({
 
 const mockedRepo = employeeRepository as jest.Mocked<typeof employeeRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'ADMIN') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'ADMIN') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -41,7 +41,7 @@ function baseUser(overrides: Partial<User> = {}): User {
     username: '0912345678',
     passwordHash: 'hashed',
     fullName: 'Nguyen Van A',
-    role: 'TECHNICAL',
+    role: 'STAFF',
     status: 'ACTIVE',
     email: null,
     phone: '0912345678',
@@ -82,12 +82,12 @@ describe('GET /api/v1/employees', () => {
     expect(res.body.error.message).toBe('Thiếu hoặc sai định dạng token xác thực');
   });
 
-  it('allows LEADER/TECHNICAL to read (read-only roles)', async () => {
+  it('allows STAFF to read (read-only role)', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 });
     mockedRepo.countByJobTitle.mockResolvedValue([]);
     mockedRepo.countAll.mockResolvedValue(0);
 
-    const res = await request(app).get('/api/v1/employees').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/employees').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(200);
   });
 });
@@ -112,7 +112,7 @@ describe('POST /api/v1/employees', () => {
     expect(res.body.data).toMatchObject({ id: 'u2', employeeCode: 'NV002' });
     expect(res.body.data.tempPassword).toBeTruthy();
     expect(mockedRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ fullName: 'Nguyen Van B', role: 'TECHNICAL', jobTitle: 'Kỹ thuật', employeeCode: 'NV002' }),
+      expect.objectContaining({ fullName: 'Nguyen Van B', role: 'STAFF', jobTitle: 'Kỹ thuật', employeeCode: 'NV002' }),
     );
   });
 

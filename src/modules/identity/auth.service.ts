@@ -18,8 +18,7 @@ export type ApiUserStatus = 'active' | 'inactive' | 'locked';
 const ROLE_MAP: Record<UserRole, { roleId: string; roleName: string }> = {
   ADMIN: { roleId: 'role-admin', roleName: 'Admin' },
   MANAGER: { roleId: 'role-manager', roleName: 'Manager' },
-  LEADER: { roleId: 'role-leader', roleName: 'LEADER_STAFF' },
-  TECHNICAL: { roleId: 'role-technical', roleName: 'TECHNICAL_STAFF' },
+  STAFF: { roleId: 'role-staff', roleName: 'STAFF' },
 };
 
 const STATUS_MAP: Record<UserStatus, ApiUserStatus> = {

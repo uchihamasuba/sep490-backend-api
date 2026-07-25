@@ -24,7 +24,7 @@ jest.mock('bcrypt', () => ({
 
 const mockedRepo = userRepository as jest.Mocked<typeof userRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -35,7 +35,7 @@ function fakeUser(overrides: Partial<User> = {}): User {
     username: 'leader1',
     passwordHash: 'hash',
     fullName: 'Le Van Leader',
-    role: 'LEADER',
+    role: 'STAFF',
     status: 'ACTIVE',
     email: 'leader1@example.com',
     phone: '0900000003',
@@ -54,11 +54,11 @@ describe('GET /api/v1/users', () => {
   it('lists users filtered by role, without exposing email/phone', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [fakeUser()], totalItems: 1 });
 
-    const res = await request(app).get('/api/v1/users?role=LEADER').set('Authorization', authHeader());
+    const res = await request(app).get('/api/v1/users?role=STAFF').set('Authorization', authHeader());
 
     expect(res.status).toBe(200);
-    expect(mockedRepo.findMany).toHaveBeenCalledWith(expect.objectContaining({ role: 'LEADER' }));
-    expect(res.body.data[0]).toEqual({ userId: 'leader-1', username: 'leader1', fullName: 'Le Van Leader', role: 'LEADER', status: 'ACTIVE' });
+    expect(mockedRepo.findMany).toHaveBeenCalledWith(expect.objectContaining({ role: 'STAFF' }));
+    expect(res.body.data[0]).toEqual({ userId: 'leader-1', username: 'leader1', fullName: 'Le Van Leader', role: 'STAFF', status: 'ACTIVE' });
     expect(res.body.data[0].email).toBeUndefined();
     expect(res.body.data[0].phone).toBeUndefined();
   });
@@ -71,7 +71,7 @@ describe('GET /api/v1/users', () => {
   });
 
   it('rejects roles outside manager/admin with 403', async () => {
-    const res = await request(app).get('/api/v1/users').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/users').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 });
@@ -109,7 +109,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER' });
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF' });
 
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ userId: 'u9', username: 'newuser' });
@@ -121,7 +121,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'leader1', password: '123456', fullName: 'New User', role: 'LEADER' });
+      .send({ username: 'leader1', password: '123456', fullName: 'New User', role: 'STAFF' });
 
     expect(res.status).toBe(400);
     expect(res.body.error.message).toBe('Tên đăng nhập đã tồn tại');
@@ -134,7 +134,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER', email: 'leader1@example.com' });
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF', email: 'leader1@example.com' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.message).toBe('Email đã được sử dụng');
@@ -147,7 +147,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER', phone: '0900000003' });
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF', phone: '0900000003' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
@@ -159,11 +159,11 @@ describe('POST /api/v1/users', () => {
     expect(res.status).toBe(400);
   });
 
-  it('is forbidden for technical/leader roles', async () => {
+  it('is forbidden for staff role', async () => {
     const res = await request(app)
       .post('/api/v1/users')
-      .set('Authorization', authHeader('TECHNICAL'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER' });
+      .set('Authorization', authHeader('STAFF'))
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF' });
     expect(res.status).toBe(403);
   });
 });

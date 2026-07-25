@@ -6,6 +6,7 @@ import {
   type SupplierTransactionWithDetails,
   type SupplierTransactionWithItems,
 } from './supplier.repository';
+import { scheduleRepository } from './schedule.repository';
 import type {
   CreateSupplierBody,
   ListSupplierTransactionsQuery,
@@ -154,13 +155,13 @@ function mapTransactionDetail(row: SupplierTransactionWithItems): SupplierTransa
   };
 }
 
-// LEADER chỉ thao tác được trên transaction thuộc order của plan họ được phân công (docs/api/api.md
+// STAFF chỉ thao tác được trên transaction thuộc order của plan họ giữ vai trò LEAD (docs/api/api.md
 // gap (h)/(i)) — MANAGER/ADMIN không bị giới hạn phạm vi này.
 async function assertActorCanAccessTransaction(actor: Actor, orderId: string): Promise<void> {
-  if (actor.role === 'LEADER') {
-    const assigned = await supplierTransactionRepository.isUserAssignedToOrder(actor.id, orderId);
-    if (!assigned) {
-      throw AppError.forbidden('Bạn không được phân công vào kế hoạch nào của đơn hàng này');
+  if (actor.role === 'STAFF') {
+    const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, orderId);
+    if (!isLead) {
+      throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được thao tác');
     }
   }
 }

@@ -57,11 +57,12 @@ settlementRouter.put(
   asyncHandler(paymentController.confirmSettlement),
 );
 
-// Transition REQUESTED -> PAID (docs/api/api.md gap (n)) — role LEADER, Leader xác nhận đã thu tiền
-// tại hiện trường kèm ảnh bằng chứng.
+// Transition UNPAID -> PAID (docs/api/api.md gap (n)) — role STAFF, giới hạn ở tầng service theo
+// Leader giữ vai trò LEAD của plan gắn với order này. Leader xác nhận đã thu tiền tại hiện trường kèm
+// ảnh bằng chứng.
 settlementRouter.put(
   '/:settlementId/mark-paid',
-  requireRole('LEADER'),
+  requireRole('STAFF'),
   validate(settlementIdParamSchema, 'params'),
   validate(markSettlementPaidBodySchema, 'body'),
   asyncHandler(paymentController.markSettlementPaid),

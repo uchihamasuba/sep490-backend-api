@@ -51,7 +51,7 @@ function baseUser(overrides: Partial<User> = {}): User {
   };
 }
 
-function authHeaderFor(userId = 'u1', role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeaderFor(userId = 'u1', role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: userId, role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }

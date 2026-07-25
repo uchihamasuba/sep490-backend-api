@@ -63,7 +63,7 @@ export const paymentRepository = {
     return prisma.deposit.delete({ where: { depositId } });
   },
 
-  // Khi status -> SUCCESS: set approvedBy/approvedAt/paymentDate VÀ cập nhật orders.payment_status =
+  // Khi status -> PAID: set approvedBy/approvedAt/paymentDate VÀ cập nhật orders.payment_status =
   // DEPOSITED trong CÙNG 1 transaction — khớp đúng hành vi đã chốt ở docs/api/tiendosukien_api.md mục
   // 3.1 (FE không cần tự gọi thêm PUT /orders/:id/status sau khi xác nhận cọc).
   async updateStatus(
@@ -72,7 +72,7 @@ export const paymentRepository = {
     status: DepositStatus,
     approvedBy: string,
   ): Promise<Deposit> {
-    if (status !== 'SUCCESS') {
+    if (status !== 'PAID') {
       return prisma.deposit.update({ where: { depositId }, data: { status } });
     }
 
@@ -92,7 +92,7 @@ export const paymentRepository = {
   confirmSettlement(settlementId: string, confirmedBy: string): Promise<Settlement> {
     return prisma.settlement.update({
       where: { settlementId },
-      data: { status: 'CONFIRMED', confirmedBy, confirmedAt: new Date() },
+      data: { status: 'PAID', confirmedBy, confirmedAt: new Date() },
     });
   },
 

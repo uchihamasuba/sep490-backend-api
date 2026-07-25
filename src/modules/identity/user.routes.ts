@@ -10,7 +10,7 @@ const router = Router();
 router.use(requireAuth);
 
 // Danh mục nhân sự dùng để chọn người phụ trách (docs/api/kehoachvaphancong_api.md mục 8.3: GET
-// /api/v1/users?role=LEADER|TECHNICAL) — đọc được bởi Manager (người lập kế hoạch) và Admin (audit).
+// /api/v1/users?role=STAFF) — đọc được bởi Manager (người lập kế hoạch) và Admin (audit).
 router.get(
   '/',
   requireRole('MANAGER', 'ADMIN'),

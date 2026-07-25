@@ -13,7 +13,7 @@ jest.mock('../event.repository', () => ({
 
 const mockedRepo = eventRepository as jest.Mocked<typeof eventRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -143,13 +143,8 @@ describe('HTTP routes — role permission matrix', () => {
     expect(res.status).toBe(200);
   });
 
-  it('GET /api/v1/events/:orderId/overview is forbidden for LEADER', async () => {
-    const res = await request(app).get('/api/v1/events/ord-1/overview').set('Authorization', authHeader('LEADER'));
-    expect(res.status).toBe(403);
-  });
-
-  it('GET /api/v1/events/:orderId/overview is forbidden for TECHNICAL', async () => {
-    const res = await request(app).get('/api/v1/events/ord-1/overview').set('Authorization', authHeader('TECHNICAL'));
+  it('GET /api/v1/events/:orderId/overview is forbidden for STAFF', async () => {
+    const res = await request(app).get('/api/v1/events/ord-1/overview').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 

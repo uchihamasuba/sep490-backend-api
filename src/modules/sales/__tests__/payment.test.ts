@@ -18,7 +18,7 @@ jest.mock('../payment.repository', () => ({
 
 const mockedPaymentRepo = paymentRepository as jest.Mocked<typeof paymentRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -33,7 +33,7 @@ function fakeDeposit(overrides: Record<string, unknown> = {}) {
     paymentDate: null,
     paymentMethod: null,
     qrCodeUrl: null,
-    status: 'PENDING',
+    status: 'UNPAID',
     evidenceId: null,
     requestedBy: 'user-1',
     approvedBy: null,
@@ -57,7 +57,7 @@ function fakeSettlement(overrides: Record<string, unknown> = {}) {
     qrCodeUrl: null,
     paidAt: null,
     evidenceId: null,
-    status: 'DRAFT',
+    status: 'UNPAID',
     requestedBy: 'user-1',
     requestedAt: new Date('2026-07-01T00:00:00Z'),
     confirmedBy: null,
@@ -70,22 +70,22 @@ function fakeSettlement(overrides: Record<string, unknown> = {}) {
 }
 
 describe('paymentService.updateDepositStatus', () => {
-  it('confirms a PENDING deposit and returns the updated record', async () => {
+  it('confirms an UNPAID deposit and returns the updated record', async () => {
     mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit() as never);
     mockedPaymentRepo.updateStatus.mockResolvedValue(
-      fakeDeposit({ status: 'SUCCESS', approvedBy: 'user-1', approvedAt: new Date(), paymentDate: new Date() }) as never,
+      fakeDeposit({ status: 'PAID', approvedBy: 'user-1', approvedAt: new Date(), paymentDate: new Date() }) as never,
     );
 
-    const result = await paymentService.updateDepositStatus('dep-1', { status: 'SUCCESS' }, 'user-1');
+    const result = await paymentService.updateDepositStatus('dep-1', { status: 'PAID' }, 'user-1');
 
-    expect(mockedPaymentRepo.updateStatus).toHaveBeenCalledWith('dep-1', 'ord-1', 'SUCCESS', 'user-1');
-    expect(result.status).toBe('SUCCESS');
+    expect(mockedPaymentRepo.updateStatus).toHaveBeenCalledWith('dep-1', 'ord-1', 'PAID', 'user-1');
+    expect(result.status).toBe('PAID');
   });
 
-  it('rejects updating a deposit that is already SUCCESS (400)', async () => {
-    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'SUCCESS' }) as never);
+  it('rejects updating a deposit that is already PAID (400)', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'PAID' }) as never);
 
-    await expect(paymentService.updateDepositStatus('dep-1', { status: 'SUCCESS' }, 'user-1')).rejects.toMatchObject({
+    await expect(paymentService.updateDepositStatus('dep-1', { status: 'PAID' }, 'user-1')).rejects.toMatchObject({
       status: 400,
     });
     expect(mockedPaymentRepo.updateStatus).not.toHaveBeenCalled();
@@ -94,27 +94,27 @@ describe('paymentService.updateDepositStatus', () => {
   it('returns 404 when the deposit does not exist', async () => {
     mockedPaymentRepo.findDepositById.mockResolvedValue(null);
 
-    await expect(paymentService.updateDepositStatus('ghost', { status: 'SUCCESS' }, 'user-1')).rejects.toMatchObject({
+    await expect(paymentService.updateDepositStatus('ghost', { status: 'PAID' }, 'user-1')).rejects.toMatchObject({
       status: 404,
     });
   });
 });
 
 describe('paymentService.confirmSettlement', () => {
-  it('confirms a DRAFT settlement', async () => {
+  it('confirms an UNPAID settlement', async () => {
     mockedPaymentRepo.findSettlementById.mockResolvedValue(fakeSettlement() as never);
     mockedPaymentRepo.confirmSettlement.mockResolvedValue(
-      fakeSettlement({ status: 'CONFIRMED', confirmedBy: 'user-1', confirmedAt: new Date() }) as never,
+      fakeSettlement({ status: 'PAID', confirmedBy: 'user-1', confirmedAt: new Date() }) as never,
     );
 
     const result = await paymentService.confirmSettlement('set-1', 'user-1');
 
     expect(mockedPaymentRepo.confirmSettlement).toHaveBeenCalledWith('set-1', 'user-1');
-    expect(result.status).toBe('CONFIRMED');
+    expect(result.status).toBe('PAID');
   });
 
-  it('rejects confirming an already-CONFIRMED settlement (400)', async () => {
-    mockedPaymentRepo.findSettlementById.mockResolvedValue(fakeSettlement({ status: 'CONFIRMED' }) as never);
+  it('rejects confirming an already-PAID settlement (400)', async () => {
+    mockedPaymentRepo.findSettlementById.mockResolvedValue(fakeSettlement({ status: 'PAID' }) as never);
 
     await expect(paymentService.confirmSettlement('set-1', 'user-1')).rejects.toMatchObject({ status: 400 });
     expect(mockedPaymentRepo.confirmSettlement).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe('HTTP routes', () => {
     const res = await request(app)
       .put('/api/v1/deposits/dep-1')
       .set('Authorization', authHeader())
-      .send({ status: 'PENDING' });
+      .send({ status: 'UNPAID' });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -134,25 +134,25 @@ describe('HTTP routes', () => {
   });
 
   it('PUT /api/v1/deposits/:depositId is forbidden for non-Manager roles', async () => {
-    const res = await request(app).put('/api/v1/deposits/dep-1').set('Authorization', authHeader('ADMIN')).send({ status: 'SUCCESS' });
+    const res = await request(app).put('/api/v1/deposits/dep-1').set('Authorization', authHeader('ADMIN')).send({ status: 'PAID' });
     expect(res.status).toBe(403);
   });
 
   it('PUT /api/v1/deposits/:depositId confirms a deposit end-to-end', async () => {
     mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit() as never);
-    mockedPaymentRepo.updateStatus.mockResolvedValue(fakeDeposit({ status: 'SUCCESS' }) as never);
+    mockedPaymentRepo.updateStatus.mockResolvedValue(fakeDeposit({ status: 'PAID' }) as never);
 
-    const res = await request(app).put('/api/v1/deposits/dep-1').set('Authorization', authHeader()).send({ status: 'SUCCESS' });
+    const res = await request(app).put('/api/v1/deposits/dep-1').set('Authorization', authHeader()).send({ status: 'PAID' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('SUCCESS');
+    expect(res.body.data.status).toBe('PAID');
   });
 
   it('PUT /api/v1/settlements/:settlementId/confirm rejects a wrong status literal with 400', async () => {
     const res = await request(app)
       .put('/api/v1/settlements/set-1/confirm')
       .set('Authorization', authHeader())
-      .send({ status: 'PAID' });
+      .send({ status: 'CONFIRMED' });
 
     expect(res.status).toBe(400);
     expect(mockedPaymentRepo.findSettlementById).not.toHaveBeenCalled();
@@ -160,12 +160,12 @@ describe('HTTP routes', () => {
 
   it('PUT /api/v1/settlements/:settlementId/confirm confirms end-to-end', async () => {
     mockedPaymentRepo.findSettlementById.mockResolvedValue(fakeSettlement() as never);
-    mockedPaymentRepo.confirmSettlement.mockResolvedValue(fakeSettlement({ status: 'CONFIRMED' }) as never);
+    mockedPaymentRepo.confirmSettlement.mockResolvedValue(fakeSettlement({ status: 'PAID' }) as never);
 
-    const res = await request(app).put('/api/v1/settlements/set-1/confirm').set('Authorization', authHeader()).send({ status: 'CONFIRMED' });
+    const res = await request(app).put('/api/v1/settlements/set-1/confirm').set('Authorization', authHeader()).send({ status: 'PAID' });
 
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('CONFIRMED');
+    expect(res.body.data.status).toBe('PAID');
   });
 });
 
@@ -223,8 +223,8 @@ describe('GET /api/v1/deposits', () => {
 });
 
 describe('DELETE /api/v1/deposits/:depositId', () => {
-  it('deletes a PENDING deposit', async () => {
-    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'PENDING' }) as never);
+  it('deletes an UNPAID deposit', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'UNPAID' }) as never);
     mockedPaymentRepo.deleteDeposit.mockResolvedValue(fakeDeposit() as never);
 
     const res = await request(app).delete('/api/v1/deposits/dep-1').set('Authorization', authHeader());
@@ -233,8 +233,8 @@ describe('DELETE /api/v1/deposits/:depositId', () => {
     expect(mockedPaymentRepo.deleteDeposit).toHaveBeenCalledWith('dep-1');
   });
 
-  it('rejects deleting a SUCCESS deposit with 400', async () => {
-    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'SUCCESS' }) as never);
+  it('rejects deleting a PAID deposit with 400', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'PAID' }) as never);
 
     const res = await request(app).delete('/api/v1/deposits/dep-1').set('Authorization', authHeader());
 

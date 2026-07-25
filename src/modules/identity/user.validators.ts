@@ -4,7 +4,7 @@ export const userIdParamSchema = z.object({
   userId: z.string().trim().min(1, 'Thiếu mã người dùng'),
 });
 
-const userRoleEnum = z.enum(['ADMIN', 'MANAGER', 'LEADER', 'TECHNICAL'], {
+const userRoleEnum = z.enum(['ADMIN', 'MANAGER', 'STAFF'], {
   message: 'role không hợp lệ, vui lòng chọn một trong các vai trò được hỗ trợ',
 });
 const userStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED'], {

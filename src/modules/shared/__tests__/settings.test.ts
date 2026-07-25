@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { app } from '../../../app';
 import { env } from '../../../config/env';
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -59,7 +59,7 @@ describe('GET /api/v1/settings/bank-account', () => {
   });
 
   it('rejects roles outside manager/admin with 403', async () => {
-    const res = await request(app).get('/api/v1/settings/bank-account').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/settings/bank-account').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 });

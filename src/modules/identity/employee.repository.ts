@@ -1,9 +1,9 @@
 import type { Prisma, User, UserRole, UserStatus } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 
-// "Nhân sự vận hành" (Hướng A, docs/api/admin_themnhansu_api.md mục 3.3) = users có role LEADER/
-// TECHNICAL — ADMIN/MANAGER là tài khoản quản trị, quản lý qua /users, không thuộc màn "Nhân viên".
-const EMPLOYEE_ROLES: UserRole[] = ['LEADER', 'TECHNICAL'];
+// "Nhân sự vận hành" (Hướng A, docs/api/admin_themnhansu_api.md mục 3.3) = users có role STAFF —
+// ADMIN/MANAGER là tài khoản quản trị, quản lý qua /users, không thuộc màn "Nhân viên".
+const EMPLOYEE_ROLES: UserRole[] = ['STAFF'];
 
 export interface EmployeeListFilter {
   jobTitle?: string;

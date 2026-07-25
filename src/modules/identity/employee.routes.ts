@@ -13,14 +13,14 @@ import {
 } from './employee.validators';
 
 // Mounted at /api/v1/employees — docs/api/admin_danhsachnguoidung__api.md mục 0: Admin đọc+ghi đầy đủ,
-// Manager/Leader/Technical chỉ đọc.
+// Manager/Staff chỉ đọc.
 const router = Router();
 
 router.use(requireAuth);
 
 router.get(
   '/',
-  requireRole('ADMIN', 'MANAGER', 'LEADER', 'TECHNICAL'),
+  requireRole('ADMIN', 'MANAGER', 'STAFF'),
   validate(listEmployeesQuerySchema, 'query'),
   asyncHandler(employeeController.list),
 );
@@ -41,7 +41,7 @@ router.post(
 
 router.get(
   '/:id',
-  requireRole('ADMIN', 'MANAGER', 'LEADER', 'TECHNICAL'),
+  requireRole('ADMIN', 'MANAGER', 'STAFF'),
   validate(employeeIdParamSchema, 'params'),
   asyncHandler(employeeController.getById),
 );

@@ -14,7 +14,7 @@ async function submitCollectedReport(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { id } = req.params as unknown as MobileOrderIdParam;
   const body = req.body as CreateMobileReportBody;
-  const report = await mobileService.submitCollectedReport(id, body, req.user.id);
+  const report = await mobileService.submitCollectedReport(id, body, req.user);
   created(res, report);
 }
 

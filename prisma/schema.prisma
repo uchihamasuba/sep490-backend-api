@@ -34,8 +34,7 @@ datasource db {
 enum UserRole {
   ADMIN
   MANAGER
-  LEADER
-  TECHNICAL
+  STAFF
 }
 
 enum UserStatus {
@@ -145,18 +144,15 @@ enum SupplierTransactionStatus {
 }
 
 enum DepositStatus {
-  PENDING
-  SUCCESS
-  OVERDUE
+  UNPAID
+  PAID
   CANCELLED
 }
 
 enum SettlementStatus {
-  DRAFT
-  AGREED
-  REQUESTED
+  UNPAID
   PAID
-  CONFIRMED
+  CANCELLED
 }
 
 enum NotificationType {
@@ -712,7 +708,7 @@ model Deposit {
   paymentDate   DateTime?     @map("payment_date") @db.Timestamp(0)
   paymentMethod String?       @map("payment_method") @db.VarChar(100)
   qrCodeUrl     String?       @map("qr_code_url") @db.Text
-  status        DepositStatus @default(PENDING)
+  status        DepositStatus @default(UNPAID)
   evidenceId    String?       @map("evidence_id") @db.VarChar(36)
   requestedBy   String        @map("requested_by") @db.VarChar(36)
   approvedBy    String?       @map("approved_by") @db.VarChar(36)
@@ -742,7 +738,7 @@ model Settlement {
   qrCodeUrl     String?          @map("qr_code_url") @db.Text
   paidAt        DateTime?        @map("paid_at") @db.Timestamp(0)
   evidenceId    String?          @map("evidence_id") @db.VarChar(36)
-  status        SettlementStatus @default(DRAFT)
+  status        SettlementStatus @default(UNPAID)
   requestedBy   String?          @map("requested_by") @db.VarChar(36)
   requestedAt   DateTime?        @map("requested_at") @db.Timestamp(0)
   confirmedBy   String?          @map("confirmed_by") @db.VarChar(36)

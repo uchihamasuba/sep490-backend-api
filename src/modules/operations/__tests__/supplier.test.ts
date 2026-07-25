@@ -23,7 +23,7 @@ jest.mock('../supplier.repository', () => ({
 const mockedSupplierRepo = supplierRepository as jest.Mocked<typeof supplierRepository>;
 const mockedTransactionRepo = supplierTransactionRepository as jest.Mocked<typeof supplierTransactionRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -83,7 +83,7 @@ describe('GET /api/v1/suppliers', () => {
   });
 
   it('rejects roles outside manager/admin with 403', async () => {
-    const res = await request(app).get('/api/v1/suppliers').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/suppliers').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 });

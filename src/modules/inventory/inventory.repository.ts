@@ -252,16 +252,6 @@ export const inventoryRepository = {
     return report;
   },
 
-  // Giới hạn LEADER chỉ confirm được report thuộc order của plan họ được phân công (docs/api/api.md
-  // gap (k)) — cùng mẫu với supplierTransactionRepository.isUserAssignedToOrder.
-  async isUserAssignedToOrder(userId: string, orderId: string): Promise<boolean> {
-    const assignee = await prisma.schedulePlanAssignee.findFirst({
-      where: { userId, plan: { orderId } },
-      select: { assigneeId: true },
-    });
-    return assignee !== null;
-  },
-
   // POST /schedule-plans/:planId/warehouse-movement (docs/api/api.md gap (g)) — Leader ghi nhận xuất
   // kho doanh nghiệp thực tế tại hiện trường. Cùng hiệu ứng tồn kho với export-equipment
   // (order.repository.ts#exportEquipment): quantityAvailable -= quantity, quantityReserved += quantity,

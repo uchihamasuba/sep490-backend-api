@@ -4,14 +4,14 @@ import { app } from '../../../app';
 import { env } from '../../../config/env';
 import { EMPLOYEE_ROLES } from '../employeeRole.constants';
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'LEADER' | 'TECHNICAL' = 'ADMIN') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'ADMIN') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
 
 describe('GET /api/v1/employee-roles', () => {
   it('returns the fixed 6-value static list', async () => {
-    const res = await request(app).get('/api/v1/employee-roles').set('Authorization', authHeader('TECHNICAL'));
+    const res = await request(app).get('/api/v1/employee-roles').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(200);
     expect(res.body.data).toEqual(EMPLOYEE_ROLES);
     expect(res.body.data).toHaveLength(6);
