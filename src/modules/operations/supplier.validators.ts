@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 export const supplierIdParamSchema = z.object({
-  id: z.string().trim().min(1, 'id is required'),
+  id: z.string().trim().min(1, 'Thiếu mã nhà cung cấp'),
 });
 
-const activeStatusEnum = z.enum(['ACTIVE', 'INACTIVE']);
+const activeStatusEnum = z.enum(['ACTIVE', 'INACTIVE'], { message: 'status không hợp lệ, chỉ chấp nhận ACTIVE hoặc INACTIVE' });
 
 export const listSuppliersQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),
@@ -18,9 +18,9 @@ export const listSuppliersQuerySchema = z.object({
 // Không nhận `email` dù model Supplier có cột này — đã chốt ở docs/api/supplier_api.md mục 1.3/5
 // (createSupplierSchema thật không nhận field này, tránh gây hiểu nhầm là lưu được).
 export const createSupplierBodySchema = z.object({
-  supplierCode: z.string().trim().min(1, 'supplierCode is required'),
-  supplierName: z.string().trim().min(1, 'supplierName is required'),
-  serviceType: z.string().trim().min(1, 'serviceType is required'),
+  supplierCode: z.string().trim().min(1, 'Vui lòng nhập mã nhà cung cấp'),
+  supplierName: z.string().trim().min(1, 'Vui lòng nhập tên nhà cung cấp'),
+  serviceType: z.string().trim().min(1, 'Vui lòng nhập loại hình dịch vụ'),
   phone: z.string().trim().min(1).optional(),
   address: z.string().trim().min(1).optional(),
   contactPerson: z.string().trim().min(1).optional(),
@@ -42,9 +42,11 @@ export const updateSupplierBodySchema = z
     notes: z.string().trim().optional(),
     status: activeStatusEnum.optional(),
   })
-  .refine((data) => Object.keys(data).length > 0, { message: 'At least one field is required' });
+  .refine((data) => Object.keys(data).length > 0, { message: 'Vui lòng cung cấp ít nhất một trường thông tin' });
 
-const supplierTransactionStatusEnum = z.enum(['PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']);
+const supplierTransactionStatusEnum = z.enum(['PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], {
+  message: 'status không hợp lệ',
+});
 
 export const listSupplierTransactionsQuerySchema = z.object({
   supplierId: z.string().trim().min(1).optional(),
@@ -55,18 +57,18 @@ export const listSupplierTransactionsQuerySchema = z.object({
 });
 
 export const transactionIdParamSchema = z.object({
-  id: z.string().trim().min(1, 'id is required'),
+  id: z.string().trim().min(1, 'Thiếu mã giao dịch'),
 });
 
 export const transactionItemParamSchema = z.object({
-  transactionId: z.string().trim().min(1, 'transactionId is required'),
-  stItemId: z.string().trim().min(1, 'stItemId is required'),
+  transactionId: z.string().trim().min(1, 'Thiếu mã giao dịch'),
+  stItemId: z.string().trim().min(1, 'Thiếu mã dòng hàng'),
 });
 
 // PATCH /supplier-transactions/:transactionId/items/:stItemId — xác nhận nhận hàng (docs/api/api.md
 // gap (i)). Giá trị tuyệt đối (không cộng dồn) — khớp cách FE gửi lại toàn bộ số đã nhận sau mỗi lần sửa.
 export const receiveTransactionItemBodySchema = z.object({
-  receivedQuantity: z.coerce.number().int().min(0, 'receivedQuantity must be >= 0'),
+  receivedQuantity: z.coerce.number().int().min(0, 'Số lượng đã nhận phải >= 0'),
 });
 
 export type SupplierIdParam = z.infer<typeof supplierIdParamSchema>;

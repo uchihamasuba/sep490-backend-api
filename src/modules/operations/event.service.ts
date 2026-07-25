@@ -139,7 +139,7 @@ function mapOverview(order: OrderOverview): EventOverviewDTO {
 
 async function getEventOverview(orderId: string): Promise<EventOverviewDTO> {
   const order = await eventRepository.findOrderOverview(orderId);
-  if (!order) throw AppError.notFound('Order not found');
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
   return mapOverview(order);
 }
 

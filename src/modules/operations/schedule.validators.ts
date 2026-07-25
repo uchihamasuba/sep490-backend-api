@@ -1,16 +1,18 @@
 import { z } from 'zod';
 
 export const planIdParamSchema = z.object({
-  planId: z.string().trim().min(1, 'planId is required'),
+  planId: z.string().trim().min(1, 'Thiếu mã kế hoạch'),
 });
 
 export const assigneeParamSchema = z.object({
-  planId: z.string().trim().min(1, 'planId is required'),
-  userId: z.string().trim().min(1, 'userId is required'),
+  planId: z.string().trim().min(1, 'Thiếu mã kế hoạch'),
+  userId: z.string().trim().min(1, 'Thiếu mã người dùng'),
 });
 
-const scheduleStatusEnum = z.enum(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']);
-const planMemberRoleEnum = z.enum(['LEAD', 'TECHNICAL']);
+const scheduleStatusEnum = z.enum(['PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], {
+  message: 'status không hợp lệ',
+});
+const planMemberRoleEnum = z.enum(['LEAD', 'TECHNICAL'], { message: 'role không hợp lệ, chỉ chấp nhận LEAD hoặc TECHNICAL' });
 
 export const listSchedulePlansQuerySchema = z
   .object({
@@ -26,19 +28,19 @@ export const listSchedulePlansQuerySchema = z
     limit: z.coerce.number().int().positive().max(500).optional(),
   })
   .refine((data) => !data.dateFrom || !data.dateTo || data.dateFrom <= data.dateTo, {
-    message: 'dateFrom must be before or equal to dateTo',
+    message: 'dateFrom phải nhỏ hơn hoặc bằng dateTo',
     path: ['dateTo'],
   });
 
 const assigneeInputSchema = z.object({
-  userId: z.string().trim().min(1, 'userId is required'),
+  userId: z.string().trim().min(1, 'Thiếu mã người dùng'),
   role: planMemberRoleEnum,
 });
 
 export const createSchedulePlanBodySchema = z
   .object({
-    orderId: z.string().trim().min(1, 'orderId is required'),
-    taskId: z.string().trim().min(1, 'taskId is required'),
+    orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
+    taskId: z.string().trim().min(1, 'Thiếu mã đầu việc'),
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
@@ -46,7 +48,7 @@ export const createSchedulePlanBodySchema = z
     assignees: z.array(assigneeInputSchema).default([]),
   })
   .refine((data) => !data.endTime || data.endTime > data.startTime, {
-    message: 'endTime must be after startTime',
+    message: 'Thời gian kết thúc phải sau thời gian bắt đầu',
     path: ['endTime'],
   });
 
@@ -58,7 +60,7 @@ export const updateSchedulePlanBodySchema = z
     notes: z.string().trim().optional(),
   })
   .refine((data) => !data.endTime || data.endTime > data.startTime, {
-    message: 'endTime must be after startTime',
+    message: 'Thời gian kết thúc phải sau thời gian bắt đầu',
     path: ['endTime'],
   });
 
@@ -66,7 +68,7 @@ export const updateSchedulePlanBodySchema = z
 // 2026-07-21) — 2 giá trị này giờ được service tự suy ra từ chấm công (attendances) của assignee LEAD
 // khi gọi check-in/check-out, không còn là transition Leader/Technical tự PATCH tay qua endpoint này.
 export const updateSchedulePlanStatusBodySchema = z.object({
-  status: z.enum(['CONFIRMED', 'CANCELLED']),
+  status: z.enum(['CONFIRMED', 'CANCELLED'], { message: 'status không hợp lệ, chỉ chấp nhận CONFIRMED hoặc CANCELLED' }),
   notes: z.string().trim().optional(),
   evidenceId: z.string().trim().min(1).optional(),
 });
@@ -84,7 +86,7 @@ export const checkInBodySchema = z.object({
 // (đã chốt ở docs/api/more-require.md mục (ag), thay cho đường cũ PATCH .../status { COMPLETED,
 // evidenceId } không còn dùng được). Không bắt buộc, nhân viên tự gắn khi có ảnh.
 export const attachEvidenceBodySchema = z.object({
-  evidenceId: z.string().trim().min(1, 'evidenceId is required'),
+  evidenceId: z.string().trim().min(1, 'Thiếu mã ảnh minh chứng'),
 });
 
 // POST /schedule-plans/batch — tạo nhiều dòng cùng orderId trong 1 transaction (docs/api/
@@ -92,7 +94,7 @@ export const attachEvidenceBodySchema = z.object({
 // giữa chừng.
 const batchPlanInputSchema = z
   .object({
-    taskId: z.string().trim().min(1, 'taskId is required'),
+    taskId: z.string().trim().min(1, 'Thiếu mã đầu việc'),
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
@@ -100,13 +102,13 @@ const batchPlanInputSchema = z
     assignees: z.array(assigneeInputSchema).default([]),
   })
   .refine((data) => !data.endTime || data.endTime > data.startTime, {
-    message: 'endTime must be after startTime',
+    message: 'Thời gian kết thúc phải sau thời gian bắt đầu',
     path: ['endTime'],
   });
 
 export const createSchedulePlansBatchBodySchema = z.object({
-  orderId: z.string().trim().min(1, 'orderId is required'),
-  plans: z.array(batchPlanInputSchema).min(1, 'plans must contain at least 1 line'),
+  orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
+  plans: z.array(batchPlanInputSchema).min(1, 'Danh sách kế hoạch phải có ít nhất 1 dòng'),
 });
 
 // PATCH /schedule-plans/batch/status — cập nhật trạng thái nhiều dòng cùng lúc trong 1 transaction
@@ -115,8 +117,8 @@ export const createSchedulePlansBatchBodySchema = z.object({
 // hành động Manager được phép ở updateSchedulePlanStatus (IN_PROGRESS/COMPLETED thuộc quyền Leader/
 // Technical, gắn với đúng 1 người thi công nên không có nhu cầu batch).
 export const batchUpdateSchedulePlanStatusBodySchema = z.object({
-  planIds: z.array(z.string().trim().min(1)).min(1, 'planIds must contain at least 1 id'),
-  status: z.enum(['CONFIRMED', 'CANCELLED']),
+  planIds: z.array(z.string().trim().min(1)).min(1, 'Danh sách planIds phải có ít nhất 1 mã'),
+  status: z.enum(['CONFIRMED', 'CANCELLED'], { message: 'status không hợp lệ, chỉ chấp nhận CONFIRMED hoặc CANCELLED' }),
   notes: z.string().trim().optional(),
 });
 
@@ -124,12 +126,12 @@ export const batchUpdateSchedulePlanStatusBodySchema = z.object({
 // thiết bị kho doanh nghiệp đã thực xuất tại hiện trường (TSK-SETUP), có thể khác/nhiều hơn
 // order_items gốc nếu đổi/bổ sung thiết bị ngay tại chỗ.
 const warehouseMovementLineSchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
-  quantity: z.coerce.number().int().positive('quantity must be > 0'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
 });
 
 export const warehouseMovementBodySchema = z.object({
-  items: z.array(warehouseMovementLineSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(warehouseMovementLineSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
   notes: z.string().trim().optional(),
 });
 
