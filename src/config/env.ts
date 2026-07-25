@@ -5,9 +5,9 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3001),
 
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  DATABASE_URL: z.string().min(1, 'Thiếu biến môi trường DATABASE_URL'),
 
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  JWT_SECRET: z.string().min(16, 'JWT_SECRET phải có ít nhất 16 ký tự'),
   JWT_EXPIRES_IN: z.string().default('7d'),
 
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
@@ -40,7 +40,7 @@ function loadEnv() {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
     // eslint-disable-next-line no-console
-    console.error('Invalid environment variables:', z.treeifyError(parsed.error));
+    console.error('Biến môi trường không hợp lệ:', z.treeifyError(parsed.error));
     process.exit(1);
   }
   return parsed.data;
