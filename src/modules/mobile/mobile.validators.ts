@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
 export const mobileOrderIdParamSchema = z.object({
-  id: z.string().trim().min(1, 'id is required'),
+  id: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
 });
 
 const reportTypeEnum = z.enum(['INTERNAL', 'SUPPLIER']);
 
 const reportItemInputSchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
   goodQuantity: z.coerce.number().int().nonnegative().default(0),
   damagedQuantity: z.coerce.number().int().nonnegative().default(0),
   lostQuantity: z.coerce.number().int().nonnegative().default(0),
@@ -20,7 +20,7 @@ export const createMobileReportBodySchema = z.object({
   reportType: reportTypeEnum.default('INTERNAL'),
   transactionId: z.string().trim().min(1).optional(),
   notes: z.string().trim().optional(),
-  items: z.array(reportItemInputSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(reportItemInputSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
 });
 
 export type MobileOrderIdParam = z.infer<typeof mobileOrderIdParamSchema>;

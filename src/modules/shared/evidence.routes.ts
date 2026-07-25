@@ -22,11 +22,23 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
-      return cb(AppError.badRequest(`Unsupported file type: ${file.mimetype}`));
+      return cb(AppError.badRequest(`Định dạng file không được hỗ trợ: ${file.mimetype}`));
     }
     cb(null, true);
   },
 });
+
+// MulterError.message luôn là tiếng Anh cứng (vd "File too large") — map theo code sang tiếng Việt
+// thay vì lộ nguyên message gốc ra response.
+const MULTER_ERROR_MESSAGES: Partial<Record<MulterError['code'], string>> = {
+  LIMIT_FILE_SIZE: 'Dung lượng file vượt quá giới hạn cho phép (tối đa 10MB)',
+  LIMIT_UNEXPECTED_FILE: 'Field file không hợp lệ, vui lòng gửi file qua field "file"',
+  LIMIT_FILE_COUNT: 'Chỉ được tải lên 1 file',
+};
+
+function mapMulterError(err: MulterError): AppError {
+  return AppError.badRequest(MULTER_ERROR_MESSAGES[err.code] ?? 'Tải file lên thất bại, vui lòng thử lại');
+}
 
 // multer's single() calls its callback with the error instead of calling next() with it — wrap so
 // MulterError (and our AppError from fileFilter) both flow into the shared errorHandler correctly.
@@ -34,7 +46,7 @@ function uploadSingleFile(req: Request, res: Response, next: NextFunction) {
   upload.single('file')(req, res, (err: unknown) => {
     if (!err) return next();
     if (err instanceof AppError) return next(err);
-    if (err instanceof MulterError) return next(AppError.badRequest(err.message));
+    if (err instanceof MulterError) return next(mapMulterError(err));
     next(err);
   });
 }

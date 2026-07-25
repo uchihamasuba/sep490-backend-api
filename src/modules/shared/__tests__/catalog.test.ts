@@ -115,6 +115,23 @@ describe('POST /api/v1/catalog/items', () => {
 
     expect(res.status).toBe(403);
   });
+
+  it('rejects priceValidFrom after priceValidTo with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/catalog/items')
+      .set('Authorization', authHeader())
+      .send({
+        itemName: 'Đèn Beam 230',
+        typeId: 'type-1',
+        unit: 'Cái',
+        priceValidFrom: '2026-06-01',
+        priceValidTo: '2026-01-01',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/v1/catalog/items/:itemId', () => {

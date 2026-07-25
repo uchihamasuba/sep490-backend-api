@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const itemIdParamSchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
 });
 
 const itemStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'MAINTENANCE']);
@@ -17,40 +17,53 @@ export const listCatalogItemsQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
 
-export const createCatalogItemBodySchema = z.object({
-  itemCode: z.string().trim().optional(),
-  itemName: z.string().trim().min(1, 'itemName is required'),
-  typeId: z.string().trim().min(1, 'typeId is required'),
-  description: z.string().trim().optional(),
-  unit: z.string().trim().min(1, 'unit is required'),
-  rentalPrice: z.coerce.number().nonnegative().default(0),
-  purchasePrice: z.coerce.number().nonnegative().optional(),
-  priceValidFrom: z.coerce.date().optional(),
-  priceValidTo: z.coerce.date().optional(),
-  imageUrl: z.string().trim().optional(),
-  status: itemStatusEnum.default('ACTIVE'),
-});
+// Cả 2 mốc cùng được truyền thì "hiệu lực từ" phải trước "hiệu lực đến" — tránh lưu 1 khoảng ngày rỗng
+// khiến priceValidFrom/priceValidTo vô nghĩa khi hiển thị/lọc theo giá đang áp dụng.
+const priceDateRangeRefinement = <T extends { priceValidFrom?: Date; priceValidTo?: Date }>(data: T) =>
+  !data.priceValidFrom || !data.priceValidTo || data.priceValidFrom <= data.priceValidTo;
+const priceDateRangeRefinementOptions = {
+  message: 'Ngày hiệu lực từ phải trước hoặc bằng ngày hiệu lực đến',
+  path: ['priceValidTo'],
+};
+
+export const createCatalogItemBodySchema = z
+  .object({
+    itemCode: z.string().trim().optional(),
+    itemName: z.string().trim().min(1, 'Vui lòng nhập tên thiết bị'),
+    typeId: z.string().trim().min(1, 'Thiếu mã loại thiết bị'),
+    description: z.string().trim().optional(),
+    unit: z.string().trim().min(1, 'Vui lòng nhập đơn vị tính'),
+    rentalPrice: z.coerce.number().nonnegative().default(0),
+    purchasePrice: z.coerce.number().nonnegative().optional(),
+    priceValidFrom: z.coerce.date().optional(),
+    priceValidTo: z.coerce.date().optional(),
+    imageUrl: z.string().trim().optional(),
+    status: itemStatusEnum.default('ACTIVE'),
+  })
+  .refine(priceDateRangeRefinement, priceDateRangeRefinementOptions);
 
 // PUT /catalog/items/:id — itemCode không sửa được sau khi tạo (docs/api/admin_danhmucthietbi_api.md
 // mục 3.2), không nằm trong body sửa.
-export const updateCatalogItemBodySchema = z.object({
-  itemName: z.string().trim().min(1, 'itemName is required'),
-  typeId: z.string().trim().min(1, 'typeId is required'),
-  description: z.string().trim().optional(),
-  unit: z.string().trim().min(1, 'unit is required'),
-  rentalPrice: z.coerce.number().nonnegative(),
-  purchasePrice: z.coerce.number().nonnegative().optional(),
-  priceValidFrom: z.coerce.date().optional(),
-  priceValidTo: z.coerce.date().optional(),
-  imageUrl: z.string().trim().optional(),
-});
+export const updateCatalogItemBodySchema = z
+  .object({
+    itemName: z.string().trim().min(1, 'Vui lòng nhập tên thiết bị'),
+    typeId: z.string().trim().min(1, 'Thiếu mã loại thiết bị'),
+    description: z.string().trim().optional(),
+    unit: z.string().trim().min(1, 'Vui lòng nhập đơn vị tính'),
+    rentalPrice: z.coerce.number().nonnegative(),
+    purchasePrice: z.coerce.number().nonnegative().optional(),
+    priceValidFrom: z.coerce.date().optional(),
+    priceValidTo: z.coerce.date().optional(),
+    imageUrl: z.string().trim().optional(),
+  })
+  .refine(priceDateRangeRefinement, priceDateRangeRefinementOptions);
 
 export const updateCatalogItemStatusBodySchema = z.object({
   status: itemStatusEnum,
 });
 
 export const categoryIdParamSchema = z.object({
-  categoryId: z.string().trim().min(1, 'categoryId is required'),
+  categoryId: z.string().trim().min(1, 'Thiếu mã danh mục'),
 });
 
 export const listCategoriesQuerySchema = z.object({
@@ -60,7 +73,7 @@ export const listCategoriesQuerySchema = z.object({
 });
 
 export const createCategoryBodySchema = z.object({
-  categoryName: z.string().trim().min(1, 'categoryName is required'),
+  categoryName: z.string().trim().min(1, 'Vui lòng nhập tên danh mục'),
   description: z.string().trim().optional(),
 });
 
