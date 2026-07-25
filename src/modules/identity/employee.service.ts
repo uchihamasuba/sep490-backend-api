@@ -92,7 +92,7 @@ async function listEmployees(query: ListEmployeesQuery): Promise<{ data: Employe
 
 async function getEmployeeById(userId: string): Promise<EmployeeDTO> {
   const user = await employeeRepository.findById(userId);
-  if (!user) throw AppError.notFound('Employee not found');
+  if (!user) throw AppError.notFound('Không tìm thấy nhân viên');
   return mapEmployee(user);
 }
 
@@ -122,7 +122,14 @@ function buildInviteEmailHtml(fullName: string, username: string, tempPassword: 
 
 async function createEmployee(body: CreateEmployeeBody): Promise<EmployeeCreatedDTO> {
   const roleOption = jobTitleById(body.roleId);
-  if (!roleOption) throw AppError.badRequest('Unknown roleId');
+  if (!roleOption) throw AppError.badRequest('roleId không hợp lệ');
+
+  const [existingByEmail, existingByPhone] = await Promise.all([
+    body.email ? employeeRepository.findByEmail(body.email) : Promise.resolve(null),
+    employeeRepository.findByPhone(body.phone),
+  ]);
+  if (existingByEmail) throw AppError.conflict('Email đã được sử dụng');
+  if (existingByPhone) throw AppError.conflict('Số điện thoại đã được sử dụng');
 
   const username = await generateUniqueUsername(body.phone);
   const tempPassword = generateTempPassword();
@@ -149,7 +156,7 @@ async function createEmployee(body: CreateEmployeeBody): Promise<EmployeeCreated
 // vì trả thẳng trong response — tránh lộ mật khẩu qua log FE/API một khi đã có kênh email đáng tin cậy).
 async function inviteEmployee(body: InviteEmployeeBody): Promise<EmployeeInvitedDTO> {
   const roleOption = jobTitleById(body.roleId);
-  if (!roleOption) throw AppError.badRequest('Unknown roleId');
+  if (!roleOption) throw AppError.badRequest('roleId không hợp lệ');
 
   const [existingByEmail, existingByPhone] = await Promise.all([
     employeeRepository.findByEmail(body.email),
@@ -183,10 +190,10 @@ async function inviteEmployee(body: InviteEmployeeBody): Promise<EmployeeInvited
 
 async function updateEmployee(userId: string, body: UpdateEmployeeBody): Promise<EmployeeDTO> {
   const existing = await employeeRepository.findById(userId);
-  if (!existing) throw AppError.notFound('Employee not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy nhân viên');
 
   const roleOption = jobTitleById(body.roleId);
-  if (!roleOption) throw AppError.badRequest('Unknown roleId');
+  if (!roleOption) throw AppError.badRequest('roleId không hợp lệ');
 
   const updated = await employeeRepository.update(userId, {
     fullName: body.name,
@@ -202,7 +209,7 @@ async function updateEmployee(userId: string, body: UpdateEmployeeBody): Promise
 
 async function updateEmployeeStatus(userId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<EmployeeDTO> {
   const existing = await employeeRepository.findById(userId);
-  if (!existing) throw AppError.notFound('Employee not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy nhân viên');
 
   const updated = await employeeRepository.update(userId, { status });
   return mapEmployee(updated);

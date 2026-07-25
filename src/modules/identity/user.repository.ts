@@ -32,9 +32,13 @@ export const userRepository = {
     return prisma.user.findUnique({ where: { userId } });
   },
 
-  // email không có unique constraint ở DB — dùng findFirst, lấy bản ghi khớp đầu tiên.
+  // email/phone không có unique constraint ở DB — dùng findFirst, lấy bản ghi khớp đầu tiên.
   findByEmail(email: string) {
     return prisma.user.findFirst({ where: { email } });
+  },
+
+  findByPhone(phone: string) {
+    return prisma.user.findFirst({ where: { phone } });
   },
 
   async findMany(params: UserListParams) {

@@ -1,11 +1,15 @@
 import { z } from 'zod';
 
 export const userIdParamSchema = z.object({
-  userId: z.string().trim().min(1, 'userId is required'),
+  userId: z.string().trim().min(1, 'Thiếu mã người dùng'),
 });
 
-const userRoleEnum = z.enum(['ADMIN', 'MANAGER', 'LEADER', 'TECHNICAL']);
-const userStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED']);
+const userRoleEnum = z.enum(['ADMIN', 'MANAGER', 'LEADER', 'TECHNICAL'], {
+  message: 'role không hợp lệ, vui lòng chọn một trong các vai trò được hỗ trợ',
+});
+const userStatusEnum = z.enum(['ACTIVE', 'INACTIVE', 'SUSPENDED'], {
+  message: 'status không hợp lệ, vui lòng chọn một trong các trạng thái được hỗ trợ',
+});
 
 export const listUsersQuerySchema = z.object({
   role: userRoleEnum.optional(),
@@ -20,19 +24,32 @@ export const updateUserStatusBodySchema = z.object({
 });
 
 export const createUserBodySchema = z.object({
-  username: z.string().trim().min(3).max(50),
-  password: z.string().min(6),
-  fullName: z.string().trim().min(1),
+  username: z
+    .string()
+    .trim()
+    .min(3, 'Tên đăng nhập phải có ít nhất 3 ký tự')
+    .max(50, 'Tên đăng nhập không được vượt quá 50 ký tự'),
+  password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
+  fullName: z.string().trim().min(1, 'Vui lòng nhập họ tên'),
   role: userRoleEnum,
-  email: z.string().email().optional().or(z.literal('')),
-  phone: z.string().regex(/^0[0-9]{9}$/).optional().or(z.literal('')),
+  email: z.string().email('Email không đúng định dạng').optional().or(z.literal('')),
+  phone: z
+    .string()
+    .regex(/^0[0-9]{9}$/, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0')
+    .optional()
+    .or(z.literal('')),
 });
 
 export const updateUserBodySchema = z.object({
-  fullName: z.string().trim().min(1).optional(),
+  fullName: z.string().trim().min(1, 'Họ tên không được để trống').optional(),
   role: userRoleEnum.optional(),
-  email: z.string().email().nullable().optional().or(z.literal('')),
-  phone: z.string().regex(/^0[0-9]{9}$/).nullable().optional().or(z.literal('')),
+  email: z.string().email('Email không đúng định dạng').nullable().optional().or(z.literal('')),
+  phone: z
+    .string()
+    .regex(/^0[0-9]{9}$/, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0')
+    .nullable()
+    .optional()
+    .or(z.literal('')),
 });
 
 export type UserIdParam = z.infer<typeof userIdParamSchema>;

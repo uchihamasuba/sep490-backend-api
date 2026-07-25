@@ -67,13 +67,13 @@ async function listUsers(query: ListUsersQuery): Promise<{ data: UserListItemDTO
 
 async function getUserById(userId: string): Promise<UserDetailDTO> {
   const user = await userRepository.findById(userId);
-  if (!user) throw AppError.notFound('User not found');
+  if (!user) throw AppError.notFound('Không tìm thấy người dùng');
   return mapDetail(user);
 }
 
 async function updateUserStatus(userId: string, status: User['status']): Promise<UserDetailDTO> {
   const existing = await userRepository.findById(userId);
-  if (!existing) throw AppError.notFound('User not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy người dùng');
 
   const updated = await userRepository.update(userId, { status });
   return mapDetail(updated);
@@ -83,6 +83,15 @@ async function createUser(body: CreateUserBody): Promise<UserDetailDTO> {
   const existing = await userRepository.findByUsername(body.username);
   if (existing) {
     throw AppError.badRequest('Tên đăng nhập đã tồn tại');
+  }
+
+  if (body.email) {
+    const existingByEmail = await userRepository.findByEmail(body.email);
+    if (existingByEmail) throw AppError.conflict('Email đã được sử dụng');
+  }
+  if (body.phone) {
+    const existingByPhone = await userRepository.findByPhone(body.phone);
+    if (existingByPhone) throw AppError.conflict('Số điện thoại đã được sử dụng');
   }
 
   const passwordHash = await bcrypt.hash(body.password, 10);
@@ -102,7 +111,20 @@ async function createUser(body: CreateUserBody): Promise<UserDetailDTO> {
 async function updateUser(userId: string, body: UpdateUserBody): Promise<UserDetailDTO> {
   const existing = await userRepository.findById(userId);
   if (!existing) {
-    throw AppError.notFound('User not found');
+    throw AppError.notFound('Không tìm thấy người dùng');
+  }
+
+  if (body.email && body.email !== existing.email) {
+    const existingByEmail = await userRepository.findByEmail(body.email);
+    if (existingByEmail && existingByEmail.userId !== userId) {
+      throw AppError.conflict('Email đã được sử dụng');
+    }
+  }
+  if (body.phone && body.phone !== existing.phone) {
+    const existingByPhone = await userRepository.findByPhone(body.phone);
+    if (existingByPhone && existingByPhone.userId !== userId) {
+      throw AppError.conflict('Số điện thoại đã được sử dụng');
+    }
   }
 
   const data: Record<string, any> = {};
