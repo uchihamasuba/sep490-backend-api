@@ -1,5 +1,6 @@
 import type { Item, Prisma, QuotationStatus } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+import { AppError } from '../../utils/AppError';
 
 export interface QuotationLineInput {
   itemId: string;
@@ -60,7 +61,7 @@ function buildWhere(filter: QuotationListFilter): Prisma.QuotationWhereInput {
 export function computeQuotationLines(inputs: QuotationLineInput[], itemsById: Map<string, Item>): QuotationLine[] {
   return inputs.map((input) => {
     const item = itemsById.get(input.itemId);
-    if (!item) throw new Error(`Item not found: ${input.itemId}`);
+    if (!item) throw AppError.internal(`Không tìm thấy hạng mục: ${input.itemId}`);
     return {
       itemId: input.itemId,
       itemName: item.itemName,

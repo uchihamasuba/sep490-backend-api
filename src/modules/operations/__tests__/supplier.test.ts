@@ -133,6 +133,7 @@ describe('POST /api/v1/suppliers', () => {
 
     expect(res.status).toBe(409);
     expect(res.body.error.code).toBe('SUPPLIER_CODE_ALREADY_EXISTS');
+    expect(res.body.error.message).toBe('Mã nhà cung cấp đã tồn tại trong hệ thống');
     expect(mockedSupplierRepo.create).not.toHaveBeenCalled();
   });
 
@@ -150,6 +151,7 @@ describe('GET /api/v1/suppliers/:id', () => {
     mockedSupplierRepo.findById.mockResolvedValue(null);
     const res = await request(app).get('/api/v1/suppliers/missing').set('Authorization', authHeader());
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy nhà cung cấp');
   });
 
   it('returns the supplier with computed debtBalance', async () => {

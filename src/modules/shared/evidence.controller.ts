@@ -12,7 +12,7 @@ async function getById(req: Request, res: Response) {
 
 async function upload(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
-  if (!req.file) throw AppError.badRequest('file is required');
+  if (!req.file) throw AppError.badRequest('Vui lòng chọn file để tải lên');
 
   const body = req.body as UploadEvidenceBody;
   const evidence = await evidenceService.uploadEvidence(req.file, body.description, req.user.id);

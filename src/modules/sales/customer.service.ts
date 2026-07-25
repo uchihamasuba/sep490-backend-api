@@ -107,7 +107,7 @@ function mapOrder(order: Order & { creator: { fullName: string } }): CustomerOrd
 
 async function findCustomerOrThrow(customerId: string): Promise<Customer> {
   const customer = await customerRepository.findById(customerId);
-  if (!customer) throw AppError.notFound('Customer not found');
+  if (!customer) throw AppError.notFound('Không tìm thấy khách hàng');
   return customer;
 }
 
@@ -173,6 +173,14 @@ async function getCustomerById(customerId: string): Promise<CustomerDTO> {
 
 async function updateCustomer(customerId: string, body: UpdateCustomerBody): Promise<CustomerDTO> {
   await findCustomerOrThrow(customerId);
+
+  // Cùng chốt chặn trùng số điện thoại như createCustomer, loại trừ chính khách hàng đang sửa
+  // (đổi các trường khác nhưng giữ nguyên phone của mình không được coi là trùng).
+  const existingByPhone = await customerRepository.findByPhone(body.phone);
+  if (existingByPhone && existingByPhone.customerId !== customerId) {
+    throw new AppError(409, 'PHONE_ALREADY_EXISTS', 'Số điện thoại đã tồn tại trong hệ thống');
+  }
+
   const updated = await customerRepository.update(customerId, {
     customerName: body.customerName,
     phone: body.phone,

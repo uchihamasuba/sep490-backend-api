@@ -3,7 +3,7 @@ import { z } from 'zod';
 const policyTypeEnum = z.enum(['DEPOSIT', 'CANCELLATION', 'COMPENSATION', 'FEE', 'WAGE']);
 
 export const policyIdParamSchema = z.object({
-  policyId: z.string().trim().min(1, 'policyId is required'),
+  policyId: z.string().trim().min(1, 'Thiếu mã chính sách'),
 });
 
 export const listPoliciesQuerySchema = z.object({
@@ -17,11 +17,11 @@ export const listPoliciesQuerySchema = z.object({
 // docs/api/admin_taochinhsachmoi_api.md mục 2 — policyValue không giới hạn âm/0 ở FE, backend tự
 // validate tối thiểu (không cho âm; = 0 vẫn hợp lệ, vd 1 policy có thể tạm để 0 chờ cập nhật sau).
 export const createPolicyBodySchema = z.object({
-  policyCode: z.string().trim().min(1, 'policyCode is required'),
-  policyName: z.string().trim().min(1, 'policyName is required'),
+  policyCode: z.string().trim().min(1, 'Vui lòng nhập mã chính sách'),
+  policyName: z.string().trim().min(1, 'Vui lòng nhập tên chính sách'),
   policyType: policyTypeEnum,
-  policyValue: z.coerce.number().nonnegative('policyValue must be >= 0'),
-  unit: z.string().trim().min(1, 'unit is required'),
+  policyValue: z.coerce.number().nonnegative('Giá trị chính sách phải >= 0'),
+  unit: z.string().trim().min(1, 'Vui lòng nhập đơn vị tính'),
   description: z.string().trim().min(1).optional(),
 });
 
@@ -29,14 +29,14 @@ export const createPolicyBodySchema = z.object({
 // mục 2) — dùng .strict() để 400 ngay nếu client vô tình gửi kèm các field đó, thay vì âm thầm bỏ qua.
 export const updatePolicyBodySchema = z
   .object({
-    policyValue: z.coerce.number().nonnegative('policyValue must be >= 0').optional(),
+    policyValue: z.coerce.number().nonnegative('Giá trị chính sách phải >= 0').optional(),
     unit: z.string().trim().min(1).optional(),
     description: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
   })
   .strict()
   .refine((data) => Object.values(data).some((v) => v !== undefined), {
-    message: 'At least one field must be provided',
+    message: 'Vui lòng cung cấp ít nhất một trường thông tin',
   });
 
 export type PolicyIdParam = z.infer<typeof policyIdParamSchema>;

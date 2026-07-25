@@ -90,7 +90,7 @@ describe('scheduleService.createSchedulePlan', () => {
         { orderId: 'missing', taskId: 'task-1', startTime: new Date(), assignees: [] } as never,
         'user-1',
       ),
-    ).rejects.toMatchObject({ status: 404 });
+    ).rejects.toMatchObject({ status: 404, message: 'Không tìm thấy đơn hàng' });
   });
 
   it('throws 404 when an assignee userId does not exist', async () => {
@@ -108,7 +108,7 @@ describe('scheduleService.createSchedulePlan', () => {
         } as never,
         'user-1',
       ),
-    ).rejects.toMatchObject({ status: 404 });
+    ).rejects.toMatchObject({ status: 404, message: 'Không tìm thấy người dùng: ghost-user' });
   });
 
   it('throws 400 when the assignee user has an ineligible role (not LEADER/TECHNICAL)', async () => {
@@ -187,7 +187,7 @@ describe('scheduleService.addAssignee', () => {
 
     await expect(
       scheduleService.addAssignee('plan-1', { userId: 'ghost', role: 'TECHNICAL' } as never),
-    ).rejects.toMatchObject({ status: 404 });
+    ).rejects.toMatchObject({ status: 404, message: 'Không tìm thấy người dùng: ghost' });
     expect(mockedRepo.addAssignee).not.toHaveBeenCalled();
   });
 
@@ -197,7 +197,7 @@ describe('scheduleService.addAssignee', () => {
 
     await expect(
       scheduleService.addAssignee('plan-1', { userId: 'leader-1', role: 'LEAD' } as never),
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({ status: 409, message: 'Nhân sự này đã được phân công vào kế hoạch' });
     expect(mockedRepo.addAssignee).not.toHaveBeenCalled();
   });
 
@@ -217,7 +217,7 @@ describe('scheduleService.addAssignee', () => {
 
     await expect(
       scheduleService.addAssignee('plan-1', { userId: 'leader-2', role: 'LEAD' } as never),
-    ).rejects.toMatchObject({ status: 409 });
+    ).rejects.toMatchObject({ status: 409, message: 'Kế hoạch này đã có người vai trò LEAD' });
     expect(mockedRepo.addAssignee).not.toHaveBeenCalled();
   });
 });
@@ -257,7 +257,10 @@ describe('scheduleService.checkIn / checkOut', () => {
 
   it('throws 404 when the user is not an assignee of this plan', async () => {
     mockedRepo.findById.mockResolvedValue(fakePlan({ status: 'CONFIRMED' }, []) as never);
-    await expect(scheduleService.checkIn('plan-1', 'leader-1', leader)).rejects.toMatchObject({ status: 404 });
+    await expect(scheduleService.checkIn('plan-1', 'leader-1', leader)).rejects.toMatchObject({
+      status: 404,
+      message: 'Không tìm thấy nhân sự được phân công trong kế hoạch này',
+    });
   });
 
   it('rejects check-out when the assignee never checked in', async () => {
@@ -519,6 +522,7 @@ describe('PATCH /api/v1/schedule-plans/batch/status', () => {
       .send({ planIds: ['ghost'], status: 'CANCELLED' });
 
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy kế hoạch lịch trình');
   });
 
   it('rejects an empty planIds array with 400', async () => {

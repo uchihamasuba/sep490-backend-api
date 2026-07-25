@@ -10,6 +10,7 @@ jest.mock('../user.repository', () => ({
     findByUsername: jest.fn(),
     findById: jest.fn(),
     findByEmail: jest.fn(),
+    findByPhone: jest.fn(),
     update: jest.fn(),
     updatePasswordHash: jest.fn(),
   },
@@ -79,6 +80,7 @@ describe('authService.login', () => {
     await expect(authService.login({ username: 'ghost', password: 'whatever' } as LoginBody)).rejects.toMatchObject({
       status: 401,
       code: 'UNAUTHORIZED',
+      message: 'Sai tên đăng nhập hoặc mật khẩu',
     });
   });
 
@@ -95,7 +97,7 @@ describe('authService.login', () => {
 
     await expect(
       authService.login({ username: 'manager', password: PLAIN_PASSWORD } as LoginBody),
-    ).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    ).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN', message: 'Tài khoản đã bị khóa hoặc vô hiệu hóa' });
   });
 });
 
@@ -173,7 +175,10 @@ describe('authService.getProfile', () => {
 
   it('throws 404 when the user no longer exists', async () => {
     mockedRepo.findById.mockResolvedValue(null);
-    await expect(authService.getProfile('missing')).rejects.toMatchObject({ status: 404 });
+    await expect(authService.getProfile('missing')).rejects.toMatchObject({
+      status: 404,
+      message: 'Không tìm thấy người dùng',
+    });
   });
 });
 
@@ -187,6 +192,35 @@ describe('authService.updateProfile', () => {
     expect(mockedRepo.update).toHaveBeenCalledWith('u1', { fullName: 'New Name' });
     expect(result.fullName).toBe('New Name');
   });
+
+  it('throws 404 with a Vietnamese message when the user no longer exists', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    await expect(
+      authService.updateProfile('missing', { fullName: 'New Name' } as UpdateProfileBody),
+    ).rejects.toMatchObject({ status: 404, message: 'Không tìm thấy người dùng' });
+  });
+
+  it('rejects with 409 when the new phone number is already used by another account', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser());
+    mockedRepo.findByPhone.mockResolvedValue(baseUser({ userId: 'someone-else' }));
+
+    await expect(
+      authService.updateProfile('u1', { phone: '0911111111' } as UpdateProfileBody),
+    ).rejects.toMatchObject({ status: 409, code: 'CONFLICT', message: 'Số điện thoại đã được sử dụng bởi tài khoản khác' });
+
+    expect(mockedRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('allows keeping the caller own phone number unchanged', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser({ phone: '0900000002' }));
+    mockedRepo.findByPhone.mockResolvedValue(baseUser({ userId: 'u1', phone: '0900000002' }));
+    mockedRepo.update.mockResolvedValue(baseUser({ phone: '0900000002' }));
+
+    await expect(
+      authService.updateProfile('u1', { phone: '0900000002' } as UpdateProfileBody),
+    ).resolves.toBeDefined();
+  });
 });
 
 describe('authService.changePassword', () => {
@@ -199,7 +233,7 @@ describe('authService.changePassword', () => {
         newPassword: 'newpass1',
         confirmNewPassword: 'newpass1',
       } as ChangePasswordBody),
-    ).rejects.toMatchObject({ status: 400, code: 'BAD_REQUEST' });
+    ).rejects.toMatchObject({ status: 400, code: 'BAD_REQUEST', message: 'Mật khẩu hiện tại không đúng' });
 
     expect(mockedRepo.updatePasswordHash).not.toHaveBeenCalled();
   });

@@ -23,6 +23,10 @@ export const notificationRepository = {
     return prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
   },
 
+  findById(notificationId: string) {
+    return prisma.notification.findUnique({ where: { notificationId } });
+  },
+
   markNotificationAsRead(notificationId: string) {
     return prisma.notification.update({
       where: { notificationId },

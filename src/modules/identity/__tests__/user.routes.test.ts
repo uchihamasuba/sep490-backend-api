@@ -9,10 +9,17 @@ jest.mock('../user.repository', () => ({
   userRepository: {
     findByUsername: jest.fn(),
     findById: jest.fn(),
+    findByEmail: jest.fn(),
+    findByPhone: jest.fn(),
     findMany: jest.fn(),
+    create: jest.fn(),
     update: jest.fn(),
     updatePasswordHash: jest.fn(),
   },
+}));
+
+jest.mock('bcrypt', () => ({
+  hash: jest.fn().mockResolvedValue('hashed'),
 }));
 
 const mockedRepo = userRepository as jest.Mocked<typeof userRepository>;
@@ -79,12 +86,153 @@ describe('GET /api/v1/users/:userId', () => {
     expect(res.body.data).toMatchObject({ userId: 'leader-1', email: 'leader1@example.com', phone: '0900000003' });
   });
 
-  it('returns 404 when the user does not exist', async () => {
+  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
     mockedRepo.findById.mockResolvedValue(null);
 
     const res = await request(app).get('/api/v1/users/ghost').set('Authorization', authHeader());
 
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
+  });
+});
+
+describe('POST /api/v1/users', () => {
+  beforeEach(() => {
+    mockedRepo.findByUsername.mockResolvedValue(null);
+    mockedRepo.findByEmail.mockResolvedValue(null);
+    mockedRepo.findByPhone.mockResolvedValue(null);
+  });
+
+  it('creates the user and returns 200 with the mapped detail', async () => {
+    mockedRepo.create.mockResolvedValue(fakeUser({ userId: 'u9', username: 'newuser' }));
+
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ userId: 'u9', username: 'newuser' });
+  });
+
+  it('rejects a duplicate username with 400 and a Vietnamese message', async () => {
+    mockedRepo.findByUsername.mockResolvedValue(fakeUser());
+
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'leader1', password: '123456', fullName: 'New User', role: 'LEADER' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toBe('Tên đăng nhập đã tồn tại');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a duplicate email with 409 and a Vietnamese message', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(fakeUser());
+
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER', email: 'leader1@example.com' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Email đã được sử dụng');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a duplicate phone with 409 and a Vietnamese message', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(fakeUser());
+
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER', phone: '0900000003' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a payload missing required fields with 400', async () => {
+    const res = await request(app).post('/api/v1/users').set('Authorization', authHeader('ADMIN')).send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('is forbidden for technical/leader roles', async () => {
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('TECHNICAL'))
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'LEADER' });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('PUT /api/v1/users/:userId', () => {
+  it('updates the user and returns the mapped detail', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    mockedRepo.update.mockResolvedValue(fakeUser({ fullName: 'Updated Name' }));
+
+    const res = await request(app)
+      .put('/api/v1/users/leader-1')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ fullName: 'Updated Name' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.fullName).toBe('Updated Name');
+  });
+
+  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/v1/users/ghost')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ fullName: 'Updated Name' });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
+  });
+
+  it('rejects a duplicate email (belonging to another account) with 409', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    mockedRepo.findByEmail.mockResolvedValue(fakeUser({ userId: 'someone-else' }));
+
+    const res = await request(app)
+      .put('/api/v1/users/leader-1')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ email: 'taken@example.com' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Email đã được sử dụng');
+    expect(mockedRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a duplicate phone (belonging to another account) with 409', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    mockedRepo.findByPhone.mockResolvedValue(fakeUser({ userId: 'someone-else' }));
+
+    const res = await request(app)
+      .put('/api/v1/users/leader-1')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ phone: '0911111111' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
+    expect(mockedRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('allows keeping the caller own email/phone unchanged', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    mockedRepo.findByEmail.mockResolvedValue(fakeUser());
+    mockedRepo.update.mockResolvedValue(fakeUser({ fullName: 'Updated Name' }));
+
+    const res = await request(app)
+      .put('/api/v1/users/leader-1')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ email: 'leader1@example.com', fullName: 'Updated Name' });
+
+    expect(res.status).toBe(200);
   });
 });
 
@@ -103,7 +251,7 @@ describe('PATCH /api/v1/users/:userId/status', () => {
     expect(mockedRepo.update).toHaveBeenCalledWith('leader-1', { status: 'SUSPENDED' });
   });
 
-  it('returns 404 when the user does not exist', async () => {
+  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
     mockedRepo.findById.mockResolvedValue(null);
 
     const res = await request(app)
@@ -112,6 +260,7 @@ describe('PATCH /api/v1/users/:userId/status', () => {
       .send({ status: 'INACTIVE' });
 
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
   });
 
   it('rejects an invalid status value with 400', async () => {

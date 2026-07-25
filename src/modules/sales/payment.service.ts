@@ -132,7 +132,7 @@ function mapSettlement(row: Settlement): SettlementDTO {
 // cho sửa lại qua endpoint này (tránh xác nhận nhầm 2 lần hoặc hồi sinh 1 khoản đã hủy).
 async function updateDepositStatus(depositId: string, body: UpdateDepositStatusBody, actorId: string): Promise<DepositDTO> {
   const deposit = await paymentRepository.findDepositById(depositId);
-  if (!deposit) throw AppError.notFound('Deposit not found');
+  if (!deposit) throw AppError.notFound('Không tìm thấy khoản cọc');
 
   if (!OPEN_DEPOSIT_STATUSES.includes(deposit.status)) {
     throw AppError.badRequest(`Khoản cọc đang ở trạng thái ${deposit.status} (đã kết thúc), không thể cập nhật thêm`);
@@ -147,7 +147,7 @@ async function updateDepositStatus(depositId: string, body: UpdateDepositStatusB
 // bước 4) — không tự cascade cập nhật Order ở đây.
 async function confirmSettlement(settlementId: string, confirmedBy: string): Promise<SettlementDTO> {
   const settlement = await paymentRepository.findSettlementById(settlementId);
-  if (!settlement) throw AppError.notFound('Settlement not found');
+  if (!settlement) throw AppError.notFound('Không tìm thấy bản quyết toán');
 
   if (settlement.status === 'CONFIRMED') {
     throw AppError.badRequest('Bản quyết toán này đã được xác nhận trước đó');
@@ -162,7 +162,7 @@ async function confirmSettlement(settlementId: string, confirmedBy: string): Pro
 // chưa gửi yêu cầu, PAID/CONFIRMED đã kết thúc giai đoạn thu tiền).
 async function markSettlementPaid(settlementId: string, body: MarkSettlementPaidBody): Promise<SettlementDTO> {
   const settlement = await paymentRepository.findSettlementById(settlementId);
-  if (!settlement) throw AppError.notFound('Settlement not found');
+  if (!settlement) throw AppError.notFound('Không tìm thấy bản quyết toán');
 
   if (settlement.status !== 'REQUESTED') {
     throw AppError.badRequest(`Bản quyết toán đang ở trạng thái ${settlement.status}, chỉ chuyển được PAID từ REQUESTED`);
@@ -196,7 +196,7 @@ async function listDeposits(query: ListDepositsQuery): Promise<DepositListResult
 // ghi nhận cọc sai — chỉ cho phép khi còn PENDING (guard trạng thái, xem ghi chú DELETABLE_DEPOSIT_STATUSES).
 async function deleteDeposit(depositId: string): Promise<void> {
   const deposit = await paymentRepository.findDepositById(depositId);
-  if (!deposit) throw AppError.notFound('Deposit not found');
+  if (!deposit) throw AppError.notFound('Không tìm thấy khoản cọc');
 
   if (!DELETABLE_DEPOSIT_STATUSES.includes(deposit.status)) {
     throw AppError.badRequest(

@@ -167,7 +167,7 @@ async function assertActorCanAccessTransaction(actor: Actor, orderId: string): P
 
 async function findSupplierOrThrow(supplierId: string): Promise<Supplier> {
   const supplier = await supplierRepository.findById(supplierId);
-  if (!supplier) throw AppError.notFound('Supplier not found');
+  if (!supplier) throw AppError.notFound('Không tìm thấy nhà cung cấp');
   return supplier;
 }
 
@@ -257,7 +257,7 @@ async function listSupplierTransactions(query: ListSupplierTransactionsQuery): P
 // GET /supplier-transactions/:id — chi tiết kèm items[] (docs/api/api.md gap (q)).
 async function getSupplierTransactionById(transactionId: string, actor: Actor): Promise<SupplierTransactionDetailDTO> {
   const transaction = await supplierTransactionRepository.findById(transactionId);
-  if (!transaction) throw AppError.notFound('Supplier transaction not found');
+  if (!transaction) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
 
   await assertActorCanAccessTransaction(actor, transaction.orderId);
   return mapTransactionDetail(transaction);
@@ -273,12 +273,12 @@ async function receiveTransactionItem(
   actor: Actor,
 ): Promise<SupplierTransactionItemDTO> {
   const transaction = await supplierTransactionRepository.findById(transactionId);
-  if (!transaction) throw AppError.notFound('Supplier transaction not found');
+  if (!transaction) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
 
   await assertActorCanAccessTransaction(actor, transaction.orderId);
 
   const item = transaction.items.find((i) => i.stItemId === stItemId);
-  if (!item) throw AppError.notFound('Supplier transaction item not found');
+  if (!item) throw AppError.notFound('Không tìm thấy dòng hàng trong giao dịch nhà cung cấp');
 
   if (body.receivedQuantity > item.quantity) {
     throw AppError.badRequest(`receivedQuantity không được vượt quá quantity đã đặt (${item.quantity})`);

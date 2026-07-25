@@ -58,7 +58,7 @@ async function listPolicies(query: ListPoliciesQuery): Promise<{ data: PolicyDTO
 
 async function createPolicy(body: CreatePolicyBody): Promise<PolicyDTO> {
   const existing = await policyRepository.findByCode(body.policyCode);
-  if (existing) throw AppError.conflict('policyCode already exists');
+  if (existing) throw AppError.conflict('Mã chính sách đã tồn tại');
 
   const created = await policyRepository.create({
     policyCode: body.policyCode,
@@ -74,7 +74,7 @@ async function createPolicy(body: CreatePolicyBody): Promise<PolicyDTO> {
 
 async function updatePolicy(policyId: string, body: UpdatePolicyBody): Promise<PolicyDTO> {
   const existing = await policyRepository.findById(policyId);
-  if (!existing) throw AppError.notFound('Policy not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy chính sách');
 
   const updated = await policyRepository.update(policyId, {
     ...(body.policyValue !== undefined ? { policyValue: body.policyValue } : {}),

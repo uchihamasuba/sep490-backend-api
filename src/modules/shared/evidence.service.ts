@@ -29,7 +29,7 @@ function mapEvidence(row: EvidenceWithUploader): EvidenceDTO {
 
 async function getEvidenceById(evidenceId: string): Promise<EvidenceDTO> {
   const row = await evidenceRepository.findById(evidenceId);
-  if (!row) throw AppError.notFound('Evidence not found');
+  if (!row) throw AppError.notFound('Không tìm thấy minh chứng');
   return mapEvidence(row);
 }
 

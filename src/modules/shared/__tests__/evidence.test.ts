@@ -110,4 +110,15 @@ describe('POST /api/v1/evidence/upload', () => {
 
     expect(res.status).toBe(401);
   });
+
+  it('rejects a file sent under a field name other than "file" with a Vietnamese Multer error (400)', async () => {
+    const res = await request(app)
+      .post('/api/v1/evidence/upload')
+      .set('Authorization', authHeader())
+      .attach('wrongField', Buffer.from('fake-image-bytes'), { filename: 'photo.jpg', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toBe('Field file không hợp lệ, vui lòng gửi file qua field "file"');
+    expect(mockedRepo.uploadFile).not.toHaveBeenCalled();
+  });
 });

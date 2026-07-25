@@ -100,7 +100,7 @@ async function listItems(
 
 async function createItem(body: CreateCatalogItemBody): Promise<CatalogItemDTO> {
   const type = await catalogRepository.typeExists(body.typeId);
-  if (!type) throw AppError.notFound('Item type not found');
+  if (!type) throw AppError.notFound('Không tìm thấy loại thiết bị');
 
   const itemCode = body.itemCode ?? (await catalogRepository.generateNextItemCode());
   const created = await catalogRepository.create({
@@ -122,16 +122,16 @@ async function createItem(body: CreateCatalogItemBody): Promise<CatalogItemDTO> 
 
 async function getItemById(itemId: string): Promise<CatalogItemDTO> {
   const item = await catalogRepository.findById(itemId);
-  if (!item) throw AppError.notFound('Item not found');
+  if (!item) throw AppError.notFound('Không tìm thấy thiết bị');
   return mapItem(item);
 }
 
 async function updateItem(itemId: string, body: UpdateCatalogItemBody): Promise<CatalogItemDTO> {
   const existing = await catalogRepository.findById(itemId);
-  if (!existing) throw AppError.notFound('Item not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy thiết bị');
 
   const type = await catalogRepository.typeExists(body.typeId);
-  if (!type) throw AppError.notFound('Item type not found');
+  if (!type) throw AppError.notFound('Không tìm thấy loại thiết bị');
 
   const updated = await catalogRepository.update(itemId, {
     itemName: body.itemName,
@@ -150,7 +150,7 @@ async function updateItem(itemId: string, body: UpdateCatalogItemBody): Promise<
 
 async function updateItemStatus(itemId: string, status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE'): Promise<CatalogItemDTO> {
   const existing = await catalogRepository.findById(itemId);
-  if (!existing) throw AppError.notFound('Item not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy thiết bị');
 
   const updated = await catalogRepository.updateStatus(itemId, status);
   return mapItem(updated);
@@ -202,7 +202,7 @@ async function createCategory(body: CreateCategoryBody): Promise<CategoryDTO> {
 
 async function updateCategory(categoryId: string, body: UpdateCategoryBody): Promise<CategoryDTO> {
   const existing = await catalogCategoryRepository.findById(categoryId);
-  if (!existing) throw AppError.notFound('Category not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy danh mục');
 
   const updated = await catalogCategoryRepository.update(categoryId, {
     categoryName: body.categoryName,

@@ -7,11 +7,11 @@ const PHONE_RE = /^0\d{9}$/;
 const emailField = z
   .string()
   .trim()
-  .refine((value) => value === '' || EMAIL_RE.test(value), { message: 'Invalid email' })
+  .refine((value) => value === '' || EMAIL_RE.test(value), { message: 'Email không hợp lệ' })
   .optional();
 
 export const customerIdParamSchema = z.object({
-  customerId: z.string().trim().min(1, 'customerId is required'),
+  customerId: z.string().trim().min(1, 'Thiếu mã khách hàng'),
 });
 
 export const listCustomersQuerySchema = z.object({
@@ -22,25 +22,25 @@ export const listCustomersQuerySchema = z.object({
 });
 
 export const createCustomerBodySchema = z.object({
-  customerName: z.string().trim().min(1, 'customerName is required'),
+  customerName: z.string().trim().min(1, 'Vui lòng nhập tên khách hàng'),
   phone: z
     .string()
     .trim()
-    .min(1, 'phone is required')
+    .min(1, 'Vui lòng nhập số điện thoại')
     .regex(PHONE_RE, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.'),
   email: emailField,
   // Bắt buộc ở modal "Thêm khách hàng" (docs/api/taokhachhang_api.md mục 1) — khác PUT (vẫn nullable).
-  address: z.string().trim().min(1, 'address is required'),
+  address: z.string().trim().min(1, 'Vui lòng nhập địa chỉ'),
   notes: z.string().trim().optional(),
   status: z.enum(['active', 'inactive']).default('active'),
 });
 
 export const updateCustomerBodySchema = z.object({
-  customerName: z.string().trim().min(1, 'customerName is required'),
+  customerName: z.string().trim().min(1, 'Vui lòng nhập tên khách hàng'),
   phone: z
     .string()
     .trim()
-    .min(1, 'phone is required')
+    .min(1, 'Vui lòng nhập số điện thoại')
     .regex(PHONE_RE, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0.'),
   email: emailField,
   address: z.string().trim().min(1).optional(),

@@ -75,7 +75,10 @@ function fakeOrderOverview(overrides: Record<string, unknown> = {}) {
 describe('eventService.getEventOverview', () => {
   it('throws 404 when the order does not exist', async () => {
     mockedRepo.findOrderOverview.mockResolvedValue(null);
-    await expect(eventService.getEventOverview('missing')).rejects.toMatchObject({ status: 404 });
+    await expect(eventService.getEventOverview('missing')).rejects.toMatchObject({
+      status: 404,
+      message: 'Không tìm thấy đơn hàng',
+    });
   });
 
   it('computes milestones and aggregate schedule status honestly from available data', async () => {
@@ -154,5 +157,6 @@ describe('HTTP routes — role permission matrix', () => {
     mockedRepo.findOrderOverview.mockResolvedValue(null);
     const res = await request(app).get('/api/v1/events/missing/overview').set('Authorization', authHeader('MANAGER'));
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy đơn hàng');
   });
 });

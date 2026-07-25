@@ -1,17 +1,17 @@
 import { z } from 'zod';
 
 export const sendNotificationSchema = z.object({
-  userId: z.string().trim().min(1, 'userId is required'),
-  title: z.string().trim().min(1, 'title is required'),
+  userId: z.string().trim().min(1, 'Thiếu mã người dùng'),
+  title: z.string().trim().min(1, 'Vui lòng nhập tiêu đề'),
   content: z.string().trim().optional(),
 });
 
 export const notificationIdParamSchema = z.object({
-  id: z.string().trim().min(1, 'notification id is required'),
+  id: z.string().trim().min(1, 'Thiếu mã thông báo'),
 });
 
 export const registerDeviceTokenSchema = z.object({
-  deviceToken: z.string().trim().min(1, 'deviceToken is required'),
+  deviceToken: z.string().trim().min(1, 'Thiếu device token'),
 });
 
 export type SendNotificationBody = z.infer<typeof sendNotificationSchema>;

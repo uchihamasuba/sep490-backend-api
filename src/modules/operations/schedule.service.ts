@@ -111,14 +111,14 @@ function mapPlan(row: SchedulePlanWithDetails): SchedulePlanDTO {
 
 async function findPlanOrThrow(planId: string): Promise<SchedulePlanWithDetails> {
   const plan = await scheduleRepository.findById(planId);
-  if (!plan) throw AppError.notFound('Schedule plan not found');
+  if (!plan) throw AppError.notFound('Không tìm thấy kế hoạch lịch trình');
   return plan;
 }
 
 async function validateAssigneeInputs(assignees: { userId: string; role: PlanMemberRole }[]): Promise<void> {
   for (const a of assignees) {
     const user = await scheduleRepository.findUserById(a.userId);
-    if (!user) throw AppError.notFound(`User not found: ${a.userId}`, { userId: a.userId });
+    if (!user) throw AppError.notFound(`Không tìm thấy người dùng: ${a.userId}`, { userId: a.userId });
     if (!ELIGIBLE_ASSIGNEE_USER_ROLES.includes(user.role)) {
       throw AppError.badRequest(`User ${a.userId} không có vai trò LEADER/TECHNICAL, không thể phân công`, {
         userId: a.userId,
@@ -173,10 +173,10 @@ async function getSchedulePlanById(planId: string): Promise<SchedulePlanDTO> {
 
 async function createSchedulePlan(body: CreateSchedulePlanBody, createdBy: string): Promise<SchedulePlanDTO> {
   const order = await scheduleRepository.orderExists(body.orderId);
-  if (!order) throw AppError.notFound('Order not found');
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   const task = await scheduleRepository.taskExists(body.taskId);
-  if (!task) throw AppError.notFound('Work task not found');
+  if (!task) throw AppError.notFound('Không tìm thấy đầu việc');
 
   await validateAssigneeInputs(body.assignees);
   assertAtMostOneLead(body.assignees);
@@ -276,7 +276,7 @@ async function removeAssignee(planId: string, userId: string): Promise<ScheduleP
   }
 
   const assignee = existing.assignees.find((a) => a.userId === userId);
-  if (!assignee) throw AppError.notFound('Assignee not found on this schedule plan');
+  if (!assignee) throw AppError.notFound('Không tìm thấy nhân sự được phân công trong kế hoạch này');
 
   await scheduleRepository.removeAssignee(planId, userId);
   return getSchedulePlanById(planId);
@@ -298,7 +298,7 @@ async function checkIn(
 
   const plan = await findPlanOrThrow(planId);
   const assignee = plan.assignees.find((a) => a.userId === userId);
-  if (!assignee) throw AppError.notFound('Assignee not found on this schedule plan');
+  if (!assignee) throw AppError.notFound('Không tìm thấy nhân sự được phân công trong kế hoạch này');
   if (assignee.attendance?.checkInAt) {
     throw AppError.badRequest('Đã check-in trước đó');
   }
@@ -318,7 +318,7 @@ async function checkOut(planId: string, userId: string, actor: Actor): Promise<S
 
   const plan = await findPlanOrThrow(planId);
   const assignee = plan.assignees.find((a) => a.userId === userId);
-  if (!assignee) throw AppError.notFound('Assignee not found on this schedule plan');
+  if (!assignee) throw AppError.notFound('Không tìm thấy nhân sự được phân công trong kế hoạch này');
   if (!assignee.attendance?.checkInAt) {
     throw AppError.badRequest('Chưa check-in, không thể check-out');
   }
@@ -374,11 +374,11 @@ async function deleteSchedulePlan(planId: string): Promise<void> {
 // order_id trong 1 transaction, tránh trạng thái lưu dở dang nếu gọi POST tuần tự bị lỗi giữa chừng.
 async function createSchedulePlansBatch(body: CreateSchedulePlansBatchBody, createdBy: string): Promise<SchedulePlanDTO[]> {
   const order = await scheduleRepository.orderExists(body.orderId);
-  if (!order) throw AppError.notFound('Order not found');
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   for (const plan of body.plans) {
     const task = await scheduleRepository.taskExists(plan.taskId);
-    if (!task) throw AppError.notFound(`Work task not found: ${plan.taskId}`, { taskId: plan.taskId });
+    if (!task) throw AppError.notFound(`Không tìm thấy đầu việc: ${plan.taskId}`, { taskId: plan.taskId });
     await validateAssigneeInputs(plan.assignees);
     assertAtMostOneLead(plan.assignees);
   }

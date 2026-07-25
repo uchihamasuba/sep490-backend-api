@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const quotationIdParamSchema = z.object({
-  quotationId: z.string().trim().min(1, 'quotationId is required'),
+  quotationId: z.string().trim().min(1, 'Thiếu mã báo giá'),
 });
 
 export const customerIdParamSchema = z.object({
-  customerId: z.string().trim().min(1, 'customerId is required'),
+  customerId: z.string().trim().min(1, 'Thiếu mã khách hàng'),
 });
 
 const quotationApiStatusEnum = z.enum(['draft', 'approved', 'rejected']);
@@ -25,22 +25,22 @@ export const listCustomerQuotationsQuerySchema = z.object({
 });
 
 const quotationItemInputSchema = z.object({
-  itemId: z.string().trim().min(1, 'itemId is required'),
-  quantity: z.coerce.number().int().positive('quantity must be > 0'),
-  price: z.coerce.number().nonnegative('price must be >= 0'),
-  discount: z.coerce.number().nonnegative('discount must be >= 0').default(0),
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
+  price: z.coerce.number().nonnegative('Đơn giá phải >= 0'),
+  discount: z.coerce.number().nonnegative('Giảm giá phải >= 0').default(0),
 });
 
 export const createQuotationBodySchema = z.object({
-  version: z.string().trim().min(1, 'version is required').default('v1'),
+  version: z.string().trim().min(1, 'Vui lòng nhập phiên bản báo giá').default('v1'),
   notes: z.string().trim().optional(),
-  items: z.array(quotationItemInputSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(quotationItemInputSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
 });
 
 export const updateQuotationBodySchema = z.object({
-  version: z.string().trim().min(1, 'version is required'),
+  version: z.string().trim().min(1, 'Vui lòng nhập phiên bản báo giá'),
   notes: z.string().trim().optional(),
-  items: z.array(quotationItemInputSchema).min(1, 'items must contain at least 1 line'),
+  items: z.array(quotationItemInputSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
 });
 
 export const updateQuotationStatusBodySchema = z.object({

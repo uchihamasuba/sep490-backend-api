@@ -79,6 +79,7 @@ describe('GET /api/v1/employees', () => {
   it('rejects unauthenticated requests with 401', async () => {
     const res = await request(app).get('/api/v1/employees');
     expect(res.status).toBe(401);
+    expect(res.body.error.message).toBe('Thiếu hoặc sai định dạng token xác thực');
   });
 
   it('allows LEADER/TECHNICAL to read (read-only roles)', async () => {
@@ -92,6 +93,11 @@ describe('GET /api/v1/employees', () => {
 });
 
 describe('POST /api/v1/employees', () => {
+  beforeEach(() => {
+    mockedRepo.findByEmail.mockResolvedValue(null);
+    mockedRepo.findByPhone.mockResolvedValue(null);
+  });
+
   it('creates an employee, generating username/employeeCode/tempPassword, and returns 201', async () => {
     mockedRepo.findByUsername.mockResolvedValue(null);
     mockedRepo.generateNextEmployeeCode.mockResolvedValue('NV002');
@@ -117,12 +123,29 @@ describe('POST /api/v1/employees', () => {
       .send({ name: 'Nguyen Van B', phone: '0912345678', roleId: 'not-a-real-role' });
 
     expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.details).toContainEqual(
+      expect.objectContaining({ path: 'roleId', message: expect.stringContaining('roleId không hợp lệ') }),
+    );
     expect(mockedRepo.create).not.toHaveBeenCalled();
   });
 
   it('rejects a payload missing required fields with 400', async () => {
     const res = await request(app).post('/api/v1/employees').set('Authorization', authHeader()).send({ phone: '0912345678' });
     expect(res.status).toBe(400);
+  });
+
+  it('rejects a duplicate phone with 409 and a Vietnamese message', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(baseUser());
+
+    const res = await request(app)
+      .post('/api/v1/employees')
+      .set('Authorization', authHeader())
+      .send({ name: 'Nguyen Van B', phone: '0912345678', roleId: 'ky-thuat' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
   });
 
   it('is forbidden for non-admin roles', async () => {
@@ -196,10 +219,11 @@ describe('POST /api/v1/employees/invite', () => {
 });
 
 describe('GET /api/v1/employees/:id', () => {
-  it('returns 404 when the employee does not exist', async () => {
+  it('returns 404 with a Vietnamese message when the employee does not exist', async () => {
     mockedRepo.findById.mockResolvedValue(null);
     const res = await request(app).get('/api/v1/employees/missing').set('Authorization', authHeader());
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy nhân viên');
   });
 });
 

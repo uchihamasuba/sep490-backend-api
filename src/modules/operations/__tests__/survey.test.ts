@@ -62,7 +62,7 @@ describe('surveyService.createSurveyReport', () => {
         { orderId: 'missing', surveyDate: new Date(), location: 'Hall A' } as never,
         'leader-1',
       ),
-    ).rejects.toMatchObject({ status: 404 });
+    ).rejects.toMatchObject({ status: 404, message: 'Không tìm thấy đơn hàng' });
   });
 
   it('creates the report with status NEEDS_REVIEW on success', async () => {
@@ -183,6 +183,7 @@ describe('HTTP routes — role permission matrix', () => {
       .send({ orderId: 'missing-order', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy đơn hàng');
     expect(mockedRepo.create).not.toHaveBeenCalled();
   });
 
@@ -250,6 +251,7 @@ describe('HTTP routes — role permission matrix', () => {
       .send({ orderId: 'ord-1', planId: 'missing-plan', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
 
     expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy kế hoạch lịch trình');
     expect(mockedRepo.create).not.toHaveBeenCalled();
   });
 

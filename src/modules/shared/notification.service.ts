@@ -1,18 +1,23 @@
 import type { Message } from 'firebase-admin/messaging';
 import { getFirebaseMessaging } from '../../config/firebase';
+import { AppError } from '../../utils/AppError';
 import { logDeveloper } from '../../utils/logger';
 import { notificationRepository } from './notification.repository';
 import type { SendNotificationBody } from './notification.validators';
 
 async function sendNotificationToUser(body: SendNotificationBody) {
+  // Notification.userId có FK cứng tới User (onDelete: Cascade) — kiểm tra tồn tại trước để trả 404 rõ
+  // ràng thay vì để prisma.notification.create() rơi xuống lỗi FK constraint (P2003) chung chung.
+  const user = await notificationRepository.getUserDeviceToken(body.userId);
+  if (!user) throw AppError.notFound('Không tìm thấy người dùng');
+
   const notification = await notificationRepository.createNotification({
     userId: body.userId,
     title: body.title,
     content: body.content ?? null,
   });
 
-  const user = await notificationRepository.getUserDeviceToken(body.userId);
-  const deviceToken = user?.deviceToken ?? null;
+  const deviceToken = user.deviceToken ?? null;
 
   logDeveloper('Device Token check', { userId: body.userId, deviceToken });
 
@@ -32,6 +37,8 @@ async function getUserNotifications(userId: string) {
 }
 
 async function markAsRead(notificationId: string) {
+  const existing = await notificationRepository.findById(notificationId);
+  if (!existing) throw AppError.notFound('Không tìm thấy thông báo');
   return notificationRepository.markNotificationAsRead(notificationId);
 }
 

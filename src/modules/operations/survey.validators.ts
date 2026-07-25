@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
 export const surveyIdParamSchema = z.object({
-  surveyId: z.string().trim().min(1, 'surveyId is required'),
+  surveyId: z.string().trim().min(1, 'Thiếu mã báo cáo khảo sát'),
 });
 
-const surveyStatusEnum = z.enum(['DRAFT', 'NEEDS_REVIEW', 'SUBMITTED', 'CONFIRMED']);
+const surveyStatusEnum = z.enum(['DRAFT', 'NEEDS_REVIEW', 'SUBMITTED', 'CONFIRMED'], { message: 'status không hợp lệ' });
 
 export const listSurveyReportsQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),
@@ -15,10 +15,10 @@ export const listSurveyReportsQuerySchema = z.object({
 
 export const createSurveyReportBodySchema = z
   .object({
-    orderId: z.string().trim().min(1, 'orderId is required'),
+    orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
     planId: z.string().trim().min(1).optional(),
     surveyDate: z.coerce.date(),
-    location: z.string().trim().min(1, 'location is required'),
+    location: z.string().trim().min(1, 'Vui lòng nhập địa điểm khảo sát'),
     area: z.coerce.number().nonnegative().optional(),
     length: z.coerce.number().nonnegative().optional(),
     width: z.coerce.number().nonnegative().optional(),
@@ -40,7 +40,7 @@ export const createSurveyReportBodySchema = z
   );
 
 export const confirmSurveyReportBodySchema = z.object({
-  status: z.literal('CONFIRMED'),
+  status: z.literal('CONFIRMED', { message: 'status phải là CONFIRMED' }),
 });
 
 export type SurveyIdParam = z.infer<typeof surveyIdParamSchema>;

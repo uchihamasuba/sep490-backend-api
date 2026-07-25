@@ -128,13 +128,20 @@ async function resetPassword(email: string): Promise<void> {
 
 async function getProfile(userId: string): Promise<AuthProfileDTO> {
   const user = await userRepository.findById(userId);
-  if (!user) throw AppError.notFound('User not found');
+  if (!user) throw AppError.notFound('Không tìm thấy người dùng');
   return mapProfile(user);
 }
 
 async function updateProfile(userId: string, body: UpdateProfileBody): Promise<AuthProfileDTO> {
   const existing = await userRepository.findById(userId);
-  if (!existing) throw AppError.notFound('User not found');
+  if (!existing) throw AppError.notFound('Không tìm thấy người dùng');
+
+  if (body.phone !== undefined && body.phone !== existing.phone) {
+    const phoneOwner = await userRepository.findByPhone(body.phone);
+    if (phoneOwner && phoneOwner.userId !== userId) {
+      throw AppError.conflict('Số điện thoại đã được sử dụng bởi tài khoản khác');
+    }
+  }
 
   const data: Record<string, string> = {};
   if (body.fullName !== undefined) data.fullName = body.fullName;
@@ -148,7 +155,7 @@ async function updateProfile(userId: string, body: UpdateProfileBody): Promise<A
 
 async function changePassword(userId: string, body: ChangePasswordBody): Promise<void> {
   const user = await userRepository.findById(userId);
-  if (!user) throw AppError.notFound('User not found');
+  if (!user) throw AppError.notFound('Không tìm thấy người dùng');
 
   const oldPasswordMatches = await bcrypt.compare(body.oldPassword, user.passwordHash);
   if (!oldPasswordMatches) {

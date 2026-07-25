@@ -18,7 +18,7 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
   if (err instanceof ZodError) {
     return res.status(400).json({
       success: false,
-      error: { code: 'VALIDATION_ERROR', message: 'Invalid request data', details: formatZodIssues(err) },
+      error: { code: 'VALIDATION_ERROR', message: 'Dữ liệu gửi lên không hợp lệ', details: formatZodIssues(err) },
     });
   }
 
@@ -26,30 +26,30 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     if (err.code === 'P2002') {
       return res.status(409).json({
         success: false,
-        error: { code: 'CONFLICT', message: 'Resource already exists', details: err.meta },
+        error: { code: 'CONFLICT', message: 'Dữ liệu đã tồn tại trong hệ thống', details: err.meta },
       });
     }
     if (err.code === 'P2025') {
       return res.status(404).json({
         success: false,
-        error: { code: 'NOT_FOUND', message: 'Resource not found' },
+        error: { code: 'NOT_FOUND', message: 'Không tìm thấy dữ liệu' },
       });
     }
     return res.status(400).json({
       success: false,
-      error: { code: 'BAD_REQUEST', message: 'Invalid request', details: isProd ? undefined : err.message },
+      error: { code: 'BAD_REQUEST', message: 'Yêu cầu không hợp lệ', details: isProd ? undefined : err.message },
     });
   }
 
   if (err instanceof Prisma.PrismaClientValidationError) {
     return res.status(400).json({
       success: false,
-      error: { code: 'BAD_REQUEST', message: 'Invalid request data' },
+      error: { code: 'BAD_REQUEST', message: 'Dữ liệu gửi lên không hợp lệ' },
     });
   }
 
   logger.error({ err, path: req.originalUrl }, 'Unhandled error');
-  const message = isProd || !(err instanceof Error) ? 'Internal server error' : err.message;
+  const message = isProd || !(err instanceof Error) ? 'Lỗi hệ thống, vui lòng thử lại sau' : err.message;
   return res.status(500).json({
     success: false,
     error: { code: 'INTERNAL_ERROR', message },

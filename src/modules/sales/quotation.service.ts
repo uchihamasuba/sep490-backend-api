@@ -177,7 +177,7 @@ async function resolveAndValidateLines(
 
 async function findQuotationOrThrow(quotationId: string): Promise<QuotationWithDetails> {
   const quotation = await quotationRepository.findById(quotationId);
-  if (!quotation) throw AppError.notFound('Quotation not found');
+  if (!quotation) throw AppError.notFound('Không tìm thấy báo giá');
   return quotation;
 }
 
@@ -216,7 +216,7 @@ async function listQuotations(query: ListQuotationsQuery): Promise<{ data: Quota
 
 async function listQuotationsByCustomer(customerId: string, query: ListCustomerQuotationsQuery) {
   const customer = await customerRepository.findById(customerId);
-  if (!customer) throw AppError.notFound('Customer not found');
+  if (!customer) throw AppError.notFound('Không tìm thấy khách hàng');
 
   const { page, limit } = query;
   const skip = (page - 1) * limit;
@@ -245,7 +245,7 @@ async function createQuotationForCustomer(
   createdByUserId: string,
 ): Promise<QuotationDetailDTO> {
   const customer = await customerRepository.findById(customerId);
-  if (!customer) throw AppError.notFound('Customer not found');
+  if (!customer) throw AppError.notFound('Không tìm thấy khách hàng');
 
   const { itemsById } = await resolveAndValidateLines(body.items);
   const quotationCode = await quotationRepository.generateNextQuotationCode();

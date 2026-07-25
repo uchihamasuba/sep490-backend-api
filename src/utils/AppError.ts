@@ -12,27 +12,27 @@ export class AppError extends Error {
     Error.captureStackTrace?.(this, AppError);
   }
 
-  static badRequest(message = 'Bad request', details?: unknown) {
+  static badRequest(message = 'Yêu cầu không hợp lệ', details?: unknown) {
     return new AppError(400, 'BAD_REQUEST', message, details);
   }
 
-  static unauthorized(message = 'Unauthorized', details?: unknown) {
+  static unauthorized(message = 'Chưa xác thực', details?: unknown) {
     return new AppError(401, 'UNAUTHORIZED', message, details);
   }
 
-  static forbidden(message = 'Forbidden', details?: unknown) {
+  static forbidden(message = 'Không đủ quyền truy cập', details?: unknown) {
     return new AppError(403, 'FORBIDDEN', message, details);
   }
 
-  static notFound(message = 'Not found', details?: unknown) {
+  static notFound(message = 'Không tìm thấy dữ liệu', details?: unknown) {
     return new AppError(404, 'NOT_FOUND', message, details);
   }
 
-  static conflict(message = 'Conflict', details?: unknown) {
+  static conflict(message = 'Dữ liệu bị trùng lặp', details?: unknown) {
     return new AppError(409, 'CONFLICT', message, details);
   }
 
-  static internal(message = 'Internal server error', details?: unknown) {
+  static internal(message = 'Lỗi hệ thống, vui lòng thử lại sau', details?: unknown) {
     return new AppError(500, 'INTERNAL_ERROR', message, details);
   }
 }

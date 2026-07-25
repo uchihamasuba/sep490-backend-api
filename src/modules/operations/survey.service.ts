@@ -84,7 +84,7 @@ function mapDetail(row: SurveyReportWithDetails): SurveyReportDetailDTO {
 
 async function findSurveyOrThrow(surveyId: string): Promise<SurveyReportWithDetails> {
   const survey = await surveyRepository.findById(surveyId);
-  if (!survey) throw AppError.notFound('Survey report not found');
+  if (!survey) throw AppError.notFound('Không tìm thấy báo cáo khảo sát');
   return survey;
 }
 
@@ -118,11 +118,11 @@ async function getSurveyReportById(surveyId: string): Promise<SurveyReportDetail
 
 async function createSurveyReport(body: CreateSurveyReportBody, reportedBy: string): Promise<SurveyReportDetailDTO> {
   const order = await surveyRepository.orderExists(body.orderId);
-  if (!order) throw AppError.notFound('Order not found');
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   if (body.planId) {
     const plan = await surveyRepository.planExists(body.planId);
-    if (!plan) throw AppError.notFound('Schedule plan not found');
+    if (!plan) throw AppError.notFound('Không tìm thấy kế hoạch lịch trình');
   }
 
   const reportCode = await surveyRepository.generateNextReportCode();

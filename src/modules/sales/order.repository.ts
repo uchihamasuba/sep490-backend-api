@@ -1,5 +1,6 @@
 import type { DepositStatus, Item, OrderItemSource, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+import { AppError } from '../../utils/AppError';
 
 export interface LiveShowChecklist {
   backdrop: boolean;
@@ -345,7 +346,7 @@ export const orderRepository = {
       ),
     );
     const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
-    if (!order) throw new Error('Order not found after confirm-prepared — should be unreachable');
+    if (!order) throw AppError.internal('Không tìm thấy đơn hàng sau khi xác nhận số lượng chuẩn bị');
     return order;
   },
 
@@ -584,7 +585,7 @@ export const orderRepository = {
 
     // Đọc response NGOÀI transaction — detailInclude nặng, chỉ phục vụ build response (BUG mục 7.2).
     const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
-    if (!order) throw new Error('Order not found after export-equipment — should be unreachable');
+    if (!order) throw AppError.internal('Không tìm thấy đơn hàng sau khi xuất kho thiết bị');
     return { order, movements, itemsChanged };
   },
 };

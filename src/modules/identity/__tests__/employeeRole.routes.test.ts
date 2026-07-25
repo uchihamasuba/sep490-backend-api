@@ -20,6 +20,7 @@ describe('GET /api/v1/employee-roles', () => {
   it('rejects unauthenticated requests with 401', async () => {
     const res = await request(app).get('/api/v1/employee-roles');
     expect(res.status).toBe(401);
+    expect(res.body.error.message).toBe('Thiếu hoặc sai định dạng token xác thực');
   });
 });
 

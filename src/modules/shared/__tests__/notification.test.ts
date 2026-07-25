@@ -12,6 +12,7 @@ jest.mock('../notification.repository', () => ({
     createNotification: jest.fn(),
     getUserDeviceToken: jest.fn(),
     findNotificationsByUserId: jest.fn(),
+    findById: jest.fn(),
     markNotificationAsRead: jest.fn(),
     updateUserDeviceToken: jest.fn(),
   },
@@ -104,6 +105,20 @@ describe('notificationService.sendNotificationToUser', () => {
     expect(mockSend).not.toHaveBeenCalled();
     expect(mockedGetFirebaseMessaging).not.toHaveBeenCalled();
   });
+
+  it('throws 404 and does not create a notification when the target user does not exist', async () => {
+    mockedRepo.getUserDeviceToken.mockResolvedValue(null);
+
+    await expect(
+      notificationService.sendNotificationToUser({
+        userId: 'missing-user',
+        title: 'Test title',
+        content: 'Test content',
+      }),
+    ).rejects.toMatchObject({ status: 404 });
+
+    expect(mockedRepo.createNotification).not.toHaveBeenCalled();
+  });
 });
 
 describe('notificationService.getUserNotifications', () => {
@@ -122,6 +137,7 @@ describe('notificationService.getUserNotifications', () => {
 
 describe('notificationService.markAsRead', () => {
   it('marks the notification as read and forwards the id to the repository', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeNotification() as never);
     mockedRepo.markNotificationAsRead.mockResolvedValue(
       fakeNotification({ isRead: true, readAt: new Date('2026-07-23T01:00:00Z') }) as never,
     );
@@ -131,6 +147,13 @@ describe('notificationService.markAsRead', () => {
     expect(mockedRepo.markNotificationAsRead).toHaveBeenCalledWith('noti-1');
     expect(result.isRead).toBe(true);
     expect(result.readAt).not.toBeNull();
+  });
+
+  it('throws 404 and does not update when the notification does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    await expect(notificationService.markAsRead('missing')).rejects.toMatchObject({ status: 404 });
+    expect(mockedRepo.markNotificationAsRead).not.toHaveBeenCalled();
   });
 });
 
@@ -157,6 +180,18 @@ describe('HTTP routes', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.data).toMatchObject({ notificationId: 'noti-1' });
+  });
+
+  it('POST /api/v1/notifications/test-send returns 404 when the target user does not exist', async () => {
+    mockedRepo.getUserDeviceToken.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/v1/notifications/test-send')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ userId: 'missing-user', title: 'Test title' });
+
+    expect(res.status).toBe(404);
+    expect(mockedRepo.createNotification).not.toHaveBeenCalled();
   });
 
   it('POST /api/v1/notifications/test-send rejects a payload missing title with 400', async () => {
@@ -187,6 +222,7 @@ describe('HTTP routes', () => {
   });
 
   it('PATCH /api/v1/notifications/:id/read returns 200 with the updated notification', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeNotification() as never);
     mockedRepo.markNotificationAsRead.mockResolvedValue(fakeNotification({ isRead: true }) as never);
 
     const res = await request(app)
@@ -196,6 +232,17 @@ describe('HTTP routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.isRead).toBe(true);
     expect(mockedRepo.markNotificationAsRead).toHaveBeenCalledWith('noti-1');
+  });
+
+  it('PATCH /api/v1/notifications/:id/read returns 404 when the notification does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .patch('/api/v1/notifications/missing/read')
+      .set('Authorization', authHeader('ADMIN'));
+
+    expect(res.status).toBe(404);
+    expect(mockedRepo.markNotificationAsRead).not.toHaveBeenCalled();
   });
 
   it('POST /api/v1/notifications/device-token registers the token for the authenticated user', async () => {

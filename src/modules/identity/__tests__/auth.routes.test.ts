@@ -11,6 +11,7 @@ jest.mock('../user.repository', () => ({
     findByUsername: jest.fn(),
     findById: jest.fn(),
     findByEmail: jest.fn(),
+    findByPhone: jest.fn(),
     update: jest.fn(),
     updatePasswordHash: jest.fn(),
   },
@@ -79,6 +80,7 @@ describe('POST /api/v1/auth/login', () => {
 
     expect(res.status).toBe(401);
     expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toBe('Sai tên đăng nhập hoặc mật khẩu');
   });
 
   it('returns 403 when the account is locked (SUSPENDED)', async () => {
@@ -89,6 +91,7 @@ describe('POST /api/v1/auth/login', () => {
       .send({ username: 'manager', password: PLAIN_PASSWORD });
 
     expect(res.status).toBe(403);
+    expect(res.body.error.message).toBe('Tài khoản đã bị khóa hoặc vô hiệu hóa');
   });
 
   it('returns 400 when the request body fails validation', async () => {
@@ -144,6 +147,7 @@ describe('GET /api/v1/auth/profile', () => {
   it('requires authentication (401 without a token)', async () => {
     const res = await request(app).get('/api/v1/auth/profile');
     expect(res.status).toBe(401);
+    expect(res.body.error.message).toBe('Thiếu hoặc sai định dạng token xác thực');
   });
 
   it('returns the current user profile for a valid token', async () => {
@@ -176,6 +180,20 @@ describe('PUT /api/v1/auth/profile', () => {
     expect(res.body.data.fullName).toBe('Updated Name');
     expect(mockedRepo.update).toHaveBeenCalledWith('u1', { fullName: 'Updated Name' });
   });
+
+  it('returns 409 with a Vietnamese message when the new phone is already used by another account', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser());
+    mockedRepo.findByPhone.mockResolvedValue(baseUser({ userId: 'someone-else' }));
+
+    const res = await request(app)
+      .put('/api/v1/auth/profile')
+      .set('Authorization', authHeaderFor())
+      .send({ phone: '0911111111' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng bởi tài khoản khác');
+    expect(mockedRepo.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('PUT /api/v1/auth/change-password', () => {
@@ -198,6 +216,7 @@ describe('PUT /api/v1/auth/change-password', () => {
       .send({ oldPassword: 'wrong-old-password', newPassword: 'newpass1', confirmNewPassword: 'newpass1' });
 
     expect(res.status).toBe(400);
+    expect(res.body.error.message).toBe('Mật khẩu hiện tại không đúng');
     expect(mockedRepo.updatePasswordHash).not.toHaveBeenCalled();
   });
 

@@ -97,6 +97,7 @@ describe('employeeService.inviteEmployee', () => {
     await expect(employeeService.inviteEmployee(validBody({ roleId: 'not-a-real-role' }))).rejects.toMatchObject({
       status: 400,
       code: 'BAD_REQUEST',
+      message: 'roleId không hợp lệ',
     });
 
     expect(mockedRepo.findByEmail).not.toHaveBeenCalled();
@@ -109,6 +110,7 @@ describe('employeeService.inviteEmployee', () => {
     await expect(employeeService.inviteEmployee(validBody())).rejects.toMatchObject({
       status: 409,
       code: 'CONFLICT',
+      message: 'Email đã được sử dụng',
     });
 
     expect(mockedRepo.create).not.toHaveBeenCalled();
@@ -121,6 +123,7 @@ describe('employeeService.inviteEmployee', () => {
     await expect(employeeService.inviteEmployee(validBody())).rejects.toMatchObject({
       status: 409,
       code: 'CONFLICT',
+      message: 'Số điện thoại đã được sử dụng',
     });
 
     expect(mockedRepo.create).not.toHaveBeenCalled();
@@ -133,5 +136,82 @@ describe('employeeService.inviteEmployee', () => {
 
     await expect(employeeService.inviteEmployee(validBody())).rejects.toThrow('SMTP connection refused');
     expect(mockedRepo.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('employeeService.createEmployee', () => {
+  function validCreateBody(overrides: Partial<Parameters<typeof employeeService.createEmployee>[0]> = {}) {
+    return {
+      name: 'Nguyen Van C',
+      phone: '0977777777',
+      email: 'c@bnw.com',
+      roleId: 'ky-thuat',
+      role: 'TECHNICAL' as const,
+      status: 'ACTIVE' as const,
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    mockedRepo.findByEmail.mockResolvedValue(null);
+    mockedRepo.findByPhone.mockResolvedValue(null);
+    mockedRepo.findByUsername.mockResolvedValue(null);
+    mockedRepo.generateNextEmployeeCode.mockResolvedValue('NV003');
+  });
+
+  it('rejects an unknown roleId with a Vietnamese message before touching the repository', async () => {
+    await expect(employeeService.createEmployee(validCreateBody({ roleId: 'not-a-real-role' }))).rejects.toMatchObject({
+      status: 400,
+      message: 'roleId không hợp lệ',
+    });
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects with 409 when the email is already used by another account', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(baseUser());
+
+    await expect(employeeService.createEmployee(validCreateBody())).rejects.toMatchObject({
+      status: 409,
+      code: 'CONFLICT',
+      message: 'Email đã được sử dụng',
+    });
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects with 409 when the phone is already used by another account', async () => {
+    mockedRepo.findByPhone.mockResolvedValue(baseUser());
+
+    await expect(employeeService.createEmployee(validCreateBody())).rejects.toMatchObject({
+      status: 409,
+      code: 'CONFLICT',
+      message: 'Số điện thoại đã được sử dụng',
+    });
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('creates the employee when email/phone are not taken', async () => {
+    mockedRepo.create.mockResolvedValue(baseUser({ userId: 'u3', employeeCode: 'NV003' }));
+
+    const result = await employeeService.createEmployee(validCreateBody());
+
+    expect(result).toMatchObject({ id: 'u3', employeeCode: 'NV003' });
+  });
+});
+
+describe('employeeService not-found flows', () => {
+  it('getEmployeeById throws 404 with a Vietnamese message', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    await expect(employeeService.getEmployeeById('missing')).rejects.toMatchObject({
+      status: 404,
+      message: 'Không tìm thấy nhân viên',
+    });
+  });
+
+  it('updateEmployeeStatus throws 404 with a Vietnamese message', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    await expect(employeeService.updateEmployeeStatus('missing', 'INACTIVE')).rejects.toMatchObject({
+      status: 404,
+      message: 'Không tìm thấy nhân viên',
+    });
   });
 });
