@@ -5,6 +5,7 @@ import { orderService } from './order.service';
 import type {
   CloseOrderBody,
   ConfirmPreparedItemsBody,
+  CreateChangeRequestBody,
   CreateDepositBody,
   CreateOrderBody,
   CreateSettlementBody,
@@ -119,6 +120,14 @@ async function createSettlement(req: Request, res: Response) {
   created(res, result);
 }
 
+async function createChangeRequest(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { orderId } = req.params as unknown as OrderIdParam;
+  const body = req.body as CreateChangeRequestBody;
+  const changeRequest = await orderService.createChangeRequest(orderId, body, req.user);
+  created(res, changeRequest);
+}
+
 async function close(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { orderId } = req.params as unknown as OrderIdParam;
@@ -171,6 +180,7 @@ export const orderController = {
   updateQuotation,
   createDeposit,
   createSettlement,
+  createChangeRequest,
   close,
   confirmPreparedItems,
   exportEquipment,

@@ -6,6 +6,7 @@ import { orderController } from './order.controller';
 import {
   closeOrderBodySchema,
   confirmPreparedItemsBodySchema,
+  createChangeRequestBodySchema,
   createDepositBodySchema,
   createOrderBodySchema,
   createSettlementBodySchema,
@@ -135,6 +136,18 @@ router.post(
   validate(orderIdParamSchema, 'params'),
   validate(createSettlementBodySchema, 'body'),
   asyncHandler(orderController.createSettlement),
+);
+
+// Leader báo thay đổi thiết bị tại hiện trường (thêm/bớt/đổi) khi đơn đã CONFIRMED — Manager duyệt qua
+// PUT /change-requests/:changeRequestId/approve (changeRequest.routes.ts, mounted top-level). Backend
+// refactor 2026-07-26 gộp LEADER/TECHNICAL thành STAFF — giới hạn đúng Leader (vai trò LEAD của kế
+// hoạch) ở tầng service (orderService.createChangeRequest), giống pattern createSettlement.
+router.post(
+  '/:orderId/change-requests',
+  requireRole('MANAGER', 'STAFF'),
+  validate(orderIdParamSchema, 'params'),
+  validate(createChangeRequestBodySchema, 'body'),
+  asyncHandler(orderController.createChangeRequest),
 );
 
 router.patch(

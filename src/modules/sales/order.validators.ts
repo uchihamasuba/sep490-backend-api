@@ -118,6 +118,39 @@ export const createSettlementBodySchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+const changeRequestTypeEnum = z.enum(['add', 'remove', 'replace'], { message: 'type không hợp lệ' });
+const changeRequestItemActionEnum = z.enum(['add', 'remove'], { message: 'action không hợp lệ' });
+
+const changeRequestItemInputSchema = z.object({
+  catalogItemId: z.string().trim().min(1, 'Thiếu mã hạng mục'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
+  action: changeRequestItemActionEnum,
+});
+
+// POST /orders/:orderId/change-requests — Leader báo thêm/bớt/đổi thiết bị tại hiện trường. `type`
+// quyết định action hợp lệ của từng dòng items: add/remove chỉ chứa toàn action cùng tên, replace cần
+// đúng 1 dòng remove (đồ cũ) + 1 dòng add (đồ mới).
+export const createChangeRequestBodySchema = z
+  .object({
+    type: changeRequestTypeEnum,
+    items: z.array(changeRequestItemInputSchema).min(1, 'Phải có ít nhất 1 dòng thiết bị'),
+  })
+  .refine(
+    (body) => {
+      if (body.type === 'add') return body.items.every((item) => item.action === 'add');
+      if (body.type === 'remove') return body.items.every((item) => item.action === 'remove');
+      return (
+        body.items.length === 2 &&
+        body.items.filter((item) => item.action === 'add').length === 1 &&
+        body.items.filter((item) => item.action === 'remove').length === 1
+      );
+    },
+    {
+      message: 'items không khớp với type (add/remove cần cùng action; replace cần đúng 1 add + 1 remove)',
+      path: ['items'],
+    },
+  );
+
 const exportStatusEnum = z.enum(['PENDING', 'EXPORTED'], { message: 'exportStatus không hợp lệ' });
 
 export const listPicklistsQuerySchema = z.object({
@@ -143,3 +176,4 @@ export type ExportEquipmentBody = z.infer<typeof exportEquipmentBodySchema>;
 export type ConfirmPreparedItemsBody = z.infer<typeof confirmPreparedItemsBodySchema>;
 export type CreateDepositBody = z.infer<typeof createDepositBodySchema>;
 export type CreateSettlementBody = z.infer<typeof createSettlementBodySchema>;
+export type CreateChangeRequestBody = z.infer<typeof createChangeRequestBodySchema>;
