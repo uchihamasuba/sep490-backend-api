@@ -271,6 +271,24 @@ describe('orderService.updateOrderQuotation', () => {
     expect(result.quotationId).toBe('quo-1');
   });
 
+  it('links a DRAFT quotation not already linked elsewhere', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(buildOrderRow({ quotationId: null }) as never);
+    mockedQuotationRepo.findById.mockResolvedValue({ quotationId: 'quo-1', status: 'DRAFT' } as never);
+    mockedQuotationRepo.getLinkedOrderId.mockResolvedValue(null);
+    mockedOrderRepo.updateQuotationId.mockResolvedValue(buildOrderRow({ quotationId: 'quo-1' }) as never);
+
+    const result = await orderService.updateOrderQuotation('ord-1', { quotationId: 'quo-1' });
+    expect(result.quotationId).toBe('quo-1');
+  });
+
+  it('rejects linking a REJECTED quotation (400)', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(buildOrderRow({ quotationId: null }) as never);
+    mockedQuotationRepo.findById.mockResolvedValue({ quotationId: 'quo-1', status: 'REJECTED' } as never);
+
+    await expect(orderService.updateOrderQuotation('ord-1', { quotationId: 'quo-1' })).rejects.toMatchObject({ status: 400 });
+    expect(mockedOrderRepo.updateQuotationId).not.toHaveBeenCalled();
+  });
+
   it('rejects linking a quotation already linked to a different order (409)', async () => {
     mockedOrderRepo.findById.mockResolvedValue(buildOrderRow({ quotationId: null }) as never);
     mockedQuotationRepo.findById.mockResolvedValue({ quotationId: 'quo-1', status: 'APPROVED' } as never);
