@@ -88,7 +88,7 @@ Mã nguồn chính nằm trong `src/modules/`. Mỗi tính năng (domain) sẽ c
 - **Lỗi `PrismaClientKnownRequestError` khi thao tác DB**:
   Hãy kiểm tra xem bạn đã cấu hình đúng `DATABASE_URL` chưa, hoặc hãy chạy lại `npx prisma db push`.
 - **Lỗi `DB_ERROR` hoặc 401/403 lúc test API**:
-  Chắc chắn rằng bạn truyền đúng `Authorization: Bearer <token>` vào Headers. Để lấy token, hãy login bằng các user có trong Seed data (admin/manager/leader/tech - pass: `123456`).
+  Chắc chắn rằng bạn truyền đúng `Authorization: Bearer <token>` vào Headers. Để lấy token, hãy login bằng các user có trong Seed data (admin/manager/staff1..staff10 - pass: `123456`).
 
 ---
 
@@ -258,7 +258,7 @@ Tất cả đều yêu cầu header `Authorization: Bearer <token>` (login qua `
 > Toàn bộ 5 lệnh bên dưới, viết sẵn cho PowerShell (copy-paste, chạy tuần tự — sau Lệnh 1 nhớ dán `token`/`userId` vào 2 biến `$jwt`/`$userId` trước khi chạy tiếp):
 > ```powershell
 > # 1. Đăng nhập lấy JWT (không có biến nên dùng --% được)
-> curl.exe --% -X POST http://localhost:3001/api/v1/auth/login -H "Content-Type: application/json" -d "{\"username\":\"tech\",\"password\":\"123456\"}"
+> curl.exe --% -X POST http://localhost:3001/api/v1/auth/login -H "Content-Type: application/json" -d "{\"username\":\"staff1\",\"password\":\"123456\"}"
 >
 > # Copy "token" và "user.userId" từ kết quả Lệnh 1 rồi dán vào đây trước khi chạy tiếp:
 > $jwt = "<dán token JWT>"
@@ -284,11 +284,11 @@ Chạy **từng lệnh một, theo đúng thứ tự** — mỗi lệnh đều c
 
 **Lệnh 1 — Đăng nhập lấy JWT:**
 ```bash
-curl -X POST http://localhost:3001/api/v1/auth/login -H "Content-Type: application/json" -d '{"username":"tech","password":"123456"}'
+curl -X POST http://localhost:3001/api/v1/auth/login -H "Content-Type: application/json" -d '{"username":"staff1","password":"123456"}'
 ```
 ✅ Kết quả mong đợi (status `200`) — **copy giá trị `token` và `user.userId`, sẽ dùng ở các lệnh sau**:
 ```json
-{"success":true,"data":{"token":"eyJhbGciOiJIUzI1NiIs...","user":{"userId":"ff58ed57-331d-4dfe-9e97-4bea6fdbc710","username":"tech","fullName":"Technician","role":{...},"status":"active"}}}
+{"success":true,"data":{"token":"eyJhbGciOiJIUzI1NiIs...","user":{"userId":"ff58ed57-331d-4dfe-9e97-4bea6fdbc710","username":"staff1","fullName":"Vũ Đức Thắng","role":{...},"status":"active"}}}
 ```
 ❌ Nếu sai: `{"success":false,...}` với message sai username/password → kiểm tra lại đã chạy `npm run seed` chưa (mục 2, Bước 4).
 
@@ -340,3 +340,100 @@ curl -X PATCH http://localhost:3001/api/v1/notifications/<notificationId>/read -
 ```json
 {"success":true,"data":{"notificationId":"0ec9d043-...","isRead":true,"readAt":"2026-07-23T17:51:13.000Z",...}}
 ```
+
+---
+
+### 6.6 Test push thật không cần Frontend/Mobile app có sẵn
+
+Mục 6.5 chỉ xác nhận API backend chạy đúng logic (lưu DB, gọi FCM), nhưng dùng token giả nên không chứng minh được thông báo có **thực sự nổi lên trên thiết bị** hay không. Mục này ghi lại 2 cách đã tự tay chạy thành công để lấy **device token thật** và xem push thật, mà không cần có sẵn app Frontend/Mobile nào của dự án.
+
+#### Web (Chrome, không cần dự án Frontend)
+
+Dựng 1 thư mục test độc lập (ngoài repo, ví dụ trong thư mục scratch bất kỳ) gồm đúng 3 file:
+
+- `index.html`: dùng Firebase JS SDK qua CDN (`firebase-app.js` + `firebase-messaging.js`, bản modular), gọi `Notification.requestPermission()` rồi `getToken(messaging, { vapidKey, serviceWorkerRegistration })`, in token ra màn hình.
+- `firebase-messaging-sw.js`: bản **compat** (`firebase-app-compat.js` + `firebase-messaging-compat.js`), gọi `firebase.initializeApp(...)` rồi `messaging.onBackgroundMessage((payload) => self.registration.showNotification(...))`. Đây là mẫu y hệt đã đưa ở mục 6.2 Bước C.
+- `server.js`: static server tối giản bằng Node `http` thuần (không cần cài package nào) để phục vụ 2 file trên cùng một origin — bắt buộc, vì Service Worker chỉ hoạt động đúng scope khi được load qua HTTP(S) thật, không phải mở file `.html` trực tiếp (`file://`).
+
+Cần **Web app config** + **VAPID key** lấy từ Firebase Console — xem hướng dẫn lấy 2 giá trị này ở mục 6.2 Bước A (dùng lại y nguyên, không cần lấy thêm gì khác).
+
+Chạy `node server.js`, mở `http://localhost:<port>` bằng Chrome (localhost được trình duyệt coi là secure context nên không cần HTTPS), bấm nút để xin quyền + lấy token → đăng ký qua **Lệnh 2** ở mục 6.5 (dùng token thật vừa lấy thay vì token giả) → gọi **Lệnh 3** → quan sát thông báo nổi lên góc màn hình.
+
+#### Android — dựng app test tối giản bằng Flutter (không cần app mobile có sẵn)
+
+Yêu cầu: đã cài Flutter SDK, Android Studio kèm 1 AVD (máy ảo) đang chạy, `adb` có trong PATH.
+
+1. **Bật Windows Developer Mode** (bắt buộc trước khi cài plugin native cho Flutter trên Windows, nếu không sẽ gặp lỗi *"Building with plugins requires symlink support"*):
+   ```
+   start ms-settings:developers
+   ```
+   Bật toggle **Developer Mode** trong cửa sổ hiện ra.
+
+2. Tạo project và thêm package Firebase:
+   ```bash
+   flutter create --org com.bnwems --project-name fcm_test_app fcm_test_app
+   cd fcm_test_app
+   flutter pub add firebase_core firebase_messaging
+   ```
+
+3. Đăng ký 1 **Android app mới** trong Firebase Console (project cùng với Admin SDK ở mục 6.1): Project settings → General → Your apps → Add app → Android. **Package name phải khớp chính xác** `applicationId` trong `android/app/build.gradle.kts` (mặc định là `<org>.<project-name>`, ví dụ `com.bnwems.fcm_test_app`). Tải `google-services.json` về, đặt tại `android/app/google-services.json`.
+
+4. Thêm plugin `google-services` để đọc file JSON đó:
+   - `android/settings.gradle.kts`, trong khối `plugins { ... }`, thêm:
+     ```kotlin
+     id("com.google.gms.google-services") version "4.4.2" apply false
+     ```
+   - `android/app/build.gradle.kts`, thêm vào khối `plugins { ... }` (sau `com.android.application`, trước `dev.flutter.flutter-gradle-plugin`):
+     ```kotlin
+     id("com.google.gms.google-services")
+     ```
+
+5. `android/app/src/main/AndroidManifest.xml` — thêm quyền thông báo (Android 13+) và trỏ default channel về 1 channel độ ưu tiên cao (**bắt buộc** để có heads-up; nếu bỏ qua bước này, Android sẽ hiển thị thông báo êm trong khay thay vì nổi lên):
+   ```xml
+   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+   <!-- trong thẻ <application>, cùng cấp với các <meta-data> khác -->
+   <meta-data
+       android:name="com.google.firebase.messaging.default_notification_channel_id"
+       android:value="high_importance_channel" />
+   ```
+
+6. `android/app/src/main/kotlin/.../MainActivity.kt` — tạo channel `high_importance_channel` với độ ưu tiên cao trong `onCreate` (khớp đúng ID ở bước 5):
+   ```kotlin
+   override fun onCreate(savedInstanceState: android.os.Bundle?) {
+       super.onCreate(savedInstanceState)
+       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+           val channel = NotificationChannel(
+               "high_importance_channel", "Thông báo quan trọng", NotificationManager.IMPORTANCE_HIGH,
+           )
+           getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+       }
+   }
+   ```
+
+7. `lib/main.dart` — `await Firebase.initializeApp()` trong `main()`, đăng ký `FirebaseMessaging.onBackgroundMessage(...)`, và 1 nút bấm gọi `FirebaseMessaging.instance.requestPermission()` rồi `FirebaseMessaging.instance.getToken()`, in token ra UI/console; `FirebaseMessaging.onMessage.listen(...)` để xử lý khi app đang mở foreground.
+
+8. Build, cài và chạy trên emulator:
+   ```bash
+   flutter build apk --debug
+   adb install -r build/app/outputs/flutter-apk/app-debug.apk
+   adb shell pm grant com.bnwems.fcm_test_app android.permission.POST_NOTIFICATIONS
+   adb shell am start -n com.bnwems.fcm_test_app/.MainActivity
+   ```
+   Bấm nút trong app, lấy token thật qua `adb logcat -d | grep "device token"` (hoặc đọc trực tiếp trên màn hình app).
+
+9. ⚠️ **Cạm bẫy hay gặp trên emulator**: nếu log báo `FirebaseInstanceId: Token retrieval failed: SERVICE_NOT_AVAILABLE`, nguyên nhân là **Google Play Services trên emulator quá cũ** so với yêu cầu của Firebase Messaging. Kiểm tra phiên bản:
+   ```bash
+   adb shell dumpsys package com.google.android.gms | grep versionName
+   ```
+   Khắc phục: mở Play Store ngay trên emulator để cập nhật Google Play Services:
+   ```bash
+   adb shell am start -a android.intent.action.VIEW -d "market://details?id=com.google.android.gms"
+   ```
+   rồi bấm Update trong Play Store. Nếu Play Store bị treo ở màn hình logo, thử `adb reboot` rồi mở lại. Sau khi Play Services đã cập nhật, mở lại app (bước 8) và bấm nút lấy token lại.
+
+10. Đăng ký token thật qua **Lệnh 2** (mục 6.5), gọi **Lệnh 3**, rồi xác nhận thông báo đã tới bằng:
+    ```bash
+    adb shell cmd statusbar expand-notifications
+    adb exec-out screencap -p > screenshot.png
+    ```
+    (kéo thanh thông báo xuống và chụp màn hình — banner heads-up có thể đã tự ẩn trước khi kịp chụp, nhưng thông báo vẫn nằm trong khay nếu gửi thành công).

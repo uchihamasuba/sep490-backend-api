@@ -1,7 +1,7 @@
 import type { Message } from 'firebase-admin/messaging';
 import { getFirebaseMessaging } from '../../config/firebase';
 import { AppError } from '../../utils/AppError';
-import { logDeveloper } from '../../utils/logger';
+import { logDeveloper, logger } from '../../utils/logger';
 import { notificationRepository } from './notification.repository';
 import type { SendNotificationBody } from './notification.validators';
 
@@ -26,7 +26,11 @@ async function sendNotificationToUser(body: SendNotificationBody) {
       token: deviceToken,
       notification: { title: body.title, body: body.content ?? '' },
     };
-    await getFirebaseMessaging().send(message);
+    try {
+      await getFirebaseMessaging().send(message);
+    } catch (err) {
+      logger.warn({ err, userId: body.userId }, 'Gửi FCM push thất bại, notification vẫn đã được lưu vào DB');
+    }
   }
 
   return notification;
@@ -36,9 +40,12 @@ async function getUserNotifications(userId: string) {
   return notificationRepository.findNotificationsByUserId(userId);
 }
 
-async function markAsRead(notificationId: string) {
+async function markAsRead(notificationId: string, callerId: string) {
   const existing = await notificationRepository.findById(notificationId);
   if (!existing) throw AppError.notFound('Không tìm thấy thông báo');
+  if (existing.userId !== callerId) {
+    throw AppError.forbidden('Bạn không có quyền truy cập thông báo này');
+  }
   return notificationRepository.markNotificationAsRead(notificationId);
 }
 
