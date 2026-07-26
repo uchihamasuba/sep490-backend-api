@@ -3,7 +3,14 @@ import { requireAuth, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { userController } from './user.controller';
-import { createUserBodySchema, listUsersQuerySchema, updateUserBodySchema, updateUserStatusBodySchema, userIdParamSchema } from './user.validators';
+import {
+  createUserBodySchema,
+  listUsersQuerySchema,
+  resetUserPasswordBodySchema,
+  updateUserBodySchema,
+  updateUserStatusBodySchema,
+  userIdParamSchema,
+} from './user.validators';
 
 const router = Router();
 
@@ -48,6 +55,16 @@ router.put(
   validate(userIdParamSchema, 'params'),
   validate(updateUserBodySchema, 'body'),
   asyncHandler(userController.update),
+);
+
+// Admin đặt lại mật khẩu cho một user cụ thể — mức nhạy cảm tương đương khoá/mở khoá tài khoản nên
+// chỉ Admin (giống pattern requireRole('ADMIN') của PATCH /:userId/status ở trên).
+router.post(
+  '/:userId/reset-password',
+  requireRole('ADMIN'),
+  validate(userIdParamSchema, 'params'),
+  validate(resetUserPasswordBodySchema, 'body'),
+  asyncHandler(userController.resetPassword),
 );
 
 export default router;

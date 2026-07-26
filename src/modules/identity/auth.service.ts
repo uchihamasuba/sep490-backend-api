@@ -5,11 +5,9 @@ import { env } from '../../config/env';
 import { AppError } from '../../utils/AppError';
 import { logger } from '../../utils/logger';
 import { sendEmail } from '../../utils/mailer';
-import { generateTempPassword } from '../../utils/password';
+import { generateTempPassword, hashPassword, hashPasswordRequiringChange, passwordRequiresChange } from '../../utils/password';
 import { userRepository } from './user.repository';
 import type { ChangePasswordBody, LoginBody, UpdateProfileBody } from './auth.validators';
-
-const BCRYPT_ROUNDS = 10;
 
 export type ApiUserStatus = 'active' | 'inactive' | 'locked';
 
@@ -33,6 +31,7 @@ export interface AuthUserDTO {
   fullName: string;
   role: { roleId: string; roleName: string };
   status: ApiUserStatus;
+  mustChangePassword: boolean;
 }
 
 export interface AuthProfileDTO extends AuthUserDTO {
@@ -56,6 +55,7 @@ function mapUser(user: User): AuthUserDTO {
     fullName: user.fullName,
     role: ROLE_MAP[user.role],
     status: STATUS_MAP[user.status],
+    mustChangePassword: passwordRequiresChange(user.passwordHash),
   };
 }
 
@@ -72,9 +72,11 @@ function mapProfile(user: User): AuthProfileDTO {
 }
 
 function signToken(user: User): string {
-  return jwt.sign({ id: user.userId, role: user.role }, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN,
-  } as jwt.SignOptions);
+  return jwt.sign(
+    { id: user.userId, role: user.role, mustChangePassword: passwordRequiresChange(user.passwordHash) },
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_EXPIRES_IN } as jwt.SignOptions,
+  );
 }
 
 async function login(body: LoginBody): Promise<LoginResult> {
@@ -96,15 +98,6 @@ async function login(body: LoginBody): Promise<LoginResult> {
   return { token: signToken(user), user: mapUser(user) };
 }
 
-async function forgotPassword(username: string): Promise<void> {
-  const user = await userRepository.findByUsername(username);
-  // Luôn trả 200 ở tầng controller dù tài khoản có tồn tại hay không (tránh lộ thông tin).
-  // Chưa có hạ tầng gửi email/SMS thật — chỉ ghi log nội bộ khi tìm thấy tài khoản (doc §2.2).
-  if (user) {
-    logger.info({ userId: user.userId, username: user.username }, 'Password reset requested');
-  }
-}
-
 function buildResetPasswordEmailHtml(username: string, newPassword: string): string {
   return `
     <p>Xin chào ${username},</p>
@@ -113,16 +106,29 @@ function buildResetPasswordEmailHtml(username: string, newPassword: string): str
   `;
 }
 
-// Reset mật khẩu qua email: sinh mật khẩu ngẫu nhiên mới, hash và cập nhật DB, rồi gửi email.
+// Sinh mật khẩu mới ngẫu nhiên, hash (đánh dấu bắt buộc đổi ở lần đăng nhập kế tiếp — xem
+// utils/password.ts), cập nhật DB rồi gửi email. Dùng chung cho cả forgot-password (tra theo
+// username) và reset-password (tra theo email) — 2 lối vào cùng một hành vi.
+async function issuePasswordResetEmail(user: User): Promise<void> {
+  if (!user.email) return; // Không có email trên hồ sơ thì không có kênh nào để gửi.
+
+  const newPassword = generateTempPassword();
+  const passwordHash = await hashPasswordRequiringChange(newPassword);
+  await userRepository.updatePasswordHash(user.userId, passwordHash);
+  await sendEmail(user.email, 'Mật khẩu mới của bạn', buildResetPasswordEmailHtml(user.username, newPassword));
+  logger.info({ userId: user.userId }, 'Password reset email sent');
+}
+
+// Luôn resolve thành công dù username có tồn tại hay không (tránh dò tài khoản, doc §2.2).
+async function forgotPassword(username: string): Promise<void> {
+  const user = await userRepository.findByUsername(username);
+  if (user) await issuePasswordResetEmail(user);
+}
+
 // Luôn resolve thành công dù email có tồn tại hay không (tránh dò tài khoản qua boundary timing/lỗi).
 async function resetPassword(email: string): Promise<void> {
   const user = await userRepository.findByEmail(email);
-  if (!user) return;
-
-  const newPassword = generateTempPassword();
-  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
-  await userRepository.updatePasswordHash(user.userId, passwordHash);
-  await sendEmail(email, 'Mật khẩu mới của bạn', buildResetPasswordEmailHtml(user.username, newPassword));
+  if (user) await issuePasswordResetEmail(user);
 }
 
 async function getProfile(userId: string): Promise<AuthProfileDTO> {
@@ -161,7 +167,7 @@ async function changePassword(userId: string, body: ChangePasswordBody): Promise
     throw AppError.badRequest('Mật khẩu hiện tại không đúng');
   }
 
-  const passwordHash = await bcrypt.hash(body.newPassword, BCRYPT_ROUNDS);
+  const passwordHash = await hashPassword(body.newPassword);
   await userRepository.updatePasswordHash(userId, passwordHash);
 }
 

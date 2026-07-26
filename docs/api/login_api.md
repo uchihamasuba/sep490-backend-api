@@ -101,8 +101,10 @@ trên web" là logic **phía FE** (`ROLE_DASHBOARD_PATH` trong `src/constants/ro
 **Request body**: `{ "username": "manager" }`
 
 **Response 200**: `{ "success": true, "data": null }` — **luôn** trả 200 dù `username` có tồn tại hay
-không (tránh lộ thông tin tài khoản còn tồn tại). Hiện tại **chưa có hạ tầng gửi email/SMS thật**, chỉ
-ghi log nội bộ khi tìm thấy tài khoản — khớp hành vi `mockAdapter.ts` hiện có ở FE.
+không (tránh lộ thông tin tài khoản còn tồn tại). Nếu tìm thấy tài khoản **và** tài khoản có email trên
+hồ sơ: sinh mật khẩu mới ngẫu nhiên, cập nhật DB rồi gửi email chứa mật khẩu mới đó (dùng chung logic
+với `POST /auth/reset-password`, xem §2.2b). Mật khẩu mới bắt buộc phải đổi ngay lần đăng nhập kế tiếp.
+Không tìm thấy tài khoản, hoặc tài khoản không có email, thì không làm gì thêm — vẫn trả 200 như nhau.
 
 **Permission**: Public.
 

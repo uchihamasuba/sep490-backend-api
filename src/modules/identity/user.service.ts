@@ -1,6 +1,7 @@
 import type { User } from '@prisma/client';
-import bcrypt from 'bcrypt';
 import { AppError } from '../../utils/AppError';
+import { sendEmail } from '../../utils/mailer';
+import { hashPassword, hashPasswordRequiringChange } from '../../utils/password';
 import { userRepository } from './user.repository';
 import type { CreateUserBody, ListUsersQuery, UpdateUserBody } from './user.validators';
 
@@ -33,6 +34,25 @@ export interface UserListMeta {
 
 function mapListItem(user: User): UserListItemDTO {
   return { userId: user.userId, username: user.username, fullName: user.fullName, role: user.role, status: user.status };
+}
+
+function buildAccountEmailHtml(username: string, password: string): string {
+  return `
+    <p>Tài khoản của bạn đã được tạo. Thông tin đăng nhập:</p>
+    <ul>
+      <li>Tên đăng nhập: <strong>${username}</strong></li>
+      <li>Mật khẩu: <strong>${password}</strong></li>
+    </ul>
+    <p>Vui lòng đăng nhập và đổi mật khẩu ngay trong lần sử dụng đầu tiên.</p>
+  `;
+}
+
+function buildPasswordResetEmailHtml(username: string, newPassword: string): string {
+  return `
+    <p>Mật khẩu tài khoản <strong>${username}</strong> của bạn vừa được quản trị viên đặt lại. Mật khẩu mới:</p>
+    <p><strong>${newPassword}</strong></p>
+    <p>Vui lòng đăng nhập và đổi mật khẩu ngay trong lần sử dụng đầu tiên.</p>
+  `;
 }
 
 function mapDetail(user: User): UserDetailDTO {
@@ -94,7 +114,10 @@ async function createUser(body: CreateUserBody): Promise<UserDetailDTO> {
     if (existingByPhone) throw AppError.conflict('Số điện thoại đã được sử dụng');
   }
 
-  const passwordHash = await bcrypt.hash(body.password, 10);
+  // Mật khẩu được gửi thẳng qua email cho user (plaintext) — bắt buộc đổi mật khẩu ngay khi đăng nhập
+  // lần đầu (đánh dấu qua hashPasswordRequiringChange, xem password.ts). Không gửi email thì giữ hành
+  // vi cũ, không bắt đổi.
+  const passwordHash = body.email ? await hashPasswordRequiringChange(body.password) : await hashPassword(body.password);
   const user = await userRepository.create({
     username: body.username,
     passwordHash,
@@ -104,6 +127,38 @@ async function createUser(body: CreateUserBody): Promise<UserDetailDTO> {
     phone: body.phone || null,
     status: 'ACTIVE',
   });
+
+  if (body.email) {
+    try {
+      await sendEmail(body.email, 'Tài khoản của bạn đã được tạo', buildAccountEmailHtml(body.username, body.password));
+    } catch (err) {
+      console.error('Gửi email thông báo tài khoản thất bại:', err);
+    }
+  }
+
+  return mapDetail(user);
+}
+
+// Admin đặt mật khẩu mới cho một user cụ thể — gửi email báo mật khẩu mới (nếu có email trên hồ sơ)
+// và bắt buộc đổi mật khẩu ở lần đăng nhập kế tiếp, cùng cơ chế với createUser (xem password.ts).
+async function resetUserPassword(userId: string, newPassword: string): Promise<UserDetailDTO> {
+  const existing = await userRepository.findById(userId);
+  if (!existing) throw AppError.notFound('Không tìm thấy người dùng');
+
+  const passwordHash = await hashPasswordRequiringChange(newPassword);
+  const user = await userRepository.updatePasswordHash(userId, passwordHash);
+
+  if (existing.email) {
+    try {
+      await sendEmail(
+        existing.email,
+        'Mật khẩu tài khoản của bạn đã được đặt lại',
+        buildPasswordResetEmailHtml(existing.username, newPassword),
+      );
+    } catch (err) {
+      console.error('Gửi email thông báo đặt lại mật khẩu thất bại:', err);
+    }
+  }
 
   return mapDetail(user);
 }
@@ -143,4 +198,5 @@ export const userService = {
   updateUserStatus,
   createUser,
   updateUser,
+  resetUserPassword,
 };

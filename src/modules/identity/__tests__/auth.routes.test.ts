@@ -70,6 +70,7 @@ describe('POST /api/v1/auth/login', () => {
       fullName: 'Project Manager',
       role: { roleId: 'role-manager', roleName: 'Manager' },
       status: 'active',
+      mustChangePassword: false,
     });
   });
 
@@ -98,11 +99,55 @@ describe('POST /api/v1/auth/login', () => {
     const res = await request(app).post('/api/v1/auth/login').send({ username: '' });
     expect(res.status).toBe(400);
   });
+
+  it('flags mustChangePassword when the stored hash was issued via reset/create-with-email', async () => {
+    const mustChangeHash = await bcrypt.hash(PLAIN_PASSWORD, 12);
+    mockedRepo.findByUsername.mockResolvedValue(baseUser({ passwordHash: mustChangeHash }));
+
+    const res = await request(app).post('/api/v1/auth/login').send({ username: 'manager', password: PLAIN_PASSWORD });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.mustChangePassword).toBe(true);
+  });
+});
+
+describe('mustChangePassword enforcement', () => {
+  it('blocks other authenticated routes with 403 until the password is changed', async () => {
+    const res = await request(app)
+      .get('/api/v1/users')
+      .set('Authorization', `Bearer ${jwt.sign({ id: 'u1', role: 'MANAGER', mustChangePassword: true }, env.JWT_SECRET, { expiresIn: '1h' })}`);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.details).toMatchObject({ code: 'MUST_CHANGE_PASSWORD' });
+  });
+
+  it('still allows PUT /auth/change-password while the flag is set', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser());
+    mockedRepo.updatePasswordHash.mockResolvedValue(baseUser());
+
+    const res = await request(app)
+      .put('/api/v1/auth/change-password')
+      .set('Authorization', `Bearer ${jwt.sign({ id: 'u1', role: 'MANAGER', mustChangePassword: true }, env.JWT_SECRET, { expiresIn: '1h' })}`)
+      .send({ oldPassword: PLAIN_PASSWORD, newPassword: 'newpass1', confirmNewPassword: 'newpass1' });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('still allows GET /auth/profile while the flag is set', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser());
+
+    const res = await request(app)
+      .get('/api/v1/auth/profile')
+      .set('Authorization', `Bearer ${jwt.sign({ id: 'u1', role: 'MANAGER', mustChangePassword: true }, env.JWT_SECRET, { expiresIn: '1h' })}`);
+
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('POST /api/v1/auth/forgot-password', () => {
   it('always returns 200 with null data, whether or not the account exists', async () => {
     mockedRepo.findByUsername.mockResolvedValueOnce(baseUser());
+    mockedRepo.updatePasswordHash.mockResolvedValueOnce(baseUser());
     const found = await request(app).post('/api/v1/auth/forgot-password').send({ username: 'manager' });
     expect(found.status).toBe(200);
     expect(found.body.data).toBeNull();
@@ -111,6 +156,16 @@ describe('POST /api/v1/auth/forgot-password', () => {
     const notFound = await request(app).post('/api/v1/auth/forgot-password').send({ username: 'ghost' });
     expect(notFound.status).toBe(200);
     expect(notFound.body.data).toBeNull();
+  });
+
+  it('emails a new password to the on-file address when the username exists', async () => {
+    mockedRepo.findByUsername.mockResolvedValue(baseUser());
+    mockedRepo.updatePasswordHash.mockResolvedValue(baseUser());
+
+    const res = await request(app).post('/api/v1/auth/forgot-password').send({ username: 'manager' });
+
+    expect(res.status).toBe(200);
+    expect(mockedRepo.updatePasswordHash).toHaveBeenCalledTimes(1);
   });
 });
 

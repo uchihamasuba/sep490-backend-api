@@ -50,7 +50,7 @@ describe('POST /api/v1/mobile/orders/:id/collected-reports', () => {
     expect(res.body.data).toMatchObject({ reportId: 'report-1', status: 'SUBMITTED' });
     expect(mockedInventoryService.createReport).toHaveBeenCalledWith(
       expect.objectContaining({ orderId: 'order-1', reportType: 'INTERNAL' }),
-      { id: 'leader-1', role: 'STAFF' },
+      { id: 'leader-1', role: 'STAFF', mustChangePassword: false },
     );
   });
 

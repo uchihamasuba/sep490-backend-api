@@ -22,6 +22,10 @@ jest.mock('bcrypt', () => ({
   hash: jest.fn().mockResolvedValue('hashed'),
 }));
 
+jest.mock('../../../utils/mailer', () => ({
+  sendEmail: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockedRepo = userRepository as jest.Mocked<typeof userRepository>;
 
 function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
@@ -276,6 +280,53 @@ describe('PATCH /api/v1/users/:userId/status', () => {
       .patch('/api/v1/users/leader-1/status')
       .set('Authorization', authHeader('MANAGER'))
       .send({ status: 'INACTIVE' });
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /api/v1/users/:userId/reset-password', () => {
+  it('resets the password and returns the mapped detail', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    mockedRepo.updatePasswordHash.mockResolvedValue(fakeUser());
+
+    const res = await request(app)
+      .post('/api/v1/users/leader-1/reset-password')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ newPassword: 'newpass1' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ userId: 'leader-1' });
+    expect(mockedRepo.updatePasswordHash).toHaveBeenCalledWith('leader-1', 'hashed');
+  });
+
+  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/v1/users/ghost/reset-password')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ newPassword: 'newpass1' });
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
+  });
+
+  it('rejects a password shorter than 6 characters with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/users/leader-1/reset-password')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ newPassword: '123' });
+
+    expect(res.status).toBe(400);
+    expect(mockedRepo.findById).not.toHaveBeenCalled();
+  });
+
+  it('is forbidden for non-admin roles', async () => {
+    const res = await request(app)
+      .post('/api/v1/users/leader-1/reset-password')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ newPassword: 'newpass1' });
+
     expect(res.status).toBe(403);
   });
 });

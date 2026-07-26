@@ -23,6 +23,10 @@ export const updateUserStatusBodySchema = z.object({
   status: userStatusEnum,
 });
 
+export const resetUserPasswordBodySchema = z.object({
+  newPassword: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
+});
+
 export const createUserBodySchema = z.object({
   username: z
     .string()
@@ -55,5 +59,6 @@ export const updateUserBodySchema = z.object({
 export type UserIdParam = z.infer<typeof userIdParamSchema>;
 export type ListUsersQuery = z.infer<typeof listUsersQuerySchema>;
 export type UpdateUserStatusBody = z.infer<typeof updateUserStatusBodySchema>;
+export type ResetUserPasswordBody = z.infer<typeof resetUserPasswordBodySchema>;
 export type CreateUserBody = z.infer<typeof createUserBodySchema>;
 export type UpdateUserBody = z.infer<typeof updateUserBodySchema>;

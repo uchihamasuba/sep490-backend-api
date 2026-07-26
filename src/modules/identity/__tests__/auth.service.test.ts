@@ -3,6 +3,7 @@ import type { User, UserRole, UserStatus } from '@prisma/client';
 import { userRepository } from '../user.repository';
 import { authService } from '../auth.service';
 import { sendEmail } from '../../../utils/mailer';
+import { passwordRequiresChange } from '../../../utils/password';
 import type { ChangePasswordBody, LoginBody, UpdateProfileBody } from '../auth.validators';
 
 jest.mock('../user.repository', () => ({
@@ -65,7 +66,17 @@ describe('authService.login', () => {
       fullName: 'Project Manager',
       role: { roleId: 'role-manager', roleName: 'Manager' },
       status: 'active',
+      mustChangePassword: false,
     });
+  });
+
+  it('flags mustChangePassword when the stored hash was issued via reset/create-with-email (higher bcrypt cost marker)', async () => {
+    const mustChangeHash = await bcrypt.hash(PLAIN_PASSWORD, 12);
+    mockedRepo.findByUsername.mockResolvedValue(baseUser({ passwordHash: mustChangeHash }));
+
+    const result = await authService.login({ username: 'manager', password: PLAIN_PASSWORD } as LoginBody);
+
+    expect(result.user.mustChangePassword).toBe(true);
   });
 
   it('maps STAFF role and SUSPENDED/INACTIVE status per the doc table', async () => {
@@ -102,12 +113,47 @@ describe('authService.login', () => {
 });
 
 describe('authService.forgotPassword', () => {
-  it('resolves without throwing whether or not the username exists (no enumeration)', async () => {
-    mockedRepo.findByUsername.mockResolvedValueOnce(baseUser());
+  beforeEach(() => {
+    mockedSendEmail.mockResolvedValue(undefined);
+  });
+
+  it('resolves without hashing/updating/emailing when the username does not exist (no enumeration)', async () => {
+    mockedRepo.findByUsername.mockResolvedValue(null);
+
+    await expect(authService.forgotPassword('ghost')).resolves.toBeUndefined();
+
+    expect(mockedRepo.updatePasswordHash).not.toHaveBeenCalled();
+    expect(mockedSendEmail).not.toHaveBeenCalled();
+  });
+
+  it('generates a new password, hashes it as must-change, stores it, and emails it to the on-file address', async () => {
+    mockedRepo.findByUsername.mockResolvedValue(baseUser());
+    mockedRepo.updatePasswordHash.mockResolvedValue(baseUser());
+
+    await authService.forgotPassword('manager');
+
+    expect(mockedRepo.updatePasswordHash).toHaveBeenCalledTimes(1);
+    const [userId, storedHash] = mockedRepo.updatePasswordHash.mock.calls[0];
+    expect(userId).toBe('u1');
+    expect(passwordRequiresChange(storedHash)).toBe(true);
+
+    expect(mockedSendEmail).toHaveBeenCalledTimes(1);
+    const [to, subject, html] = mockedSendEmail.mock.calls[0];
+    expect(to).toBe('manager@bnw.com');
+    expect(subject).toContain('Mật khẩu mới');
+
+    const newPasswordMatch = /<strong>([0-9a-f]+)<\/strong>/.exec(html);
+    expect(newPasswordMatch).not.toBeNull();
+    await expect(bcrypt.compare(newPasswordMatch![1], storedHash)).resolves.toBe(true);
+  });
+
+  it('finds the account but does nothing when it has no email on file', async () => {
+    mockedRepo.findByUsername.mockResolvedValue(baseUser({ email: null }));
+
     await expect(authService.forgotPassword('manager')).resolves.toBeUndefined();
 
-    mockedRepo.findByUsername.mockResolvedValueOnce(null);
-    await expect(authService.forgotPassword('ghost')).resolves.toBeUndefined();
+    expect(mockedRepo.updatePasswordHash).not.toHaveBeenCalled();
+    expect(mockedSendEmail).not.toHaveBeenCalled();
   });
 });
 
@@ -145,6 +191,9 @@ describe('authService.resetPassword', () => {
     const newPasswordMatch = /<strong>([0-9a-f]+)<\/strong>/.exec(html);
     expect(newPasswordMatch).not.toBeNull();
     await expect(bcrypt.compare(newPasswordMatch![1], storedHash)).resolves.toBe(true);
+
+    // Password reset must force a change on next login.
+    expect(passwordRequiresChange(storedHash)).toBe(true);
   });
 
   it('propagates the error when sending the reset email fails, after the password has already been updated', async () => {
@@ -253,5 +302,8 @@ describe('authService.changePassword', () => {
     expect(userId).toBe('u1');
     expect(storedHash).not.toBe(PASSWORD_HASH);
     await expect(bcrypt.compare('newpass1', storedHash)).resolves.toBe(true);
+
+    // A self-chosen password never carries the "must change" marker, even if the account had one before.
+    expect(passwordRequiresChange(storedHash)).toBe(false);
   });
 });
