@@ -249,6 +249,35 @@ describe('PUT /api/v1/auth/profile', () => {
     expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng bởi tài khoản khác');
     expect(mockedRepo.update).not.toHaveBeenCalled();
   });
+
+  it('updates the email successfully', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser());
+    mockedRepo.findByEmail.mockResolvedValue(null);
+    mockedRepo.update.mockResolvedValue(baseUser({ email: 'newemail@bnw.com' }));
+
+    const res = await request(app)
+      .put('/api/v1/auth/profile')
+      .set('Authorization', authHeaderFor())
+      .send({ email: 'newemail@bnw.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.email).toBe('newemail@bnw.com');
+    expect(mockedRepo.update).toHaveBeenCalledWith('u1', { email: 'newemail@bnw.com' });
+  });
+
+  it('returns 409 with a Vietnamese message when the new email is already used by another account', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser());
+    mockedRepo.findByEmail.mockResolvedValue(baseUser({ userId: 'someone-else' }));
+
+    const res = await request(app)
+      .put('/api/v1/auth/profile')
+      .set('Authorization', authHeaderFor())
+      .send({ email: 'taken@bnw.com' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.message).toBe('Email đã được sử dụng bởi tài khoản khác');
+    expect(mockedRepo.update).not.toHaveBeenCalled();
+  });
 });
 
 describe('PUT /api/v1/auth/change-password', () => {

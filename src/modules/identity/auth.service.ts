@@ -148,9 +148,17 @@ async function updateProfile(userId: string, body: UpdateProfileBody): Promise<A
     }
   }
 
+  if (body.email !== undefined && body.email !== existing.email) {
+    const emailOwner = await userRepository.findByEmail(body.email);
+    if (emailOwner && emailOwner.userId !== userId) {
+      throw AppError.conflict('Email đã được sử dụng bởi tài khoản khác');
+    }
+  }
+
   const data: Record<string, string> = {};
   if (body.fullName !== undefined) data.fullName = body.fullName;
   if (body.phone !== undefined) data.phone = body.phone;
+  if (body.email !== undefined) data.email = body.email;
   if (body.bio !== undefined) data.bio = body.bio;
   if (body.avatarUrl !== undefined) data.avatarUrl = body.avatarUrl;
 

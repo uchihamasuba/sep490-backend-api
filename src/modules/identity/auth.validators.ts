@@ -18,6 +18,7 @@ export const resetPasswordBodySchema = z.object({
 export const updateProfileBodySchema = z.object({
   fullName: z.string().trim().min(1, 'Họ tên không được để trống').optional(),
   phone: z.string().trim().min(1, 'Số điện thoại không được để trống').optional(),
+  email: z.string().trim().email('Email không đúng định dạng').optional(),
   bio: z.string().trim().optional(),
   avatarUrl: z.string().trim().optional(),
 });
