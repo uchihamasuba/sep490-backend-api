@@ -620,15 +620,25 @@ async function main(): Promise<void> {
   const supplierRows = await prisma.supplier.findMany();
   const suppliers: CreatedParty[] = supplierRows.map((s) => ({ id: s.supplierId, code: s.supplierCode, name: s.supplierName }));
   
-  const supplierItemsData: { supplierId: string; itemId: string }[] = [];
+  const supplierItemsData: { supplierId: string; itemId: string; suppliedPrice: number; isActive: boolean; minQuantity: number | null; supplierItemCode: string | null }[] = [];
   for (const supplier of suppliers) {
     // Pick 3-8 random items for each supplier to simulate many-to-many relationship
     const numItems = randomInt(3, 8);
     const assignedItems = sample(items, numItems);
     for (const item of assignedItems) {
+      // Mock some logical values for the new fields
+      const suppliedPrice = item.purchasePrice > 0 ? round2(item.purchasePrice * 0.8) : round2(item.rentalPrice * 0.5);
+      const isActive = Math.random() > 0.1; // 90% active
+      const minQuantity = item.bulk ? randomInt(10, 50) : (Math.random() > 0.5 ? randomInt(1, 5) : null);
+      const supplierItemCode = `SIC-${supplier.code}-${item.code}`;
+
       supplierItemsData.push({
         supplierId: supplier.id,
         itemId: item.itemId,
+        suppliedPrice,
+        isActive,
+        minQuantity,
+        supplierItemCode,
       });
     }
   }

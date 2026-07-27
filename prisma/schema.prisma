@@ -698,10 +698,14 @@ model SupplierTransactionItem {
 }
 
 model SupplierItem {
-  supplierId String   @map("supplier_id") @db.VarChar(36)
-  itemId     String   @map("item_id") @db.VarChar(36)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  supplierId       String   @map("supplier_id") @db.VarChar(36)
+  itemId           String   @map("item_id") @db.VarChar(36)
+  suppliedPrice    Decimal  @default(0) @map("supplied_price") @db.Decimal(14, 2)
+  isActive         Boolean  @default(true) @map("is_active")
+  minQuantity      Int?     @map("min_quantity")
+  supplierItemCode String?  @map("supplier_item_code") @db.VarChar(50)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   supplier Supplier @relation(fields: [supplierId], references: [supplierId], onDelete: Cascade)
   item     Item     @relation(fields: [itemId], references: [itemId], onDelete: Cascade)

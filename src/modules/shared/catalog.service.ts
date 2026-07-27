@@ -166,6 +166,10 @@ export interface ItemSupplierDetailsDTO {
   phone: string | null;
   email: string | null;
   address: string | null;
+  suppliedPrice: number;
+  isActive: boolean;
+  minQuantity: number | null;
+  supplierItemCode: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -185,6 +189,10 @@ async function getItemSuppliers(itemId: string): Promise<ItemSupplierDetailsDTO[
     phone: si.supplier.phone,
     email: si.supplier.email,
     address: si.supplier.address,
+    suppliedPrice: toNumber(si.suppliedPrice) || 0,
+    isActive: si.isActive,
+    minQuantity: si.minQuantity,
+    supplierItemCode: si.supplierItemCode,
     createdAt: si.createdAt.toISOString(),
     updatedAt: si.updatedAt.toISOString(),
   }));

@@ -182,6 +182,10 @@ describe('GET /api/v1/suppliers/:id/items', () => {
         itemId: 'i1',
         createdAt: new Date('2026-01-10T00:00:00Z'),
         updatedAt: new Date('2026-01-10T00:00:00Z'),
+        suppliedPrice: 100000,
+        isActive: true,
+        minQuantity: null,
+        supplierItemCode: 'CODE',
         item: {
           itemId: 'i1',
           itemCode: 'ITEM-01',

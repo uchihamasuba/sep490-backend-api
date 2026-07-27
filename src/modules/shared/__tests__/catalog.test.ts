@@ -168,6 +168,10 @@ describe('GET /api/v1/catalog/items/:itemId/suppliers', () => {
         supplierId: 'sup-1',
         createdAt: new Date('2026-07-27T00:00:00Z'),
         updatedAt: new Date('2026-07-27T00:00:00Z'),
+        suppliedPrice: 100000,
+        isActive: true,
+        minQuantity: null,
+        supplierItemCode: 'CODE',
         supplier: {
           supplierCode: 'SUP-001',
           supplierName: 'Nhà cung cấp A',

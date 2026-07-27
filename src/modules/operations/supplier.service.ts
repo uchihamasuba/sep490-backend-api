@@ -69,6 +69,10 @@ export interface SupplierItemDetailsDTO {
   typeId: string;
   rentalPrice: number;
   purchasePrice: number | null;
+  suppliedPrice: number;
+  isActive: boolean;
+  minQuantity: number | null;
+  supplierItemCode: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -260,6 +264,10 @@ async function getSupplierItems(supplierId: string): Promise<SupplierItemDetails
     typeId: si.item.typeId,
     rentalPrice: toNumber(si.item.rentalPrice),
     purchasePrice: si.item.purchasePrice ? toNumber(si.item.purchasePrice) : null,
+    suppliedPrice: toNumber(si.suppliedPrice),
+    isActive: si.isActive,
+    minQuantity: si.minQuantity,
+    supplierItemCode: si.supplierItemCode,
     createdAt: si.createdAt.toISOString(),
     updatedAt: si.updatedAt.toISOString(),
   }));
