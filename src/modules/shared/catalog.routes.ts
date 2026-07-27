@@ -34,6 +34,13 @@ router.get(
   asyncHandler(catalogController.getById),
 );
 
+router.get(
+  '/:itemId/suppliers',
+  requireRole('MANAGER', 'ADMIN'), // Based on supplier API requirements
+  validate(itemIdParamSchema, 'params'),
+  asyncHandler(catalogController.getSuppliers),
+);
+
 router.put(
   '/:itemId',
   requireRole('MANAGER'),

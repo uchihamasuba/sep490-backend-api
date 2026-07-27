@@ -46,6 +46,12 @@ async function updateStatus(req: Request, res: Response) {
   ok(res, item);
 }
 
+async function getSuppliers(req: Request, res: Response) {
+  const { itemId } = req.params as unknown as ItemIdParam;
+  const suppliers = await catalogService.getItemSuppliers(itemId);
+  ok(res, suppliers);
+}
+
 async function listCategories(req: Request, res: Response) {
   const query = req.query as unknown as ListCategoriesQuery;
   const result = await catalogService.listCategories(query);
@@ -77,6 +83,7 @@ export const catalogController = {
   getById,
   update,
   updateStatus,
+  getSuppliers,
   listCategories,
   createCategory,
   updateCategory,

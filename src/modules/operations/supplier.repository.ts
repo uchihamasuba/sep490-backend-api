@@ -59,6 +59,14 @@ export const supplierRepository = {
     });
   },
 
+  findSuppliersByItemId(itemId: string) {
+    return prisma.supplierItem.findMany({
+      where: { itemId },
+      include: { supplier: true },
+      orderBy: { supplier: { supplierName: 'asc' } },
+    });
+  },
+
   // debtBalance tính động, không lưu cột riêng — hướng khuyến nghị ở docs/api/supplier_api.md mục 3.1.
   async sumOutstandingBySupplierIds(supplierIds: string[]) {
     if (supplierIds.length === 0) return [];

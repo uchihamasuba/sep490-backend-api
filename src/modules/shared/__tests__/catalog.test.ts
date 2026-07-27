@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { app } from '../../../app';
 import { env } from '../../../config/env';
 import { catalogRepository } from '../catalog.repository';
+import { supplierRepository } from '../../operations/supplier.repository';
 
 jest.mock('../catalog.repository', () => ({
   catalogRepository: {
@@ -16,7 +17,14 @@ jest.mock('../catalog.repository', () => ({
   },
 }));
 
+jest.mock('../../operations/supplier.repository', () => ({
+  supplierRepository: {
+    findSuppliersByItemId: jest.fn(),
+  },
+}));
+
 const mockedRepo = catalogRepository as jest.Mocked<typeof catalogRepository>;
+const mockedSupplierRepo = supplierRepository as jest.Mocked<typeof supplierRepository>;
 
 function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
@@ -147,6 +155,49 @@ describe('GET /api/v1/catalog/items/:itemId', () => {
   it('returns 404 when the item does not exist', async () => {
     mockedRepo.findById.mockResolvedValue(null);
     const res = await request(app).get('/api/v1/catalog/items/missing').set('Authorization', authHeader());
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/v1/catalog/items/:itemId/suppliers', () => {
+  it('returns list of suppliers for an item', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedSupplierRepo.findSuppliersByItemId.mockResolvedValue([
+      {
+        itemId: 'item-1',
+        supplierId: 'sup-1',
+        createdAt: new Date('2026-07-27T00:00:00Z'),
+        updatedAt: new Date('2026-07-27T00:00:00Z'),
+        supplier: {
+          supplierCode: 'SUP-001',
+          supplierName: 'Nhà cung cấp A',
+          serviceType: 'Âm thanh',
+          phone: '0123456789',
+          email: null,
+          address: null,
+        }
+      }
+    ] as never);
+
+    const res = await request(app)
+      .get('/api/v1/catalog/items/item-1/suppliers')
+      .set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0]).toMatchObject({
+      itemId: 'item-1',
+      supplierId: 'sup-1',
+      supplierCode: 'SUP-001',
+      supplierName: 'Nhà cung cấp A',
+    });
+  });
+
+  it('returns 404 if item does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app)
+      .get('/api/v1/catalog/items/missing/suppliers')
+      .set('Authorization', authHeader());
     expect(res.status).toBe(404);
   });
 });

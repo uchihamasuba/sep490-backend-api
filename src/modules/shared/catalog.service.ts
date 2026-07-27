@@ -7,6 +7,7 @@ import {
   type CatalogItemWithType,
   type ItemTypeWithCategory,
 } from './catalog.repository';
+import { supplierRepository } from '../operations/supplier.repository';
 import type {
   CreateCatalogItemBody,
   CreateCategoryBody,
@@ -156,6 +157,39 @@ async function updateItemStatus(itemId: string, status: 'ACTIVE' | 'INACTIVE' | 
   return mapItem(updated);
 }
 
+export interface ItemSupplierDetailsDTO {
+  itemId: string;
+  supplierId: string;
+  supplierCode: string;
+  supplierName: string;
+  serviceType: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+async function getItemSuppliers(itemId: string): Promise<ItemSupplierDetailsDTO[]> {
+  const existing = await catalogRepository.findById(itemId);
+  if (!existing) throw AppError.notFound('Không tìm thấy thiết bị');
+
+  const supplierItems = await supplierRepository.findSuppliersByItemId(itemId);
+
+  return supplierItems.map((si) => ({
+    itemId: si.itemId,
+    supplierId: si.supplierId,
+    supplierCode: si.supplier.supplierCode,
+    supplierName: si.supplier.supplierName,
+    serviceType: si.supplier.serviceType,
+    phone: si.supplier.phone,
+    email: si.supplier.email,
+    address: si.supplier.address,
+    createdAt: si.createdAt.toISOString(),
+    updatedAt: si.updatedAt.toISOString(),
+  }));
+}
+
 export interface CategoryDTO {
   categoryId: string;
   categoryName: string;
@@ -268,6 +302,7 @@ export const catalogService = {
   getItemById,
   updateItem,
   updateItemStatus,
+  getItemSuppliers,
   listCategories,
   createCategory,
   updateCategory,
