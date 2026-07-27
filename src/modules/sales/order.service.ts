@@ -447,8 +447,8 @@ async function updateOrderQuotation(orderId: string, body: UpdateOrderQuotationB
   if (body.quotationId !== null) {
     const quotation = await quotationRepository.findById(body.quotationId);
     if (!quotation) throw AppError.notFound('Không tìm thấy báo giá');
-    if (quotation.status !== 'APPROVED') {
-      throw AppError.badRequest('Chỉ được liên kết báo giá đã ở trạng thái APPROVED');
+    if (quotation.status === 'REJECTED') {
+      throw AppError.badRequest('Không thể liên kết báo giá đã bị từ chối');
     }
     const linkedOrder = await quotationRepository.getLinkedOrderId(body.quotationId);
     if (linkedOrder && linkedOrder.orderId !== orderId) {
