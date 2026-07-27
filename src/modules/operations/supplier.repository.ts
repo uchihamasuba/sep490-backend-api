@@ -112,6 +112,12 @@ export const supplierRepository = {
     });
     return result._sum;
   },
+
+  async generateNextSupplierCode(): Promise<string> {
+    const count = await prisma.supplier.count();
+    const nextNumber = count + 1;
+    return `SUP-${nextNumber.toString().padStart(3, '0')}`;
+  },
 };
 
 export interface SupplierTransactionListFilter {

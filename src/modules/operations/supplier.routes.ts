@@ -40,6 +40,12 @@ supplierRouter.post(
 );
 
 supplierRouter.get(
+  '/next-code',
+  requireRole('MANAGER', 'ADMIN'),
+  asyncHandler(supplierController.getNextSupplierCode),
+);
+
+supplierRouter.get(
   '/:id',
   requireRole('MANAGER', 'ADMIN'),
   validate(supplierIdParamSchema, 'params'),

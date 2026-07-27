@@ -102,6 +102,11 @@ async function removeItem(req: Request, res: Response) {
   ok(res, { message: 'Đã bỏ gán mặt hàng' });
 }
 
+async function getNextSupplierCode(_req: Request, res: Response) {
+  const result = await supplierService.getNextSupplierCode();
+  ok(res, result);
+}
+
 export const supplierController = {
   list,
   create,
@@ -116,4 +121,5 @@ export const supplierController = {
   assignItem,
   updateItem,
   removeItem,
+  getNextSupplierCode,
 };

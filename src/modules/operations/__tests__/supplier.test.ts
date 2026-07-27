@@ -15,6 +15,7 @@ jest.mock('../supplier.repository', () => ({
     findItemsBySupplierId: jest.fn(),
     sumOutstandingBySupplierIds: jest.fn(),
     sumOutstandingForSupplier: jest.fn(),
+    generateNextSupplierCode: jest.fn(),
   },
   supplierTransactionRepository: {
     findMany: jest.fn(),
@@ -85,6 +86,23 @@ describe('GET /api/v1/suppliers', () => {
 
   it('rejects roles outside manager/admin with 403', async () => {
     const res = await request(app).get('/api/v1/suppliers').set('Authorization', authHeader('STAFF'));
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/v1/suppliers/next-code', () => {
+  it('returns the next supplier code generated from repository', async () => {
+    mockedSupplierRepo.generateNextSupplierCode.mockResolvedValue('SUP-005');
+
+    const res = await request(app).get('/api/v1/suppliers/next-code').set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ code: 'SUP-005' });
+    expect(mockedSupplierRepo.generateNextSupplierCode).toHaveBeenCalled();
+  });
+
+  it('rejects roles outside manager/admin with 403', async () => {
+    const res = await request(app).get('/api/v1/suppliers/next-code').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
   });
 });
@@ -240,6 +258,54 @@ describe('PUT /api/v1/suppliers/:id', () => {
       .set('Authorization', authHeader())
       .send({ status: 'INACTIVE' });
     expect(res.status).toBe(404);
+  });
+
+  it('throws CANNOT_DEACTIVATE_WITH_DEBT when setting status to INACTIVE with debt > 0', async () => {
+    mockedSupplierRepo.findById.mockResolvedValue(baseSupplier() as never);
+    mockedSupplierRepo.sumOutstandingForSupplier.mockResolvedValue({ estimatedCost: 5000000, depositAmount: 2000000 } as never);
+    // clear the update mock to ensure it's not called
+    mockedSupplierRepo.update.mockClear();
+
+    const res = await request(app)
+      .put('/api/v1/suppliers/s1')
+      .set('Authorization', authHeader())
+      .send({ status: 'INACTIVE' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('CANNOT_DEACTIVATE_WITH_DEBT');
+    expect(mockedSupplierRepo.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/v1/suppliers/:id/status', () => {
+  it('updates the status and returns mapped result', async () => {
+    mockedSupplierRepo.findById.mockResolvedValue(baseSupplier() as never);
+    mockedSupplierRepo.update.mockResolvedValue(baseSupplier({ status: 'INACTIVE' }) as never);
+    mockedSupplierRepo.sumOutstandingForSupplier.mockResolvedValue({ estimatedCost: 0, depositAmount: 0 } as never);
+
+    const res = await request(app)
+      .patch('/api/v1/suppliers/s1/status')
+      .set('Authorization', authHeader())
+      .send({ status: 'INACTIVE' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ status: 'INACTIVE' });
+    expect(mockedSupplierRepo.update).toHaveBeenCalledWith('s1', { status: 'INACTIVE' });
+  });
+
+  it('throws CANNOT_DEACTIVATE_WITH_DEBT when setting status to INACTIVE with debt > 0', async () => {
+    mockedSupplierRepo.findById.mockResolvedValue(baseSupplier() as never);
+    mockedSupplierRepo.sumOutstandingForSupplier.mockResolvedValue({ estimatedCost: 5000000, depositAmount: 2000000 } as never);
+    mockedSupplierRepo.update.mockClear();
+
+    const res = await request(app)
+      .patch('/api/v1/suppliers/s1/status')
+      .set('Authorization', authHeader())
+      .send({ status: 'INACTIVE' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('CANNOT_DEACTIVATE_WITH_DEBT');
+    expect(mockedSupplierRepo.update).not.toHaveBeenCalled();
   });
 });
 

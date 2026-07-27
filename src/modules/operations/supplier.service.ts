@@ -254,6 +254,13 @@ async function getSupplierById(supplierId: string): Promise<SupplierDTO> {
 async function updateSupplier(supplierId: string, body: UpdateSupplierBody): Promise<SupplierDTO> {
   await findSupplierOrThrow(supplierId);
 
+  if (body.status === 'INACTIVE') {
+    const sum = await supplierRepository.sumOutstandingForSupplier(supplierId);
+    if (computeDebtBalance(sum) > 0) {
+      throw new AppError(400, 'CANNOT_DEACTIVATE_WITH_DEBT', 'Không thể ngừng hoạt động nhà cung cấp đang có công nợ');
+    }
+  }
+
   const updated = await supplierRepository.update(supplierId, {
     ...(body.supplierName !== undefined ? { supplierName: body.supplierName } : {}),
     ...(body.serviceType !== undefined ? { serviceType: body.serviceType } : {}),
@@ -271,6 +278,14 @@ async function updateSupplier(supplierId: string, body: UpdateSupplierBody): Pro
 
 async function updateSupplierStatus(supplierId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<SupplierDTO> {
   await findSupplierOrThrow(supplierId);
+  
+  if (status === 'INACTIVE') {
+    const sum = await supplierRepository.sumOutstandingForSupplier(supplierId);
+    if (computeDebtBalance(sum) > 0) {
+      throw new AppError(400, 'CANNOT_DEACTIVATE_WITH_DEBT', 'Không thể ngừng hoạt động nhà cung cấp đang có công nợ');
+    }
+  }
+
   const updated = await supplierRepository.update(supplierId, { status });
   const sum = await supplierRepository.sumOutstandingForSupplier(supplierId);
   return mapSupplier(updated, computeDebtBalance(sum));
@@ -440,6 +455,11 @@ async function removeSupplierItem(supplierId: string, itemId: string): Promise<v
   await supplierRepository.removeItem(supplierId, itemId);
 }
 
+async function getNextSupplierCode(): Promise<{ code: string }> {
+  const code = await supplierRepository.generateNextSupplierCode();
+  return { code };
+}
+
 export const supplierService = {
   listSuppliers,
   createSupplier,
@@ -454,4 +474,5 @@ export const supplierService = {
   listSupplierTransactions,
   getSupplierTransactionById,
   receiveTransactionItem,
+  getNextSupplierCode,
 };
