@@ -99,6 +99,7 @@ const ALL_TABLES = [
   'item_types',
   'item_categories',
   'business_policies',
+  'supplier_items',
   'suppliers',
   'customers',
   'users',
@@ -618,7 +619,25 @@ async function main(): Promise<void> {
   });
   const supplierRows = await prisma.supplier.findMany();
   const suppliers: CreatedParty[] = supplierRows.map((s) => ({ id: s.supplierId, code: s.supplierCode, name: s.supplierName }));
-  console.log(`  - ${customers.length} customers, ${suppliers.length} suppliers`);
+  
+  const supplierItemsData: { supplierId: string; itemId: string }[] = [];
+  for (const supplier of suppliers) {
+    // Pick 3-8 random items for each supplier to simulate many-to-many relationship
+    const numItems = randomInt(3, 8);
+    const assignedItems = sample(items, numItems);
+    for (const item of assignedItems) {
+      supplierItemsData.push({
+        supplierId: supplier.id,
+        itemId: item.itemId,
+      });
+    }
+  }
+  await prisma.supplierItem.createMany({
+    data: supplierItemsData,
+    skipDuplicates: true, // Just in case
+  });
+
+  console.log(`  - ${customers.length} customers, ${suppliers.length} suppliers, ${supplierItemsData.length} supplier items`);
 
   // ==========================================================================
   // 5. EVIDENCE POOL (dùng chung cho schedule/attendance/survey/deposit/settlement)

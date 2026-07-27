@@ -263,6 +263,7 @@ model Supplier {
   updatedAt     DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   supplierTransactions SupplierTransaction[]
+  supplierItems        SupplierItem[]
 
   @@map("suppliers")
 }
@@ -341,6 +342,7 @@ model Item {
   collectedEquipmentReportItems CollectedEquipmentReportItem[]
   components                    ItemComponent[]                @relation("ParentItem")
   usedIn                        ItemComponent[]                @relation("ChildItem")
+  suppliers                     SupplierItem[]
 
   @@index([typeId], map: "idx_items_type")
   @@index([status], map: "idx_items_status")
@@ -693,6 +695,21 @@ model SupplierTransactionItem {
 
   @@index([transactionId], map: "idx_sup_txn_items_txn")
   @@map("supplier_transaction_items")
+}
+
+model SupplierItem {
+  supplierId String   @map("supplier_id") @db.VarChar(36)
+  itemId     String   @map("item_id") @db.VarChar(36)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  supplier Supplier @relation(fields: [supplierId], references: [supplierId], onDelete: Cascade)
+  item     Item     @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+
+  @@id([supplierId, itemId])
+  @@index([supplierId], map: "idx_supplier_items_supplier")
+  @@index([itemId], map: "idx_supplier_items_item")
+  @@map("supplier_items")
 }
 
 // ============================================================================
