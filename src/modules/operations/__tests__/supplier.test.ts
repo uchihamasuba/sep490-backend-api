@@ -12,6 +12,7 @@ jest.mock('../supplier.repository', () => ({
     findByCode: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    findItemsBySupplierId: jest.fn(),
     sumOutstandingBySupplierIds: jest.fn(),
     sumOutstandingForSupplier: jest.fn(),
   },
@@ -162,6 +163,47 @@ describe('GET /api/v1/suppliers/:id', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ supplierId: 's1', debtBalance: 0 });
+  });
+});
+
+describe('GET /api/v1/suppliers/:id/items', () => {
+  it('returns 404 when the supplier does not exist', async () => {
+    mockedSupplierRepo.findById.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/suppliers/missing/items').set('Authorization', authHeader());
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy nhà cung cấp');
+  });
+
+  it('returns the list of items for the supplier', async () => {
+    mockedSupplierRepo.findById.mockResolvedValue(baseSupplier() as never);
+    mockedSupplierRepo.findItemsBySupplierId.mockResolvedValue([
+      {
+        supplierId: 's1',
+        itemId: 'i1',
+        createdAt: new Date('2026-01-10T00:00:00Z'),
+        updatedAt: new Date('2026-01-10T00:00:00Z'),
+        item: {
+          itemId: 'i1',
+          itemCode: 'ITEM-01',
+          itemName: 'Speaker',
+          typeId: 't1',
+          rentalPrice: 1000,
+          purchasePrice: 2000,
+        }
+      }
+    ] as never);
+
+    const res = await request(app).get('/api/v1/suppliers/s1/items').set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0]).toMatchObject({
+      supplierId: 's1',
+      itemId: 'i1',
+      itemName: 'Speaker',
+      rentalPrice: 1000,
+      purchasePrice: 2000,
+    });
   });
 });
 

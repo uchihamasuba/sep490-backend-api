@@ -42,6 +42,13 @@ supplierRouter.get(
   asyncHandler(supplierController.getById),
 );
 
+supplierRouter.get(
+  '/:id/items',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(supplierIdParamSchema, 'params'),
+  asyncHandler(supplierController.getItems),
+);
+
 // Dùng chung cho Sửa và Khóa/Mở khóa — chỉ gửi { status } (docs/api/supplier_api.md mục 3, cột Thao tác).
 supplierRouter.put(
   '/:id',

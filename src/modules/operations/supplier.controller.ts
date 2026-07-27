@@ -38,6 +38,12 @@ async function update(req: Request, res: Response) {
   ok(res, supplier);
 }
 
+async function getItems(req: Request, res: Response) {
+  const { id } = req.params as unknown as SupplierIdParam;
+  const items = await supplierService.getSupplierItems(id);
+  ok(res, items);
+}
+
 async function listTransactions(req: Request, res: Response) {
   const query = req.query as unknown as ListSupplierTransactionsQuery;
   const result = await supplierService.listSupplierTransactions(query);
@@ -64,6 +70,7 @@ export const supplierController = {
   create,
   getById,
   update,
+  getItems,
   listTransactions,
   getTransactionById,
   receiveTransactionItem,

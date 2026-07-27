@@ -51,6 +51,14 @@ export const supplierRepository = {
     return prisma.supplier.update({ where: { supplierId }, data });
   },
 
+  findItemsBySupplierId(supplierId: string) {
+    return prisma.supplierItem.findMany({
+      where: { supplierId },
+      include: { item: true },
+      orderBy: { item: { itemName: 'asc' } },
+    });
+  },
+
   // debtBalance tính động, không lưu cột riêng — hướng khuyến nghị ở docs/api/supplier_api.md mục 3.1.
   async sumOutstandingBySupplierIds(supplierIds: string[]) {
     if (supplierIds.length === 0) return [];

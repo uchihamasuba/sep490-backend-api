@@ -61,6 +61,18 @@ export interface SupplierTransactionDTO {
   updatedAt: string;
 }
 
+export interface SupplierItemDetailsDTO {
+  supplierId: string;
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  typeId: string;
+  rentalPrice: number;
+  purchasePrice: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SupplierTransactionListResult {
   data: SupplierTransactionDTO[];
   meta: SupplierListMeta;
@@ -237,6 +249,22 @@ async function updateSupplier(supplierId: string, body: UpdateSupplierBody): Pro
   return mapSupplier(updated, computeDebtBalance(sum));
 }
 
+async function getSupplierItems(supplierId: string): Promise<SupplierItemDetailsDTO[]> {
+  await findSupplierOrThrow(supplierId);
+  const supplierItems = await supplierRepository.findItemsBySupplierId(supplierId);
+  return supplierItems.map((si) => ({
+    supplierId: si.supplierId,
+    itemId: si.itemId,
+    itemCode: si.item.itemCode,
+    itemName: si.item.itemName,
+    typeId: si.item.typeId,
+    rentalPrice: toNumber(si.item.rentalPrice),
+    purchasePrice: si.item.purchasePrice ? toNumber(si.item.purchasePrice) : null,
+    createdAt: si.createdAt.toISOString(),
+    updatedAt: si.updatedAt.toISOString(),
+  }));
+}
+
 async function listSupplierTransactions(query: ListSupplierTransactionsQuery): Promise<SupplierTransactionListResult> {
   const { page, limit } = query;
   const skip = (page - 1) * limit;
@@ -294,6 +322,7 @@ export const supplierService = {
   createSupplier,
   getSupplierById,
   updateSupplier,
+  getSupplierItems,
   listSupplierTransactions,
   getSupplierTransactionById,
   receiveTransactionItem,
