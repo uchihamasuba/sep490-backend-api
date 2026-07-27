@@ -11,6 +11,7 @@ import type {
   TransactionIdParam,
   TransactionItemParam,
   UpdateSupplierBody,
+  UpdateSupplierStatusBody,
 } from './supplier.validators';
 
 async function list(req: Request, res: Response) {
@@ -35,6 +36,13 @@ async function update(req: Request, res: Response) {
   const { id } = req.params as unknown as SupplierIdParam;
   const body = req.body as UpdateSupplierBody;
   const supplier = await supplierService.updateSupplier(id, body);
+  ok(res, supplier);
+}
+
+async function updateStatus(req: Request, res: Response) {
+  const { id } = req.params as unknown as SupplierIdParam;
+  const body = req.body as UpdateSupplierStatusBody;
+  const supplier = await supplierService.updateSupplierStatus(id, body.status);
   ok(res, supplier);
 }
 
@@ -70,6 +78,7 @@ export const supplierController = {
   create,
   getById,
   update,
+  updateStatus,
   getItems,
   listTransactions,
   getTransactionById,

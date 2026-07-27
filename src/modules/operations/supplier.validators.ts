@@ -44,6 +44,10 @@ export const updateSupplierBodySchema = z
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'Vui lòng cung cấp ít nhất một trường thông tin' });
 
+export const updateSupplierStatusBodySchema = z.object({
+  status: activeStatusEnum,
+});
+
 const supplierTransactionStatusEnum = z.enum(['PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], {
   message: 'status không hợp lệ',
 });
@@ -75,6 +79,7 @@ export type SupplierIdParam = z.infer<typeof supplierIdParamSchema>;
 export type ListSuppliersQuery = z.infer<typeof listSuppliersQuerySchema>;
 export type CreateSupplierBody = z.infer<typeof createSupplierBodySchema>;
 export type UpdateSupplierBody = z.infer<typeof updateSupplierBodySchema>;
+export type UpdateSupplierStatusBody = z.infer<typeof updateSupplierStatusBodySchema>;
 export type ListSupplierTransactionsQuery = z.infer<typeof listSupplierTransactionsQuerySchema>;
 export type TransactionIdParam = z.infer<typeof transactionIdParamSchema>;
 export type TransactionItemParam = z.infer<typeof transactionItemParamSchema>;

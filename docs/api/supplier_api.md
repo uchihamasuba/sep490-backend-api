@@ -136,7 +136,7 @@ thu `contactPerson` — field `AddSupplierModal.tsx` **có** thu và gửi lên 
 | Địa chỉ & phân loại | `address` (text tự do) + `serviceType` (text tự do, không có danh mục cố định — cả seed data lẫn form nhập đều là chuỗi tự do, ví dụ "Âm thanh biểu diễn", "Hoa tươi cắm tiệc") | `address?: string` (optional, khớp cách hiển thị), `serviceType: string` (bắt buộc, khớp). Không có bằng chứng nào cho thấy `serviceType` cần ràng buộc theo 1 danh mục enum cố định — giữ nguyên input tự do khi nối API thật, trừ khi Product muốn chuẩn hóa thành danh mục sau này. |
 | Dư nợ công nợ (số đỏ nổi bật nhất màn) | `debtBalance: number` — field lưu **trực tiếp** trên `AdminSupplier`, seed cứng lúc khởi tạo | **Không có field `debtBalance`/`totalDebt`/tương đương nào trên interface `Supplier` (`types/supplier.ts`)** — đây là gap quan trọng nhất của toàn màn hình vì đây chính là con số nổi bật nhất trên UI. Xem phân tích riêng ở mục 3.1 bên dưới — không thể chỉ thêm 1 cột đơn giản, cần quyết định kiến trúc (denormalize vs. tính động). |
 | Trạng thái | `status: SupplierStatus` (`ACTIVE`/`INACTIVE`) — badge chấm tròn xanh lá/xám | `status: SupplierStatus` — khớp 1:1. |
-| Thao tác (Xem / Sửa / Khóa-Mở khóa) | Xem → mở `SupplierDetailModal` (client, không gọi API); Sửa → mở form pre-fill, gọi `updateAdminSupplier`; Khóa/Mở khóa → `toggleAdminSupplierStatus` (đảo `ACTIVE`⇄`INACTIVE`), có `window.confirm` trước khi đổi | Xem chi tiết: nếu không cần gọi API riêng thì dùng thẳng object đã có trong danh sách (mục 4 — `SupplierDetailModal` cần thêm dữ liệu giao dịch/danh mục không có trên `Supplier` cơ bản, xem mục 4.1); Sửa + Khóa/Mở khóa: cùng đi qua `PUT /suppliers/:id` (`UpdateSupplierPayload.status`) — **không có endpoint khóa/mở khóa riêng** (đã ghi rõ trong comment `supplier.service.ts` dòng 17). Cần Backend xác nhận `PUT` có cho phép gửi **chỉ** `{status}` mà không kèm các field khác hay bắt buộc gửi đủ toàn bộ payload update. |
+| Thao tác (Xem / Sửa / Khóa-Mở khóa) | Xem → mở `SupplierDetailModal` (client, không gọi API); Sửa → mở form pre-fill, gọi `updateAdminSupplier`; Khóa/Mở khóa → `toggleAdminSupplierStatus` (đảo `ACTIVE`⇄`INACTIVE`), có `window.confirm` trước khi đổi | Xem chi tiết: nếu không cần gọi API riêng thì dùng thẳng object đã có trong danh sách; Sửa dùng `PUT /suppliers/:id`. Khóa/Mở khóa: dùng `PATCH /api/v1/suppliers/:id/status` chỉ nhận `{status}`. |
 
 ### 3.1. `debtBalance` — field hiển thị nổi bật nhất nhưng không có căn cứ trực tiếp trên `Supplier` — cần Backend/Product quyết định trước khi code
 
@@ -203,8 +203,7 @@ reports/debts).
 | *(không có trên form nào)* | `notes?: string` — tương tự `rating`, khai báo trên type nhưng chưa có UI nào dùng. |
 | *(không gửi, đúng)* | `email` — `AddSupplierModal.tsx` đã xác nhận `createSupplierSchema` thật **không** nhận field này dù model có cột `email` (mục 1.3) — 2 form inline hiện tại **không có input email** nên đã đúng ở điểm này, chỉ cần đảm bảo không vô tình thêm lại khi viết lại form theo `AddSupplierModal.tsx`. |
 
-Khóa/Mở khóa đối tác: gọi `PUT /api/v1/suppliers/:id` với `{ status: 'ACTIVE' | 'INACTIVE' }` (không có
-endpoint riêng — mục 3, cột Thao tác).
+Khóa/Mở khóa đối tác: gọi `PATCH /api/v1/suppliers/:id/status` với `{ status: 'ACTIVE' | 'INACTIVE' }` (đã tách endpoint riêng).
 
 ## 6. Tổng hợp endpoint cần cho màn này
 
@@ -229,9 +228,8 @@ API trước — mức độ ưu tiên/độ chắc chắn khác hẳn.
 - `POST /api/v1/suppliers` — **chưa tồn tại trên server thật (mục 6.0)**, chỉ có mock route tối thiểu;
   payload thật nên theo đúng field đã xác nhận ở `AddSupplierModal.tsx` (mục 5), không theo 2 form
   inline hiện tại (thiếu `contactPerson`).
-- `PUT /api/v1/suppliers/:id` — dùng chung cho Sửa **và** Khóa/Mở khóa (`UpdateSupplierPayload.status`)
-  — chưa test được vì `GET`/`POST` cùng nhóm đã 404 (mục 6.0); cần Backend xác nhận có cho phép gửi
-  partial body (chỉ `{status}`) hay bắt buộc full payload khi endpoint này được implement.
+- `PUT /api/v1/suppliers/:id` — dùng để sửa thông tin cơ bản.
+- `PATCH /api/v1/suppliers/:id/status` — dùng chuyên biệt để Khóa/Mở khóa đối tác.
 - `GET /api/v1/supplier-transactions?supplierId=X` — dùng cho khối "Lịch sử giao dịch" trong modal chi
   tiết (mục 4.1) — **cũng 404 trên server thật (mục 6.0)** dù đã có khai báo đầy đủ ở
   `procurementApiService.getTransactions`; enum `status` cũng cần đối chiếu lại DB thật trước khi hiển

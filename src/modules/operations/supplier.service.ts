@@ -253,6 +253,13 @@ async function updateSupplier(supplierId: string, body: UpdateSupplierBody): Pro
   return mapSupplier(updated, computeDebtBalance(sum));
 }
 
+async function updateSupplierStatus(supplierId: string, status: 'ACTIVE' | 'INACTIVE'): Promise<SupplierDTO> {
+  await findSupplierOrThrow(supplierId);
+  const updated = await supplierRepository.update(supplierId, { status });
+  const sum = await supplierRepository.sumOutstandingForSupplier(supplierId);
+  return mapSupplier(updated, computeDebtBalance(sum));
+}
+
 async function getSupplierItems(supplierId: string): Promise<SupplierItemDetailsDTO[]> {
   await findSupplierOrThrow(supplierId);
   const supplierItems = await supplierRepository.findItemsBySupplierId(supplierId);
@@ -330,6 +337,7 @@ export const supplierService = {
   createSupplier,
   getSupplierById,
   updateSupplier,
+  updateSupplierStatus,
   getSupplierItems,
   listSupplierTransactions,
   getSupplierTransactionById,

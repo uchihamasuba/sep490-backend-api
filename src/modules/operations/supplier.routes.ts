@@ -12,6 +12,7 @@ import {
   transactionIdParamSchema,
   transactionItemParamSchema,
   updateSupplierBodySchema,
+  updateSupplierStatusBodySchema,
 } from './supplier.validators';
 
 // Mounted at /api/v1/suppliers
@@ -56,6 +57,14 @@ supplierRouter.put(
   validate(supplierIdParamSchema, 'params'),
   validate(updateSupplierBodySchema, 'body'),
   asyncHandler(supplierController.update),
+);
+
+supplierRouter.patch(
+  '/:id/status',
+  requireRole('MANAGER'),
+  validate(supplierIdParamSchema, 'params'),
+  validate(updateSupplierStatusBodySchema, 'body'),
+  asyncHandler(supplierController.updateStatus),
 );
 
 // Mounted at /api/v1/supplier-transactions
