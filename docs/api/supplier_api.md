@@ -282,20 +282,6 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
   {
     "status": "success",
     "data": [
-### 6.1. API danh sách mặt hàng của NCC: `GET /api/v1/suppliers/:id/items`
-
-Được thêm vào để đáp ứng yêu cầu "hiển thị supplier nào sẽ có item gì" trong mục 4.1 (`catalogItems[]`).
-- **Endpoint**: `GET /api/v1/suppliers/:id/items`
-- **Method**: GET
-- **Auth**: Yêu cầu token hợp lệ, role `MANAGER` hoặc `ADMIN`.
-- **Request Params**:
-  - `id`: ID của supplier (chuỗi UUID).
-- **Response**: Trả về mảng các mặt hàng mà nhà cung cấp phân phối.
-  - Định dạng thành công (200 OK):
-  ```json
-  {
-    "status": "success",
-    "data": [
       {
         "supplierId": "uuid-của-supplier",
         "itemId": "uuid-của-item",
@@ -315,7 +301,6 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
   }
   ```
 - **Lưu ý triển khai**: Bảng trung gian `supplier_items(supplier_id, item_id, supplied_price, is_active, min_quantity, supplier_item_code, created_at, updated_at)` đã được thiết kế và thêm vào database thật. API này truy vấn từ bảng `supplier_items` và join sang `items` để lấy các chi tiết hiển thị cho front-end như `itemCode`, `itemName`, `typeId`, `rentalPrice`, `purchasePrice`. Trường cốt lõi nhất ở đây là `suppliedPrice` giúp Sale/Mua hàng cân nhắc chi phí.
-
 
 ### 6.2. API lấy danh sách nhà cung cấp theo mặt hàng: `GET /api/v1/catalog/items/:itemId/suppliers`
 
