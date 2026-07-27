@@ -230,6 +230,10 @@ API trước — mức độ ưu tiên/độ chắc chắn khác hẳn.
   inline hiện tại (thiếu `contactPerson`).
 - `PUT /api/v1/suppliers/:id` — dùng để sửa thông tin cơ bản.
 - `PATCH /api/v1/suppliers/:id/status` — dùng chuyên biệt để Khóa/Mở khóa đối tác.
+- `DELETE /api/v1/suppliers/:id` — dùng để xóa nhà cung cấp (chuyển trạng thái sang `INACTIVE` thay vì xóa cứng ở db).
+- `POST /api/v1/suppliers/:id/items` — gán một mặt hàng cho nhà cung cấp (thêm giá nhập `suppliedPrice`).
+- `PUT /api/v1/suppliers/:id/items/:itemId` — cập nhật giá nhập/số lượng tối thiểu/trạng thái cung cấp của mặt hàng.
+- `DELETE /api/v1/suppliers/:id/items/:itemId` — gỡ bỏ mặt hàng khỏi danh mục của nhà cung cấp (chuyển trạng thái `isActive` thành `false` thay vì xóa cứng).
 - `GET /api/v1/supplier-transactions?supplierId=X` — dùng cho khối "Lịch sử giao dịch" trong modal chi
   tiết (mục 4.1) — **cũng 404 trên server thật (mục 6.0)** dù đã có khai báo đầy đủ ở
   `procurementApiService.getTransactions`; enum `status` cũng cần đối chiếu lại DB thật trước khi hiển

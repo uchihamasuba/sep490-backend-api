@@ -4,6 +4,11 @@ export const supplierIdParamSchema = z.object({
   id: z.string().trim().min(1, 'Thiếu mã nhà cung cấp'),
 });
 
+export const supplierItemParamSchema = z.object({
+  id: z.string().trim().min(1, 'Thiếu mã nhà cung cấp'),
+  itemId: z.string().trim().min(1, 'Thiếu mã mặt hàng'),
+});
+
 const activeStatusEnum = z.enum(['ACTIVE', 'INACTIVE'], { message: 'status không hợp lệ, chỉ chấp nhận ACTIVE hoặc INACTIVE' });
 
 export const listSuppliersQuerySchema = z.object({
@@ -48,6 +53,21 @@ export const updateSupplierStatusBodySchema = z.object({
   status: activeStatusEnum,
 });
 
+export const assignSupplierItemBodySchema = z.object({
+  itemId: z.string().uuid('ID mặt hàng không hợp lệ'),
+  suppliedPrice: z.number().min(0, 'Giá cung cấp không được âm').default(0),
+  isActive: z.boolean().default(true),
+  minQuantity: z.number().int('Số lượng tối thiểu phải là số nguyên').min(0).nullable().optional(),
+  supplierItemCode: z.string().max(50, 'Mã mặt hàng NCC quá dài').nullable().optional(),
+});
+
+export const updateSupplierItemBodySchema = z.object({
+  suppliedPrice: z.number().min(0, 'Giá cung cấp không được âm').optional(),
+  isActive: z.boolean().optional(),
+  minQuantity: z.number().int('Số lượng tối thiểu phải là số nguyên').min(0).nullable().optional(),
+  supplierItemCode: z.string().max(50, 'Mã mặt hàng NCC quá dài').nullable().optional(),
+});
+
 const supplierTransactionStatusEnum = z.enum(['PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], {
   message: 'status không hợp lệ',
 });
@@ -80,7 +100,10 @@ export type ListSuppliersQuery = z.infer<typeof listSuppliersQuerySchema>;
 export type CreateSupplierBody = z.infer<typeof createSupplierBodySchema>;
 export type UpdateSupplierBody = z.infer<typeof updateSupplierBodySchema>;
 export type UpdateSupplierStatusBody = z.infer<typeof updateSupplierStatusBodySchema>;
+export type AssignSupplierItemBody = z.infer<typeof assignSupplierItemBodySchema>;
+export type UpdateSupplierItemBody = z.infer<typeof updateSupplierItemBodySchema>;
 export type ListSupplierTransactionsQuery = z.infer<typeof listSupplierTransactionsQuerySchema>;
 export type TransactionIdParam = z.infer<typeof transactionIdParamSchema>;
 export type TransactionItemParam = z.infer<typeof transactionItemParamSchema>;
 export type ReceiveTransactionItemBody = z.infer<typeof receiveTransactionItemBodySchema>;
+export type SupplierItemParam = z.infer<typeof supplierItemParamSchema>;

@@ -13,6 +13,8 @@ import type {
   ListSuppliersQuery,
   ReceiveTransactionItemBody,
   UpdateSupplierBody,
+  AssignSupplierItemBody,
+  UpdateSupplierItemBody,
 } from './supplier.validators';
 import type { Actor } from './schedule.service';
 
@@ -332,13 +334,109 @@ async function receiveTransactionItem(
   return mapTransactionItem(updated);
 }
 
+async function deleteSupplier(supplierId: string): Promise<void> {
+  const supplier = await supplierRepository.findById(supplierId);
+  if (!supplier) throw AppError.notFound('Không tìm thấy nhà cung cấp');
+
+  await supplierRepository.delete(supplierId);
+}
+
+async function assignItemToSupplier(supplierId: string, body: AssignSupplierItemBody): Promise<SupplierItemDetailsDTO> {
+  await findSupplierOrThrow(supplierId);
+
+  // Check if item exists in system
+  const { prisma } = require('../../db/prisma');
+  const item = await prisma.item.findUnique({ where: { itemId: body.itemId } });
+  if (!item) throw AppError.notFound('Không tìm thấy mặt hàng');
+
+  await supplierRepository.assignItem(supplierId, {
+    supplierId,
+    itemId: body.itemId,
+    suppliedPrice: body.suppliedPrice,
+    isActive: body.isActive,
+    minQuantity: body.minQuantity,
+    supplierItemCode: body.supplierItemCode,
+  });
+
+  const si = await prisma.supplierItem.findUnique({
+    where: { supplierId_itemId: { supplierId, itemId: body.itemId } },
+    include: { item: true },
+  });
+
+  return {
+    supplierId: si!.supplierId,
+    itemId: si!.itemId,
+    itemCode: si!.item.itemCode,
+    itemName: si!.item.itemName,
+    typeId: si!.item.typeId,
+    rentalPrice: toNumber(si!.item.rentalPrice),
+    purchasePrice: si!.item.purchasePrice ? toNumber(si!.item.purchasePrice) : null,
+    suppliedPrice: toNumber(si!.suppliedPrice),
+    isActive: si!.isActive,
+    minQuantity: si!.minQuantity,
+    supplierItemCode: si!.supplierItemCode,
+    createdAt: si!.createdAt.toISOString(),
+    updatedAt: si!.updatedAt.toISOString(),
+  };
+}
+
+async function updateSupplierItem(supplierId: string, itemId: string, body: UpdateSupplierItemBody): Promise<SupplierItemDetailsDTO> {
+  await findSupplierOrThrow(supplierId);
+  const { prisma } = require('../../db/prisma');
+  
+  const existing = await prisma.supplierItem.findUnique({ where: { supplierId_itemId: { supplierId, itemId } } });
+  if (!existing) throw AppError.notFound('Nhà cung cấp chưa được gán mặt hàng này');
+
+  await supplierRepository.updateItem(supplierId, itemId, {
+    suppliedPrice: body.suppliedPrice !== undefined ? body.suppliedPrice : undefined,
+    isActive: body.isActive !== undefined ? body.isActive : undefined,
+    minQuantity: body.minQuantity !== undefined ? body.minQuantity : undefined,
+    supplierItemCode: body.supplierItemCode !== undefined ? body.supplierItemCode : undefined,
+  });
+
+  const si = await prisma.supplierItem.findUnique({
+    where: { supplierId_itemId: { supplierId, itemId } },
+    include: { item: true },
+  });
+
+  return {
+    supplierId: si!.supplierId,
+    itemId: si!.itemId,
+    itemCode: si!.item.itemCode,
+    itemName: si!.item.itemName,
+    typeId: si!.item.typeId,
+    rentalPrice: toNumber(si!.item.rentalPrice),
+    purchasePrice: si!.item.purchasePrice ? toNumber(si!.item.purchasePrice) : null,
+    suppliedPrice: toNumber(si!.suppliedPrice),
+    isActive: si!.isActive,
+    minQuantity: si!.minQuantity,
+    supplierItemCode: si!.supplierItemCode,
+    createdAt: si!.createdAt.toISOString(),
+    updatedAt: si!.updatedAt.toISOString(),
+  };
+}
+
+async function removeSupplierItem(supplierId: string, itemId: string): Promise<void> {
+  await findSupplierOrThrow(supplierId);
+  const { prisma } = require('../../db/prisma');
+  
+  const existing = await prisma.supplierItem.findUnique({ where: { supplierId_itemId: { supplierId, itemId } } });
+  if (!existing) throw AppError.notFound('Nhà cung cấp chưa được gán mặt hàng này');
+
+  await supplierRepository.removeItem(supplierId, itemId);
+}
+
 export const supplierService = {
   listSuppliers,
   createSupplier,
   getSupplierById,
   updateSupplier,
   updateSupplierStatus,
+  deleteSupplier,
   getSupplierItems,
+  assignItemToSupplier,
+  updateSupplierItem,
+  removeSupplierItem,
   listSupplierTransactions,
   getSupplierTransactionById,
   receiveTransactionItem,

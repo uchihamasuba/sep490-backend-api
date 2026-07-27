@@ -12,6 +12,9 @@ import type {
   TransactionItemParam,
   UpdateSupplierBody,
   UpdateSupplierStatusBody,
+  AssignSupplierItemBody,
+  UpdateSupplierItemBody,
+  SupplierItemParam,
 } from './supplier.validators';
 
 async function list(req: Request, res: Response) {
@@ -73,6 +76,32 @@ async function receiveTransactionItem(req: Request, res: Response) {
   ok(res, item);
 }
 
+async function remove(req: Request, res: Response) {
+  const { id } = req.params as unknown as SupplierIdParam;
+  await supplierService.deleteSupplier(id);
+  ok(res, { message: 'Đã xóa nhà cung cấp' });
+}
+
+async function assignItem(req: Request, res: Response) {
+  const { id } = req.params as unknown as SupplierIdParam;
+  const body = req.body as AssignSupplierItemBody;
+  const item = await supplierService.assignItemToSupplier(id, body);
+  created(res, item);
+}
+
+async function updateItem(req: Request, res: Response) {
+  const { id, itemId } = req.params as unknown as SupplierItemParam;
+  const body = req.body as UpdateSupplierItemBody;
+  const item = await supplierService.updateSupplierItem(id, itemId, body);
+  ok(res, item);
+}
+
+async function removeItem(req: Request, res: Response) {
+  const { id, itemId } = req.params as unknown as SupplierItemParam;
+  await supplierService.removeSupplierItem(id, itemId);
+  ok(res, { message: 'Đã bỏ gán mặt hàng' });
+}
+
 export const supplierController = {
   list,
   create,
@@ -83,4 +112,8 @@ export const supplierController = {
   listTransactions,
   getTransactionById,
   receiveTransactionItem,
+  remove,
+  assignItem,
+  updateItem,
+  removeItem,
 };

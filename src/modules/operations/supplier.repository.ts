@@ -67,6 +67,34 @@ export const supplierRepository = {
     });
   },
 
+  delete(supplierId: string) {
+    return prisma.supplier.update({ where: { supplierId }, data: { status: 'INACTIVE' } });
+  },
+
+  assignItem(supplierId: string, data: Prisma.SupplierItemUncheckedCreateInput) {
+    return prisma.supplierItem.upsert({
+      where: {
+        supplierId_itemId: { supplierId, itemId: data.itemId },
+      },
+      update: data,
+      create: data,
+    });
+  },
+
+  updateItem(supplierId: string, itemId: string, data: Prisma.SupplierItemUpdateInput) {
+    return prisma.supplierItem.update({
+      where: { supplierId_itemId: { supplierId, itemId } },
+      data,
+    });
+  },
+
+  removeItem(supplierId: string, itemId: string) {
+    return prisma.supplierItem.update({
+      where: { supplierId_itemId: { supplierId, itemId } },
+      data: { isActive: false },
+    });
+  },
+
   // debtBalance tính động, không lưu cột riêng — hướng khuyến nghị ở docs/api/supplier_api.md mục 3.1.
   async sumOutstandingBySupplierIds(supplierIds: string[]) {
     if (supplierIds.length === 0) return [];
