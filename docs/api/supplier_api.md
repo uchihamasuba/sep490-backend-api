@@ -267,3 +267,33 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
 - Đối chiếu lại enum `status` giao dịch NCC với DB thật, thống nhất 1 bộ giá trị cho `SupplierDetailModal`
   + `purchase-orders` + `reports/debts` (mục 4.2).
 - Cân nhắc thêm UI phân trang nếu số NCC thực tế lớn (mục 2).
+
+### 6.1. API danh sách mặt hàng của NCC: `GET /api/v1/suppliers/:id/items`
+
+Được thêm vào để đáp ứng yêu cầu "hiển thị supplier nào sẽ có item gì" trong mục 4.1 (`catalogItems[]`).
+- **Endpoint**: `GET /api/v1/suppliers/:id/items`
+- **Method**: GET
+- **Auth**: Yêu cầu token hợp lệ, role `MANAGER` hoặc `ADMIN`.
+- **Request Params**:
+  - `id`: ID của supplier (chuỗi UUID).
+- **Response**: Trả về mảng các mặt hàng mà nhà cung cấp phân phối.
+  - Định dạng thành công (200 OK):
+  ```json
+  {
+    "status": "success",
+    "data": [
+      {
+        "supplierId": "uuid-của-supplier",
+        "itemId": "uuid-của-item",
+        "itemCode": "ITEM-001",
+        "itemName": "Loa âm thanh",
+        "typeId": "uuid-của-loại-thiết-bị",
+        "rentalPrice": 100000,
+        "purchasePrice": 200000,
+        "createdAt": "2026-07-27T10:00:00.000Z",
+        "updatedAt": "2026-07-27T10:00:00.000Z"
+      }
+    ]
+  }
+  ```
+- **Lưu ý triển khai**: Bảng trung gian `supplier_items(supplier_id, item_id, created_at, updated_at)` đã được thiết kế và thêm vào database thật. API này truy vấn từ bảng `supplier_items` và join sang `items` để lấy các chi tiết hiển thị cho front-end như `itemCode`, `itemName`, `typeId`, `rentalPrice`, `purchasePrice`.
