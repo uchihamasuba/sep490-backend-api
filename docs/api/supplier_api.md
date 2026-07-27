@@ -297,3 +297,34 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
   }
   ```
 - **Lưu ý triển khai**: Bảng trung gian `supplier_items(supplier_id, item_id, created_at, updated_at)` đã được thiết kế và thêm vào database thật. API này truy vấn từ bảng `supplier_items` và join sang `items` để lấy các chi tiết hiển thị cho front-end như `itemCode`, `itemName`, `typeId`, `rentalPrice`, `purchasePrice`.
+
+### 6.2. API lấy danh sách nhà cung cấp theo mặt hàng: `GET /api/v1/catalog/items/:itemId/suppliers`
+
+Được thêm vào để đáp ứng yêu cầu "lấy danh sách các nhà cung cấp đang cung cấp 1 item cụ thể" để từ trang chi tiết thiết bị có thể xem những ai đang cho thuê/bán món này.
+- **Endpoint**: `GET /api/v1/catalog/items/:itemId/suppliers`
+- **Method**: GET
+- **Auth**: Yêu cầu token hợp lệ, role `MANAGER` hoặc `ADMIN`.
+- **Request Params**:
+  - `itemId`: ID của mặt hàng/thiết bị (chuỗi UUID).
+- **Response**: Trả về mảng thông tin các nhà cung cấp phân phối mặt hàng này.
+  - Định dạng thành công (200 OK):
+  ```json
+  {
+    "status": "success",
+    "data": [
+      {
+        "itemId": "uuid-của-item",
+        "supplierId": "uuid-của-supplier",
+        "supplierCode": "SUP-001",
+        "supplierName": "Công ty TNHH Sự kiện",
+        "serviceType": "Âm thanh ánh sáng",
+        "phone": "0123456789",
+        "email": "contact@sukien.vn",
+        "address": "123 Đường A, Quận B",
+        "createdAt": "2026-07-27T10:00:00.000Z",
+        "updatedAt": "2026-07-27T10:00:00.000Z"
+      }
+    ]
+  }
+  ```
+- **Lưu ý triển khai**: API này query từ model `SupplierItem` (bảng trung gian) qua `supplierRepository.findSuppliersByItemId`, ánh xạ thông tin `Supplier` vào format DTO phẳng (`ItemSupplierDetailsDTO`) để dễ xử lý ở Front-end.
