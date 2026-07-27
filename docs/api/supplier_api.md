@@ -282,6 +282,20 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
   {
     "status": "success",
     "data": [
+### 6.1. API danh sách mặt hàng của NCC: `GET /api/v1/suppliers/:id/items`
+
+Được thêm vào để đáp ứng yêu cầu "hiển thị supplier nào sẽ có item gì" trong mục 4.1 (`catalogItems[]`).
+- **Endpoint**: `GET /api/v1/suppliers/:id/items`
+- **Method**: GET
+- **Auth**: Yêu cầu token hợp lệ, role `MANAGER` hoặc `ADMIN`.
+- **Request Params**:
+  - `id`: ID của supplier (chuỗi UUID).
+- **Response**: Trả về mảng các mặt hàng mà nhà cung cấp phân phối.
+  - Định dạng thành công (200 OK):
+  ```json
+  {
+    "status": "success",
+    "data": [
       {
         "supplierId": "uuid-của-supplier",
         "itemId": "uuid-của-item",
@@ -290,13 +304,18 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
         "typeId": "uuid-của-loại-thiết-bị",
         "rentalPrice": 100000,
         "purchasePrice": 200000,
+        "suppliedPrice": 150000,
+        "isActive": true,
+        "minQuantity": 10,
+        "supplierItemCode": "SIC-SUP-001",
         "createdAt": "2026-07-27T10:00:00.000Z",
         "updatedAt": "2026-07-27T10:00:00.000Z"
       }
     ]
   }
   ```
-- **Lưu ý triển khai**: Bảng trung gian `supplier_items(supplier_id, item_id, created_at, updated_at)` đã được thiết kế và thêm vào database thật. API này truy vấn từ bảng `supplier_items` và join sang `items` để lấy các chi tiết hiển thị cho front-end như `itemCode`, `itemName`, `typeId`, `rentalPrice`, `purchasePrice`.
+- **Lưu ý triển khai**: Bảng trung gian `supplier_items(supplier_id, item_id, supplied_price, is_active, min_quantity, supplier_item_code, created_at, updated_at)` đã được thiết kế và thêm vào database thật. API này truy vấn từ bảng `supplier_items` và join sang `items` để lấy các chi tiết hiển thị cho front-end như `itemCode`, `itemName`, `typeId`, `rentalPrice`, `purchasePrice`. Trường cốt lõi nhất ở đây là `suppliedPrice` giúp Sale/Mua hàng cân nhắc chi phí.
+
 
 ### 6.2. API lấy danh sách nhà cung cấp theo mặt hàng: `GET /api/v1/catalog/items/:itemId/suppliers`
 
@@ -321,6 +340,10 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
         "phone": "0123456789",
         "email": "contact@sukien.vn",
         "address": "123 Đường A, Quận B",
+        "suppliedPrice": 150000,
+        "isActive": true,
+        "minQuantity": 10,
+        "supplierItemCode": "SIC-SUP-001",
         "createdAt": "2026-07-27T10:00:00.000Z",
         "updatedAt": "2026-07-27T10:00:00.000Z"
       }
