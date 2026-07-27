@@ -98,8 +98,8 @@ async function getEmployeeById(userId: string): Promise<EmployeeDTO> {
 
 // Sinh username không trùng từ số điện thoại (đề xuất docs/api/admin_themnhansu_api.md mục 3.3) — thử
 // tối đa vài hậu tố trước khi rơi về hậu tố ngẫu nhiên, tránh vòng lặp vô hạn trong trường hợp hiếm.
-async function generateUniqueUsername(phone: string): Promise<string> {
-  const base = phone.replace(/\D/g, '') || 'nv';
+async function generateUniqueUsername(phone: string | undefined | null): Promise<string> {
+  const base = phone ? phone.replace(/\D/g, '') || 'nv' : 'nv';
   for (let attempt = 0; attempt < 5; attempt++) {
     const candidate = attempt === 0 ? base : `${base}${attempt}`;
     const existing = await employeeRepository.findByUsername(candidate);
@@ -126,7 +126,7 @@ async function createEmployee(body: CreateEmployeeBody): Promise<EmployeeCreated
 
   const [existingByEmail, existingByPhone] = await Promise.all([
     body.email ? employeeRepository.findByEmail(body.email) : Promise.resolve(null),
-    employeeRepository.findByPhone(body.phone),
+    body.phone ? employeeRepository.findByPhone(body.phone) : Promise.resolve(null),
   ]);
   if (existingByEmail) throw AppError.conflict('Email đã được sử dụng');
   if (existingByPhone) throw AppError.conflict('Số điện thoại đã được sử dụng');
@@ -160,7 +160,7 @@ async function inviteEmployee(body: InviteEmployeeBody): Promise<EmployeeInvited
 
   const [existingByEmail, existingByPhone] = await Promise.all([
     employeeRepository.findByEmail(body.email),
-    employeeRepository.findByPhone(body.phone),
+    body.phone ? employeeRepository.findByPhone(body.phone) : Promise.resolve(null),
   ]);
   if (existingByEmail) throw AppError.conflict('Email đã được sử dụng');
   if (existingByPhone) throw AppError.conflict('Số điện thoại đã được sử dụng');

@@ -113,7 +113,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF' });
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF' });
 
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ userId: 'u9', username: 'newuser' });
@@ -125,7 +125,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'leader1', password: '123456', fullName: 'New User', role: 'STAFF' });
+      .send({ username: 'leader1', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF' });
 
     expect(res.status).toBe(400);
     expect(res.body.error.message).toBe('Tên đăng nhập đã tồn tại');
@@ -151,7 +151,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF', phone: '0900000003' });
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF', phone: '0900000003' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
@@ -167,7 +167,7 @@ describe('POST /api/v1/users', () => {
     const res = await request(app)
       .post('/api/v1/users')
       .set('Authorization', authHeader('STAFF'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF' });
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF' });
     expect(res.status).toBe(403);
   });
 });
@@ -180,7 +180,7 @@ describe('PUT /api/v1/users/:userId', () => {
     const res = await request(app)
       .put('/api/v1/users/leader-1')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ fullName: 'Updated Name' });
+      .send({ fullName: 'Updated Name', email: 'test@example.com' });
 
     expect(res.status).toBe(200);
     expect(res.body.data.fullName).toBe('Updated Name');
@@ -192,7 +192,7 @@ describe('PUT /api/v1/users/:userId', () => {
     const res = await request(app)
       .put('/api/v1/users/ghost')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ fullName: 'Updated Name' });
+      .send({ fullName: 'Updated Name', email: 'test@example.com' });
 
     expect(res.status).toBe(404);
     expect(res.body.error.message).toBe('Không tìm thấy người dùng');
@@ -214,12 +214,13 @@ describe('PUT /api/v1/users/:userId', () => {
 
   it('rejects a duplicate phone (belonging to another account) with 409', async () => {
     mockedRepo.findById.mockResolvedValue(fakeUser());
+    mockedRepo.findByEmail.mockResolvedValue(null);
     mockedRepo.findByPhone.mockResolvedValue(fakeUser({ userId: 'someone-else' }));
 
     const res = await request(app)
       .put('/api/v1/users/leader-1')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ phone: '0911111111' });
+      .send({ phone: '0911111111', email: 'leader1@example.com' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');

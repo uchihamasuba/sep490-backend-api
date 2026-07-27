@@ -28,8 +28,8 @@ export const listEmployeesQuerySchema = z.object({
 
 export const createEmployeeBodySchema = z.object({
   name: z.string().trim().min(1, 'Vui lòng nhập họ tên'),
-  phone: z.string().trim().min(1, 'Vui lòng nhập số điện thoại'),
-  email: z.string().trim().email('Email không đúng định dạng').optional(),
+  phone: z.string().trim().optional(),
+  email: z.string().trim().min(1, 'Vui lòng nhập email').email('Email không đúng định dạng'),
   roleId: z.enum(jobTitleIds, { message: 'roleId không hợp lệ, vui lòng chọn vai trò chuyên môn hợp lệ' }),
   role: employeeAccountRoleEnum.default('STAFF'),
   status: employeeStatusEnum.default('ACTIVE'),
@@ -37,8 +37,8 @@ export const createEmployeeBodySchema = z.object({
 
 export const updateEmployeeBodySchema = z.object({
   name: z.string().trim().min(1, 'Vui lòng nhập họ tên'),
-  phone: z.string().trim().min(1, 'Vui lòng nhập số điện thoại'),
-  email: z.string().trim().email('Email không đúng định dạng').optional(),
+  phone: z.string().trim().optional(),
+  email: z.string().trim().min(1, 'Vui lòng nhập email').email('Email không đúng định dạng'),
   roleId: z.enum(jobTitleIds, { message: 'roleId không hợp lệ, vui lòng chọn vai trò chuyên môn hợp lệ' }),
   role: employeeAccountRoleEnum.optional(),
   status: employeeStatusEnum.optional(),
@@ -53,7 +53,7 @@ export const updateEmployeeStatusBodySchema = z.object({
 export const inviteEmployeeBodySchema = z.object({
   email: z.string().trim().min(1, 'Vui lòng nhập email').email('Email không đúng định dạng'),
   fullName: z.string().trim().min(1, 'Vui lòng nhập họ tên'),
-  phone: z.string().trim().min(1, 'Vui lòng nhập số điện thoại'),
+  phone: z.string().trim().optional(),
   roleId: z.enum(jobTitleIds, { message: 'roleId không hợp lệ, vui lòng chọn vai trò chuyên môn hợp lệ' }),
 });
 

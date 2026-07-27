@@ -36,7 +36,7 @@ export const createUserBodySchema = z.object({
   password: z.string().min(6, 'Mật khẩu phải có ít nhất 6 ký tự'),
   fullName: z.string().trim().min(1, 'Vui lòng nhập họ tên'),
   role: userRoleEnum,
-  email: z.string().email('Email không đúng định dạng').optional().or(z.literal('')),
+  email: z.string().trim().min(1, 'Vui lòng nhập email').email('Email không đúng định dạng'),
   phone: z
     .string()
     .regex(/^0[0-9]{9}$/, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0')
@@ -47,7 +47,7 @@ export const createUserBodySchema = z.object({
 export const updateUserBodySchema = z.object({
   fullName: z.string().trim().min(1, 'Họ tên không được để trống').optional(),
   role: userRoleEnum.optional(),
-  email: z.string().email('Email không đúng định dạng').nullable().optional().or(z.literal('')),
+  email: z.string().trim().min(1, 'Vui lòng nhập email').email('Email không đúng định dạng'),
   phone: z
     .string()
     .regex(/^0[0-9]{9}$/, 'Số điện thoại phải đủ 10 số và bắt đầu bằng số 0')

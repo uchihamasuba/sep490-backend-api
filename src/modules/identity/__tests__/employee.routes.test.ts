@@ -106,7 +106,7 @@ describe('POST /api/v1/employees', () => {
     const res = await request(app)
       .post('/api/v1/employees')
       .set('Authorization', authHeader())
-      .send({ name: 'Nguyen Van B', phone: '0912345678', roleId: 'ky-thuat' });
+      .send({ name: 'Nguyen Van B', email: 'test@example.com', phone: '0912345678', roleId: 'ky-thuat' });
 
     expect(res.status).toBe(201);
     expect(res.body.data).toMatchObject({ id: 'u2', employeeCode: 'NV002' });
@@ -120,7 +120,7 @@ describe('POST /api/v1/employees', () => {
     const res = await request(app)
       .post('/api/v1/employees')
       .set('Authorization', authHeader())
-      .send({ name: 'Nguyen Van B', phone: '0912345678', roleId: 'not-a-real-role' });
+      .send({ name: 'Nguyen Van B', email: 'test@example.com', phone: '0912345678', roleId: 'not-a-real-role' });
 
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
@@ -141,7 +141,7 @@ describe('POST /api/v1/employees', () => {
     const res = await request(app)
       .post('/api/v1/employees')
       .set('Authorization', authHeader())
-      .send({ name: 'Nguyen Van B', phone: '0912345678', roleId: 'ky-thuat' });
+      .send({ name: 'Nguyen Van B', email: 'test@example.com', phone: '0912345678', roleId: 'ky-thuat' });
 
     expect(res.status).toBe(409);
     expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
@@ -152,7 +152,7 @@ describe('POST /api/v1/employees', () => {
     const res = await request(app)
       .post('/api/v1/employees')
       .set('Authorization', authHeader('MANAGER'))
-      .send({ name: 'Nguyen Van B', phone: '0912345678', roleId: 'ky-thuat' });
+      .send({ name: 'Nguyen Van B', email: 'test@example.com', phone: '0912345678', roleId: 'ky-thuat' });
     expect(res.status).toBe(403);
   });
 });
@@ -235,7 +235,7 @@ describe('PUT /api/v1/employees/:id', () => {
     const res = await request(app)
       .put('/api/v1/employees/u1')
       .set('Authorization', authHeader())
-      .send({ name: 'Updated Name', phone: '0912345678', roleId: 'bep-truong' });
+      .send({ name: 'Updated Name', email: 'update@example.com', phone: '0912345678', roleId: 'bep-truong' });
 
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ name: 'Updated Name', role: { id: 'bep-truong', name: 'Bếp trưởng' } });
