@@ -197,8 +197,19 @@ export const supplierTransactionRepository = {
   },
 
   async generateNextTransactionCode(): Promise<string> {
-    const count = await prisma.supplierTransaction.count();
-    const nextNumber = count + 1;
+    const lastTx = await prisma.supplierTransaction.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { transactionCode: true }
+    });
+    
+    if (!lastTx || !lastTx.transactionCode.startsWith('STX-')) {
+      return 'STX-001';
+    }
+    
+    const match = lastTx.transactionCode.match(/STX-(\d+)/);
+    const lastNumber = match ? parseInt(match[1], 10) : 0;
+    const nextNumber = lastNumber + 1;
+    
     return `STX-${nextNumber.toString().padStart(3, '0')}`;
   },
 
