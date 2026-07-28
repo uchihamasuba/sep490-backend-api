@@ -16,6 +16,8 @@ import type {
   UpdateSupplierBody,
   AssignSupplierItemBody,
   UpdateSupplierItemBody,
+  CreateSupplierTransactionBody,
+  UpdateSupplierTransactionBody,
 } from './supplier.validators';
 import type { Actor } from './schedule.service';
 
@@ -71,8 +73,7 @@ export interface SupplierItemDetailsDTO {
   itemName: string;
   typeId: string;
   rentalPrice: number;
-  purchasePrice: number | null;
-  suppliedPrice: number;
+  purchasePrice: number;
   isActive: boolean;
   minQuantity: number | null;
   supplierItemCode: string | null;
@@ -308,9 +309,8 @@ async function getSupplierItems(supplierId: string, query: ListSupplierItemsQuer
     itemCode: si.item.itemCode,
     itemName: si.item.itemName,
     typeId: si.item.typeId,
-    rentalPrice: toNumber(si.item.rentalPrice),
-    purchasePrice: si.item.purchasePrice ? toNumber(si.item.purchasePrice) : null,
-    suppliedPrice: toNumber(si.suppliedPrice),
+    rentalPrice: toNumber(si.rentalPrice),
+    purchasePrice: toNumber(si.purchasePrice),
     isActive: si.isActive,
     minQuantity: si.minQuantity,
     supplierItemCode: si.supplierItemCode,
@@ -396,7 +396,8 @@ async function assignItemToSupplier(supplierId: string, body: AssignSupplierItem
   await supplierRepository.assignItem(supplierId, {
     supplierId,
     itemId: body.itemId,
-    suppliedPrice: body.suppliedPrice,
+    rentalPrice: body.rentalPrice,
+    purchasePrice: body.purchasePrice,
     isActive: body.isActive,
     minQuantity: body.minQuantity,
     supplierItemCode: body.supplierItemCode,
@@ -414,8 +415,7 @@ async function assignItemToSupplier(supplierId: string, body: AssignSupplierItem
     itemName: si!.item.itemName,
     typeId: si!.item.typeId,
     rentalPrice: toNumber(si!.item.rentalPrice),
-    purchasePrice: si!.item.purchasePrice ? toNumber(si!.item.purchasePrice) : null,
-    suppliedPrice: toNumber(si!.suppliedPrice),
+    purchasePrice: toNumber(si!.purchasePrice),
     isActive: si!.isActive,
     minQuantity: si!.minQuantity,
     supplierItemCode: si!.supplierItemCode,
@@ -432,7 +432,8 @@ async function updateSupplierItem(supplierId: string, itemId: string, body: Upda
   if (!existing) throw AppError.notFound('Nhà cung cấp chưa được gán mặt hàng này');
 
   await supplierRepository.updateItem(supplierId, itemId, {
-    suppliedPrice: body.suppliedPrice !== undefined ? body.suppliedPrice : undefined,
+    rentalPrice: body.rentalPrice !== undefined ? body.rentalPrice : undefined,
+    purchasePrice: body.purchasePrice !== undefined ? body.purchasePrice : undefined,
     isActive: body.isActive !== undefined ? body.isActive : undefined,
     minQuantity: body.minQuantity !== undefined ? body.minQuantity : undefined,
     supplierItemCode: body.supplierItemCode !== undefined ? body.supplierItemCode : undefined,
@@ -449,9 +450,8 @@ async function updateSupplierItem(supplierId: string, itemId: string, body: Upda
     itemCode: si!.item.itemCode,
     itemName: si!.item.itemName,
     typeId: si!.item.typeId,
-    rentalPrice: toNumber(si!.item.rentalPrice),
-    purchasePrice: si!.item.purchasePrice ? toNumber(si!.item.purchasePrice) : null,
-    suppliedPrice: toNumber(si!.suppliedPrice),
+    rentalPrice: toNumber(si!.rentalPrice),
+    purchasePrice: toNumber(si!.purchasePrice),
     isActive: si!.isActive,
     minQuantity: si!.minQuantity,
     supplierItemCode: si!.supplierItemCode,
@@ -475,10 +475,135 @@ async function getNextSupplierCode(): Promise<{ code: string }> {
   return { code };
 }
 
+async function createSupplierTransaction(body: CreateSupplierTransactionBody, actor: Actor): Promise<SupplierTransactionDetailDTO> {
+  const { prisma } = require('../../db/prisma');
+  
+  await findSupplierOrThrow(body.supplierId);
+  
+  const order = await prisma.order.findUnique({ where: { orderId: body.orderId } });
+  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
+  
+  await assertActorCanAccessTransaction(actor, body.orderId);
+
+  // Validate items
+  let estimatedCost = 0;
+  const itemsToCreate = [];
+
+  for (const itemInput of body.items) {
+    const supplierItem = await prisma.supplierItem.findUnique({
+      where: { supplierId_itemId: { supplierId: body.supplierId, itemId: itemInput.itemId } },
+      include: { item: true },
+    });
+
+    if (!supplierItem || !supplierItem.isActive) {
+      throw AppError.badRequest(`Hạng mục (itemId: ${itemInput.itemId}) không tồn tại hoặc đã ngừng cung cấp bởi nhà cung cấp này.`);
+    }
+
+    let unitCost = itemInput.unitCost;
+    if (unitCost === undefined) {
+      unitCost = body.transactionType === 'PURCHASE' ? toNumber(supplierItem.purchasePrice) : toNumber(supplierItem.rentalPrice);
+    }
+
+    const subtotal = itemInput.quantity * unitCost;
+    estimatedCost += subtotal;
+
+    itemsToCreate.push({
+      itemId: itemInput.itemId,
+      itemName: supplierItem.item.itemName,
+      quantity: itemInput.quantity,
+      unitCost,
+      subtotal,
+      notes: itemInput.notes,
+    });
+  }
+
+  const transactionCode = await supplierTransactionRepository.generateNextTransactionCode();
+
+  const transaction = await supplierTransactionRepository.createTransaction({
+    transactionCode,
+    supplierId: body.supplierId,
+    orderId: body.orderId,
+    transactionType: body.transactionType,
+    serviceTitle: body.serviceTitle,
+    estimatedCost,
+    depositAmount: body.depositAmount,
+    status: 'PENDING',
+    paymentStatus: 'UNPAID',
+  }, itemsToCreate);
+
+  return mapTransactionDetail(transaction!);
+}
+
+async function updateSupplierTransaction(transactionId: string, body: UpdateSupplierTransactionBody, actor: Actor): Promise<SupplierTransactionDetailDTO> {
+  const { prisma } = require('../../db/prisma');
+  const existingTx = await supplierTransactionRepository.findById(transactionId);
+  if (!existingTx) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
+
+  await assertActorCanAccessTransaction(actor, existingTx.orderId);
+
+  let estimatedCost = existingTx.estimatedCost;
+  let itemsToCreate: any[] | undefined = undefined;
+
+  if (body.items) {
+    estimatedCost = new (require('decimal.js').Decimal)(0);
+    itemsToCreate = [];
+
+    for (const itemInput of body.items) {
+      const supplierItem = await prisma.supplierItem.findUnique({
+        where: { supplierId_itemId: { supplierId: existingTx.supplierId, itemId: itemInput.itemId } },
+        include: { item: true },
+      });
+
+      if (!supplierItem || !supplierItem.isActive) {
+        throw AppError.badRequest(`Hạng mục (itemId: ${itemInput.itemId}) không tồn tại hoặc đã ngừng cung cấp bởi nhà cung cấp này.`);
+      }
+
+      let unitCost = itemInput.unitCost;
+      if (unitCost === undefined) {
+        unitCost = existingTx.transactionType === 'PURCHASE' ? toNumber(supplierItem.purchasePrice) : toNumber(supplierItem.rentalPrice);
+      }
+
+      const subtotal = itemInput.quantity * unitCost;
+      estimatedCost = estimatedCost.plus(subtotal);
+
+      itemsToCreate.push({
+        itemId: itemInput.itemId,
+        itemName: supplierItem.item.itemName,
+        quantity: itemInput.quantity,
+        unitCost,
+        subtotal,
+        notes: itemInput.notes,
+      });
+    }
+  }
+
+  const updateData: any = {};
+  if (body.serviceTitle !== undefined) updateData.serviceTitle = body.serviceTitle;
+  if (body.depositAmount !== undefined) updateData.depositAmount = body.depositAmount;
+  if (body.items) updateData.estimatedCost = estimatedCost;
+
+  const transaction = await supplierTransactionRepository.updateTransaction(transactionId, updateData, itemsToCreate);
+  return mapTransactionDetail(transaction!);
+}
+
+async function deleteSupplierTransaction(transactionId: string, actor: Actor): Promise<void> {
+  const existingTx = await supplierTransactionRepository.findById(transactionId);
+  if (!existingTx) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
+
+  await assertActorCanAccessTransaction(actor, existingTx.orderId);
+
+  if (existingTx.status !== 'PENDING') {
+    throw AppError.badRequest('Chỉ được xóa giao dịch ở trạng thái Chờ duyệt (PENDING). Vui lòng Hủy giao dịch nếu không còn sử dụng.');
+  }
+
+  await supplierTransactionRepository.deleteTransaction(transactionId);
+}
+
+
 export const supplierService = {
+  getSupplierById,
   listSuppliers,
   createSupplier,
-  getSupplierById,
   updateSupplier,
   updateSupplierStatus,
   deleteSupplier,
@@ -486,8 +611,11 @@ export const supplierService = {
   assignItemToSupplier,
   updateSupplierItem,
   removeSupplierItem,
+  getNextSupplierCode,
   listSupplierTransactions,
   getSupplierTransactionById,
   receiveTransactionItem,
-  getNextSupplierCode,
+  createSupplierTransaction,
+  updateSupplierTransaction,
+  deleteSupplierTransaction,
 };

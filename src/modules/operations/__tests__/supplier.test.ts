@@ -201,7 +201,8 @@ describe('GET /api/v1/suppliers/:id/items', () => {
           itemId: 'i1',
           createdAt: new Date('2026-01-10T00:00:00Z'),
           updatedAt: new Date('2026-01-10T00:00:00Z'),
-          suppliedPrice: 100000,
+          rentalPrice: 50000,
+          purchasePrice: 100000,
           isActive: true,
           minQuantity: null,
           supplierItemCode: 'CODE',
@@ -210,8 +211,8 @@ describe('GET /api/v1/suppliers/:id/items', () => {
             itemCode: 'ITEM-01',
             itemName: 'Speaker',
             typeId: 't1',
-            rentalPrice: 1000,
-            purchasePrice: 2000,
+            rentalPrice: 50000,
+            purchasePrice: 100000,
           }
         }
       ],
@@ -226,8 +227,8 @@ describe('GET /api/v1/suppliers/:id/items', () => {
       supplierId: 's1',
       itemId: 'i1',
       itemName: 'Speaker',
-      rentalPrice: 1000,
-      purchasePrice: 2000,
+      rentalPrice: 50000,
+      purchasePrice: 100000,
     });
   });
 });

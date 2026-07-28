@@ -702,7 +702,8 @@ model SupplierTransactionItem {
 model SupplierItem {
   supplierId       String   @map("supplier_id") @db.VarChar(36)
   itemId           String   @map("item_id") @db.VarChar(36)
-  suppliedPrice    Decimal  @default(0) @map("supplied_price") @db.Decimal(14, 2)
+  rentalPrice      Decimal  @default(0) @map("rental_price") @db.Decimal(14, 2)
+  purchasePrice    Decimal  @default(0) @map("purchase_price") @db.Decimal(14, 2)
   isActive         Boolean  @default(true) @map("is_active")
   minQuantity      Int?     @map("min_quantity")
   supplierItemCode String?  @map("supplier_item_code") @db.VarChar(50)

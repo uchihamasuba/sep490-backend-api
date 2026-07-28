@@ -16,6 +16,8 @@ import type {
   AssignSupplierItemBody,
   UpdateSupplierItemBody,
   SupplierItemParam,
+  CreateSupplierTransactionBody,
+  UpdateSupplierTransactionBody,
 } from './supplier.validators';
 
 async function list(req: Request, res: Response) {
@@ -109,6 +111,28 @@ async function getNextSupplierCode(_req: Request, res: Response) {
   ok(res, result);
 }
 
+async function createTransaction(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const body = req.body as CreateSupplierTransactionBody;
+  const transaction = await supplierService.createSupplierTransaction(body, req.user);
+  created(res, transaction);
+}
+
+async function updateTransaction(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as unknown as TransactionIdParam;
+  const body = req.body as UpdateSupplierTransactionBody;
+  const transaction = await supplierService.updateSupplierTransaction(id, body, req.user);
+  ok(res, transaction);
+}
+
+async function deleteTransaction(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as unknown as TransactionIdParam;
+  await supplierService.deleteSupplierTransaction(id, req.user);
+  ok(res, { message: 'Đã xóa giao dịch nhà cung cấp' });
+}
+
 export const supplierController = {
   list,
   create,
@@ -124,4 +148,7 @@ export const supplierController = {
   updateItem,
   removeItem,
   getNextSupplierCode,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction,
 };

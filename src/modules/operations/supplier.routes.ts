@@ -16,6 +16,8 @@ import {
   assignSupplierItemBodySchema,
   updateSupplierItemBodySchema,
   supplierItemParamSchema,
+  createSupplierTransactionBodySchema,
+  updateSupplierTransactionBodySchema,
 } from './supplier.validators';
 
 // Mounted at /api/v1/suppliers
@@ -137,4 +139,26 @@ supplierTransactionRouter.patch(
   validate(transactionItemParamSchema, 'params'),
   validate(receiveTransactionItemBodySchema, 'body'),
   asyncHandler(supplierController.receiveTransactionItem),
+);
+
+supplierTransactionRouter.post(
+  '/',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(createSupplierTransactionBodySchema, 'body'),
+  asyncHandler(supplierController.createTransaction),
+);
+
+supplierTransactionRouter.put(
+  '/:id',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(transactionIdParamSchema, 'params'),
+  validate(updateSupplierTransactionBodySchema, 'body'),
+  asyncHandler(supplierController.updateTransaction),
+);
+
+supplierTransactionRouter.delete(
+  '/:id',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(transactionIdParamSchema, 'params'),
+  asyncHandler(supplierController.deleteTransaction),
 );

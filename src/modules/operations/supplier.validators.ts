@@ -19,6 +19,7 @@ export const listSuppliersQuerySchema = z.object({
 });
 
 export const listSupplierItemsQuerySchema = z.object({
+  search: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
@@ -58,14 +59,16 @@ export const updateSupplierStatusBodySchema = z.object({
 
 export const assignSupplierItemBodySchema = z.object({
   itemId: z.string().uuid('ID mặt hàng không hợp lệ'),
-  suppliedPrice: z.number().min(0, 'Giá cung cấp không được âm').default(0),
+  rentalPrice: z.number().min(0, 'Giá thuê không được âm').default(0),
+  purchasePrice: z.number().min(0, 'Giá mua không được âm').default(0),
   isActive: z.boolean().default(true),
   minQuantity: z.number().int('Số lượng tối thiểu phải là số nguyên').min(0).nullable().optional(),
   supplierItemCode: z.string().max(50, 'Mã mặt hàng NCC quá dài').nullable().optional(),
 });
 
 export const updateSupplierItemBodySchema = z.object({
-  suppliedPrice: z.number().min(0, 'Giá cung cấp không được âm').optional(),
+  rentalPrice: z.number().min(0, 'Giá thuê không được âm').optional(),
+  purchasePrice: z.number().min(0, 'Giá mua không được âm').optional(),
   isActive: z.boolean().optional(),
   minQuantity: z.number().int('Số lượng tối thiểu phải là số nguyên').min(0).nullable().optional(),
   supplierItemCode: z.string().max(50, 'Mã mặt hàng NCC quá dài').nullable().optional(),
@@ -82,6 +85,30 @@ export const listSupplierTransactionsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
+
+const supplierTransactionTypeEnum = z.enum(['PURCHASE', 'RENTAL'], { message: 'Loại giao dịch không hợp lệ' });
+
+const transactionItemInputSchema = z.object({
+  itemId: z.string().trim().min(1, 'Thiếu mã hàng hóa'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
+  unitCost: z.coerce.number().nonnegative('Đơn giá phải >= 0').optional(),
+  notes: z.string().trim().optional(),
+});
+
+export const createSupplierTransactionBodySchema = z.object({
+  supplierId: z.string().trim().min(1, 'Thiếu mã nhà cung cấp'),
+  orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
+  transactionType: supplierTransactionTypeEnum,
+  serviceTitle: z.string().trim().min(1, 'Thiếu tiêu đề dịch vụ'),
+  depositAmount: z.coerce.number().nonnegative('Tiền cọc không được âm').default(0),
+  items: z.array(transactionItemInputSchema).min(1, 'Phải có ít nhất 1 hàng hóa'),
+});
+
+export const updateSupplierTransactionBodySchema = z.object({
+  serviceTitle: z.string().trim().min(1, 'Thiếu tiêu đề dịch vụ').optional(),
+  depositAmount: z.coerce.number().nonnegative('Tiền cọc không được âm').optional(),
+  items: z.array(transactionItemInputSchema).min(1, 'Phải có ít nhất 1 hàng hóa').optional(),
+}).refine((data) => Object.keys(data).length > 0, { message: 'Vui lòng cung cấp ít nhất một trường thông tin' });
 
 export const transactionIdParamSchema = z.object({
   id: z.string().trim().min(1, 'Thiếu mã giao dịch'),
@@ -111,3 +138,5 @@ export type TransactionIdParam = z.infer<typeof transactionIdParamSchema>;
 export type TransactionItemParam = z.infer<typeof transactionItemParamSchema>;
 export type ReceiveTransactionItemBody = z.infer<typeof receiveTransactionItemBodySchema>;
 export type SupplierItemParam = z.infer<typeof supplierItemParamSchema>;
+export type CreateSupplierTransactionBody = z.infer<typeof createSupplierTransactionBodySchema>;
+export type UpdateSupplierTransactionBody = z.infer<typeof updateSupplierTransactionBodySchema>;

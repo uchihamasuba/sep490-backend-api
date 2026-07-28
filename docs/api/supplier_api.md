@@ -231,7 +231,7 @@ API trước — mức độ ưu tiên/độ chắc chắn khác hẳn.
 - `PUT /api/v1/suppliers/:id` — dùng để sửa thông tin cơ bản.
 - `PATCH /api/v1/suppliers/:id/status` — dùng chuyên biệt để Khóa/Mở khóa đối tác.
 - `DELETE /api/v1/suppliers/:id` — dùng để xóa nhà cung cấp (chuyển trạng thái sang `INACTIVE` thay vì xóa cứng ở db).
-- `POST /api/v1/suppliers/:id/items` — gán một mặt hàng cho nhà cung cấp (thêm giá nhập `suppliedPrice`).
+- `POST /api/v1/suppliers/:id/items` — gán một mặt hàng cho nhà cung cấp (thêm giá nhập `rentalPrice`).
 - `PUT /api/v1/suppliers/:id/items/:itemId` — cập nhật giá nhập/số lượng tối thiểu/trạng thái cung cấp của mặt hàng.
 - `DELETE /api/v1/suppliers/:id/items/:itemId` — gỡ bỏ mặt hàng khỏi danh mục của nhà cung cấp (chuyển trạng thái `isActive` thành `false` thay vì xóa cứng).
 - `GET /api/v1/supplier-transactions?supplierId=X` — dùng cho khối "Lịch sử giao dịch" trong modal chi
@@ -292,7 +292,7 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
         "typeId": "uuid-của-loại-thiết-bị",
         "rentalPrice": 100000,
         "purchasePrice": 200000,
-        "suppliedPrice": 150000,
+        "rentalPrice": 150000,
         "isActive": true,
         "minQuantity": 10,
         "supplierItemCode": "SIC-SUP-001",
@@ -302,7 +302,7 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
     ]
   }
   ```
-- **Lưu ý triển khai**: Bảng trung gian `supplier_items(supplier_id, item_id, supplied_price, is_active, min_quantity, supplier_item_code, created_at, updated_at)` đã được thiết kế và thêm vào database thật. API này truy vấn từ bảng `supplier_items` và join sang `items` để lấy các chi tiết hiển thị cho front-end như `itemCode`, `itemName`, `typeId`, `rentalPrice`, `purchasePrice`. Trường cốt lõi nhất ở đây là `suppliedPrice` giúp Sale/Mua hàng cân nhắc chi phí.
+- **Lưu ý triển khai**: Bảng trung gian `supplier_items(supplier_id, item_id, supplied_price, is_active, min_quantity, supplier_item_code, created_at, updated_at)` đã được thiết kế và thêm vào database thật. API này truy vấn từ bảng `supplier_items` và join sang `items` để lấy các chi tiết hiển thị cho front-end như `itemCode`, `itemName`, `typeId`, `rentalPrice`, `purchasePrice`. Trường cốt lõi nhất ở đây là `rentalPrice` giúp Sale/Mua hàng cân nhắc chi phí.
 
 ### 6.2. API lấy danh sách nhà cung cấp theo mặt hàng: `GET /api/v1/catalog/items/:itemId/suppliers`
 
@@ -327,7 +327,7 @@ Cần Backend/Product xác nhận thêm (chưa có endpoint/field nào tương �
         "phone": "0123456789",
         "email": "contact@sukien.vn",
         "address": "123 Đường A, Quận B",
-        "suppliedPrice": 150000,
+        "rentalPrice": 150000,
         "isActive": true,
         "minQuantity": 10,
         "supplierItemCode": "SIC-SUP-001",

@@ -51,16 +51,23 @@ export const supplierRepository = {
     return prisma.supplier.update({ where: { supplierId }, data });
   },
 
-  async findItemsBySupplierId(supplierId: string, skip?: number, take?: number) {
+  async findItemsBySupplierId(supplierId: string, skip?: number, take?: number, search?: string) {
+    const whereClause: Prisma.SupplierItemWhereInput = { supplierId };
+    if (search) {
+      whereClause.OR = [
+        { item: { itemName: { contains: search } } },
+        { supplierItemCode: { contains: search } },
+      ];
+    }
     const [rows, totalItems] = await Promise.all([
       prisma.supplierItem.findMany({
-        where: { supplierId },
+        where: whereClause,
         include: { item: true },
         orderBy: { item: { itemName: 'asc' } },
         skip,
         take,
       }),
-      prisma.supplierItem.count({ where: { supplierId } }),
+      prisma.supplierItem.count({ where: whereClause }),
     ]);
     return { rows, totalItems };
   },
@@ -187,6 +194,51 @@ export const supplierTransactionRepository = {
 
   updateItemReceivedQuantity(stItemId: string, receivedQuantity: number) {
     return prisma.supplierTransactionItem.update({ where: { stItemId }, data: { receivedQuantity } });
+  },
+
+  async generateNextTransactionCode(): Promise<string> {
+    const count = await prisma.supplierTransaction.count();
+    const nextNumber = count + 1;
+    return `STX-${nextNumber.toString().padStart(3, '0')}`;
+  },
+
+  async createTransaction(
+    data: Prisma.SupplierTransactionUncheckedCreateInput,
+    items: Omit<Prisma.SupplierTransactionItemUncheckedCreateInput, 'transactionId'>[]
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const transaction = await tx.supplierTransaction.create({ data });
+      const itemsToCreate = items.map((item) => ({ ...item, transactionId: transaction.transactionId }));
+      await tx.supplierTransactionItem.createMany({ data: itemsToCreate });
+      return tx.supplierTransaction.findUnique({
+        where: { transactionId: transaction.transactionId },
+        include: transactionDetailInclude,
+      });
+    });
+  },
+
+  async updateTransaction(
+    transactionId: string,
+    data: Prisma.SupplierTransactionUncheckedUpdateInput,
+    items?: Omit<Prisma.SupplierTransactionItemUncheckedCreateInput, 'transactionId'>[]
+  ) {
+    return prisma.$transaction(async (tx) => {
+      await tx.supplierTransaction.update({ where: { transactionId }, data });
+      if (items && items.length > 0) {
+        await tx.supplierTransactionItem.deleteMany({ where: { transactionId } });
+        const itemsToCreate = items.map((item) => ({ ...item, transactionId }));
+        await tx.supplierTransactionItem.createMany({ data: itemsToCreate });
+      }
+      return tx.supplierTransaction.findUnique({
+        where: { transactionId },
+        include: transactionDetailInclude,
+      });
+    });
+  },
+
+  async deleteTransaction(transactionId: string) {
+    // cascade delete items as per schema
+    return prisma.supplierTransaction.delete({ where: { transactionId } });
   },
 
 };

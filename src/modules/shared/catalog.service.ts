@@ -166,7 +166,8 @@ export interface ItemSupplierDetailsDTO {
   phone: string | null;
   email: string | null;
   address: string | null;
-  suppliedPrice: number;
+  rentalPrice: number;
+  purchasePrice: number;
   isActive: boolean;
   minQuantity: number | null;
   supplierItemCode: string | null;
@@ -189,7 +190,8 @@ async function getItemSuppliers(itemId: string): Promise<ItemSupplierDetailsDTO[
     phone: si.supplier.phone,
     email: si.supplier.email,
     address: si.supplier.address,
-    suppliedPrice: toNumber(si.suppliedPrice) || 0,
+    rentalPrice: toNumber(si.rentalPrice) || 0,
+    purchasePrice: toNumber(si.purchasePrice) || 0,
     isActive: si.isActive,
     minQuantity: si.minQuantity,
     supplierItemCode: si.supplierItemCode,
