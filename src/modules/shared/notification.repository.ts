@@ -19,8 +19,17 @@ export const notificationRepository = {
     return prisma.user.findUnique({ where: { userId }, select: { deviceToken: true } });
   },
 
-  findNotificationsByUserId(userId: string) {
-    return prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
+  async findNotificationsByUserId(userId: string, skip?: number, take?: number) {
+    const [rows, totalItems] = await Promise.all([
+      prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.notification.count({ where: { userId } }),
+    ]);
+    return { rows, totalItems };
   },
 
   findById(notificationId: string) {

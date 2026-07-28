@@ -176,29 +176,32 @@ describe('orderService.getOrderSurvey', () => {
 describe('orderService.getOrderDeposits / getOrderSettlement', () => {
   it('maps deposits list', async () => {
     mockedOrderRepo.findById.mockResolvedValue(buildOrderRow() as never);
-    mockedOrderRepo.findDeposits.mockResolvedValue([
-      {
-        depositId: 'dep-1',
-        depositCode: 'DEP-001',
-        orderId: 'ord-1',
-        amount: 800000,
-        dueDate: null,
-        paymentDate: null,
-        paymentMethod: null,
-        qrCodeUrl: null,
-        status: 'UNPAID',
-        evidenceId: null,
-        requestedBy: 'user-1',
-        approvedBy: null,
-        approvedAt: null,
-        notes: null,
-        createdAt: new Date('2026-07-01T00:00:00Z'),
-        updatedAt: new Date('2026-07-01T00:00:00Z'),
-      },
-    ] as never);
+    mockedOrderRepo.findDeposits.mockResolvedValue({
+      rows: [
+        {
+          depositId: 'dep-1',
+          depositCode: 'DEP-001',
+          orderId: 'ord-1',
+          amount: 800000,
+          status: 'UNPAID',
+          dueDate: null,
+          paymentDate: null,
+          paymentMethod: null,
+          qrCodeUrl: null,
+          evidenceId: null,
+          requestedBy: 'user-1',
+          approvedBy: null,
+          approvedAt: null,
+          notes: null,
+          createdAt: new Date('2026-07-01T00:00:00Z'),
+          updatedAt: new Date('2026-07-01T00:00:00Z'),
+        },
+      ],
+      totalItems: 1,
+    } as never);
 
-    const result = await orderService.getOrderDeposits('ord-1');
-    expect(result).toEqual([expect.objectContaining({ depositId: 'dep-1', amount: 800000, status: 'UNPAID' })]);
+    const result = await orderService.getOrderDeposits('ord-1', { page: 1, limit: 10 });
+    expect(result.data).toEqual([expect.objectContaining({ depositId: 'dep-1', amount: 800000, status: 'UNPAID' })]);
   });
 
   it('returns null settlement when none exists', async () => {

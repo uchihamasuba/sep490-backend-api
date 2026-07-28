@@ -194,26 +194,29 @@ describe('GET /api/v1/suppliers/:id/items', () => {
 
   it('returns the list of items for the supplier', async () => {
     mockedSupplierRepo.findById.mockResolvedValue(baseSupplier() as never);
-    mockedSupplierRepo.findItemsBySupplierId.mockResolvedValue([
-      {
-        supplierId: 's1',
-        itemId: 'i1',
-        createdAt: new Date('2026-01-10T00:00:00Z'),
-        updatedAt: new Date('2026-01-10T00:00:00Z'),
-        suppliedPrice: 100000,
-        isActive: true,
-        minQuantity: null,
-        supplierItemCode: 'CODE',
-        item: {
+    mockedSupplierRepo.findItemsBySupplierId.mockResolvedValue({
+      rows: [
+        {
+          supplierId: 's1',
           itemId: 'i1',
-          itemCode: 'ITEM-01',
-          itemName: 'Speaker',
-          typeId: 't1',
-          rentalPrice: 1000,
-          purchasePrice: 2000,
+          createdAt: new Date('2026-01-10T00:00:00Z'),
+          updatedAt: new Date('2026-01-10T00:00:00Z'),
+          suppliedPrice: 100000,
+          isActive: true,
+          minQuantity: null,
+          supplierItemCode: 'CODE',
+          item: {
+            itemId: 'i1',
+            itemCode: 'ITEM-01',
+            itemName: 'Speaker',
+            typeId: 't1',
+            rentalPrice: 1000,
+            purchasePrice: 2000,
+          }
         }
-      }
-    ] as never);
+      ],
+      totalItems: 1
+    } as never);
 
     const res = await request(app).get('/api/v1/suppliers/s1/items').set('Authorization', authHeader());
 

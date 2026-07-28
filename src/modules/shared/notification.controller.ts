@@ -2,7 +2,12 @@ import type { Request, Response } from 'express';
 import { AppError } from '../../utils/AppError';
 import { created, ok } from '../../utils/response';
 import { notificationService } from './notification.service';
-import type { NotificationIdParam, RegisterDeviceTokenBody, SendNotificationBody } from './notification.validators';
+import type {
+  ListNotificationsQuery,
+  NotificationIdParam,
+  RegisterDeviceTokenBody,
+  SendNotificationBody,
+} from './notification.validators';
 
 async function testSendNotification(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
@@ -17,8 +22,9 @@ async function testSendNotification(req: Request, res: Response) {
 
 async function getMyNotifications(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
-  const notifications = await notificationService.getUserNotifications(req.user.id);
-  ok(res, notifications);
+  const query = req.query as unknown as ListNotificationsQuery;
+  const result = await notificationService.getUserNotifications(req.user.id, query);
+  ok(res, result.data, result.meta);
 }
 
 async function markNotificationAsRead(req: Request, res: Response) {

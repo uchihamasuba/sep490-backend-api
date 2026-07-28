@@ -230,8 +230,12 @@ export const orderRepository = {
     });
   },
 
-  findDeposits(orderId: string) {
-    return prisma.deposit.findMany({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+  async findDeposits(orderId: string, skip?: number, take?: number) {
+    const [rows, totalItems] = await Promise.all([
+      prisma.deposit.findMany({ where: { orderId }, orderBy: { createdAt: 'desc' }, skip, take }),
+      prisma.deposit.count({ where: { orderId } }),
+    ]);
+    return { rows, totalItems };
   },
 
   createDeposit(data: {

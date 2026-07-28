@@ -11,6 +11,7 @@ import type {
   CreateSupplierBody,
   ListSupplierTransactionsQuery,
   ListSuppliersQuery,
+  ListSupplierItemsQuery,
   ReceiveTransactionItemBody,
   UpdateSupplierBody,
   AssignSupplierItemBody,
@@ -291,10 +292,17 @@ async function updateSupplierStatus(supplierId: string, status: 'ACTIVE' | 'INAC
   return mapSupplier(updated, computeDebtBalance(sum));
 }
 
-async function getSupplierItems(supplierId: string): Promise<SupplierItemDetailsDTO[]> {
+async function getSupplierItems(supplierId: string, query: ListSupplierItemsQuery) {
   await findSupplierOrThrow(supplierId);
-  const supplierItems = await supplierRepository.findItemsBySupplierId(supplierId);
-  return supplierItems.map((si) => ({
+  
+  const paginated = query.page !== undefined || query.limit !== undefined;
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 500;
+  const skip = paginated ? (page - 1) * limit : undefined;
+  const take = paginated ? limit : undefined;
+
+  const { rows, totalItems } = await supplierRepository.findItemsBySupplierId(supplierId, skip, take);
+  const data = rows.map((si) => ({
     supplierId: si.supplierId,
     itemId: si.itemId,
     itemCode: si.item.itemCode,
@@ -309,6 +317,13 @@ async function getSupplierItems(supplierId: string): Promise<SupplierItemDetails
     createdAt: si.createdAt.toISOString(),
     updatedAt: si.updatedAt.toISOString(),
   }));
+
+  return {
+    data,
+    meta: paginated
+      ? { page, limit, totalItems, totalPages: Math.ceil(totalItems / limit) }
+      : { page: null, limit: null, totalItems, totalPages: null },
+  };
 }
 
 async function listSupplierTransactions(query: ListSupplierTransactionsQuery): Promise<SupplierTransactionListResult> {

@@ -11,6 +11,7 @@ import type {
   CreateSettlementBody,
   ExportEquipmentBody,
   ListOrdersQuery,
+  ListOrderDepositsQuery,
   ListPicklistsQuery,
   OrderIdParam,
   OrderItemIdParam,
@@ -73,8 +74,9 @@ async function survey(req: Request, res: Response) {
 
 async function deposits(req: Request, res: Response) {
   const { orderId } = req.params as unknown as OrderIdParam;
-  const result = await orderService.getOrderDeposits(orderId);
-  ok(res, result);
+  const query = req.query as unknown as ListOrderDepositsQuery;
+  const result = await orderService.getOrderDeposits(orderId, query);
+  ok(res, result.data, result.meta);
 }
 
 async function settlement(req: Request, res: Response) {

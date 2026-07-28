@@ -210,24 +210,28 @@ export const scheduleRepository = {
     return prisma.schedulePlanAssignee.delete({ where: { planId_userId: { planId, userId } } });
   },
 
-  checkIn(assigneeId: string, checkInEvidenceId?: string) {
+  checkIn(assigneeId: string, checkInEvidenceId?: string, latitude?: number, longitude?: number) {
     return prisma.attendance.upsert({
       where: { assigneeId },
-      create: { assigneeId, checkInAt: new Date(), checkInEvidenceId },
-      update: { checkInAt: new Date(), checkInEvidenceId },
+      create: { assigneeId, checkInAt: new Date(), checkInEvidenceId, latitude, longitude },
+      update: { checkInAt: new Date(), checkInEvidenceId, latitude, longitude },
     });
   },
 
-  checkOut(assigneeId: string) {
-    return prisma.attendance.update({ where: { assigneeId }, data: { checkOutAt: new Date() } });
+  checkOut(assigneeId: string, latitude?: number, longitude?: number) {
+    return prisma.attendance.update({ where: { assigneeId }, data: { checkOutAt: new Date(), latitude, longitude } });
   },
 
   attachEvidence(planId: string, evidenceId: string) {
     return prisma.schedulePlan.update({ where: { planId }, data: { evidenceId } });
   },
 
-  listWorkTasks() {
-    return prisma.workTask.findMany({ where: { isActive: true }, orderBy: { taskName: 'asc' } });
+  async listWorkTasks(skip?: number, take?: number) {
+    const [rows, totalItems] = await Promise.all([
+      prisma.workTask.findMany({ where: { isActive: true }, orderBy: { taskName: 'asc' }, skip, take }),
+      prisma.workTask.count({ where: { isActive: true } }),
+    ]);
+    return { rows, totalItems };
   },
 
   delete(planId: string) {

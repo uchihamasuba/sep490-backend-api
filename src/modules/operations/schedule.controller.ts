@@ -8,9 +8,11 @@ import type {
   AttachEvidenceBody,
   BatchUpdateSchedulePlanStatusBody,
   CheckInBody,
+  CheckOutBody,
   CreateSchedulePlanBody,
   CreateSchedulePlansBatchBody,
   ListSchedulePlansQuery,
+  ListWorkTasksQuery,
   PlanIdParam,
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
@@ -73,14 +75,15 @@ async function checkIn(req: Request, res: Response) {
   const actor = requireActor(req);
   const { planId, userId } = req.params as unknown as AssigneeParam;
   const body = req.body as CheckInBody;
-  const plan = await scheduleService.checkIn(planId, userId, actor, body.checkInEvidenceId);
+  const plan = await scheduleService.checkIn(planId, userId, actor, body.checkInEvidenceId, body.latitude, body.longitude);
   ok(res, plan);
 }
 
 async function checkOut(req: Request, res: Response) {
   const actor = requireActor(req);
   const { planId, userId } = req.params as unknown as AssigneeParam;
-  const plan = await scheduleService.checkOut(planId, userId, actor);
+  const body = req.body as CheckOutBody;
+  const plan = await scheduleService.checkOut(planId, userId, actor, body.latitude, body.longitude);
   ok(res, plan);
 }
 
@@ -92,9 +95,10 @@ async function attachEvidence(req: Request, res: Response) {
   ok(res, plan);
 }
 
-async function listWorkTasks(_req: Request, res: Response) {
-  const tasks = await scheduleService.listWorkTasks();
-  ok(res, tasks);
+async function listWorkTasks(req: Request, res: Response) {
+  const query = req.query as unknown as ListWorkTasksQuery;
+  const result = await scheduleService.listWorkTasks(query);
+  ok(res, result.data, result.meta);
 }
 
 async function remove(req: Request, res: Response) {

@@ -51,12 +51,18 @@ export const supplierRepository = {
     return prisma.supplier.update({ where: { supplierId }, data });
   },
 
-  findItemsBySupplierId(supplierId: string) {
-    return prisma.supplierItem.findMany({
-      where: { supplierId },
-      include: { item: true },
-      orderBy: { item: { itemName: 'asc' } },
-    });
+  async findItemsBySupplierId(supplierId: string, skip?: number, take?: number) {
+    const [rows, totalItems] = await Promise.all([
+      prisma.supplierItem.findMany({
+        where: { supplierId },
+        include: { item: true },
+        orderBy: { item: { itemName: 'asc' } },
+        skip,
+        take,
+      }),
+      prisma.supplierItem.count({ where: { supplierId } }),
+    ]);
+    return { rows, totalItems };
   },
 
   findSuppliersByItemId(itemId: string) {

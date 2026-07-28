@@ -573,6 +573,8 @@ model Attendance {
   checkInAt         DateTime? @map("check_in_at") @db.Timestamp(0)
   checkInEvidenceId String?   @map("check_in_evidence_id") @db.VarChar(36)
   checkOutAt        DateTime? @map("check_out_at") @db.Timestamp(0)
+  latitude          Float?    @db.Float
+  longitude         Float?    @db.Float
   note              String?   @db.Text
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)

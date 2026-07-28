@@ -8,6 +8,7 @@ import type {
   CreateSchedulePlanBody,
   CreateSchedulePlansBatchBody,
   ListSchedulePlansQuery,
+  ListWorkTasksQuery,
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
   WarehouseMovementBody,
@@ -28,6 +29,8 @@ export interface AssigneeDTO {
   // docs/api/api.md gap (p) — Staff app cần đọc lại ảnh check-in đã chụp; FE tự gọi thêm
   // GET /evidence/:id với giá trị này để lấy fileUrl.
   checkInEvidenceId: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface SchedulePlanDTO {
@@ -71,7 +74,7 @@ function mapAssignee(a: {
   userId: string;
   role: PlanMemberRole;
   user: { fullName: string; phone: string | null };
-  attendance: { checkInAt: Date | null; checkOutAt: Date | null; checkInEvidenceId: string | null } | null;
+  attendance: { checkInAt: Date | null; checkOutAt: Date | null; checkInEvidenceId: string | null; latitude: number | null; longitude: number | null } | null;
 }): AssigneeDTO {
   return {
     userId: a.userId,
@@ -81,6 +84,8 @@ function mapAssignee(a: {
     checkInAt: a.attendance?.checkInAt ? a.attendance.checkInAt.toISOString() : null,
     checkOutAt: a.attendance?.checkOutAt ? a.attendance.checkOutAt.toISOString() : null,
     checkInEvidenceId: a.attendance?.checkInEvidenceId ?? null,
+    latitude: a.attendance?.latitude ?? null,
+    longitude: a.attendance?.longitude ?? null,
   };
 }
 
@@ -291,6 +296,8 @@ async function checkIn(
   userId: string,
   actor: Actor,
   checkInEvidenceId?: string,
+  latitude?: number,
+  longitude?: number,
 ): Promise<SchedulePlanDTO> {
   if (actor.id !== userId) {
     throw AppError.forbidden('Chỉ chính nhân sự được phân công mới được check-in cho bản thân');
@@ -303,7 +310,7 @@ async function checkIn(
     throw AppError.badRequest('Đã check-in trước đó');
   }
 
-  await scheduleRepository.checkIn(assignee.assigneeId, checkInEvidenceId);
+  await scheduleRepository.checkIn(assignee.assigneeId, checkInEvidenceId, latitude, longitude);
   if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
     await scheduleRepository.updateStatus(planId, 'IN_PROGRESS', undefined, undefined);
   }
@@ -311,7 +318,7 @@ async function checkIn(
   return getSchedulePlanById(planId);
 }
 
-async function checkOut(planId: string, userId: string, actor: Actor): Promise<SchedulePlanDTO> {
+async function checkOut(planId: string, userId: string, actor: Actor, latitude?: number, longitude?: number): Promise<SchedulePlanDTO> {
   if (actor.id !== userId) {
     throw AppError.forbidden('Chỉ chính nhân sự được phân công mới được check-out cho bản thân');
   }
@@ -326,7 +333,7 @@ async function checkOut(planId: string, userId: string, actor: Actor): Promise<S
     throw AppError.badRequest('Đã check-out trước đó');
   }
 
-  await scheduleRepository.checkOut(assignee.assigneeId);
+  await scheduleRepository.checkOut(assignee.assigneeId, latitude, longitude);
   if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
     await scheduleRepository.updateStatus(planId, 'COMPLETED', undefined, undefined);
   }
@@ -349,9 +356,20 @@ async function attachEvidence(planId: string, evidenceId: string, actor: Actor):
   return getSchedulePlanById(planId);
 }
 
-async function listWorkTasks(): Promise<WorkTaskDTO[]> {
-  const rows = await scheduleRepository.listWorkTasks();
-  return rows.map((t) => ({ taskId: t.taskId, taskCode: t.taskCode, taskName: t.taskName, description: t.description }));
+async function listWorkTasks(query: ListWorkTasksQuery) {
+  const paginated = query.page !== undefined || query.limit !== undefined;
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 500;
+  const skip = paginated ? (page - 1) * limit : undefined;
+  const take = paginated ? limit : undefined;
+
+  const { rows, totalItems } = await scheduleRepository.listWorkTasks(skip, take);
+  return {
+    data: rows.map((t) => ({ taskId: t.taskId, taskCode: t.taskCode, taskName: t.taskName, description: t.description })),
+    meta: paginated
+      ? { page, limit, totalItems, totalPages: Math.ceil(totalItems / limit) }
+      : { page: null, limit: null, totalItems, totalPages: null },
+  };
 }
 
 // Không có DELETE thật trong đặc tả gốc (docs/api/kehoachvaphancong_api.md mục 11.1 khuyến nghị dùng

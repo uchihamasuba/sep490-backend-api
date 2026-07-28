@@ -3,7 +3,7 @@ import { getFirebaseMessaging } from '../../config/firebase';
 import { AppError } from '../../utils/AppError';
 import { logDeveloper, logger } from '../../utils/logger';
 import { notificationRepository } from './notification.repository';
-import type { SendNotificationBody } from './notification.validators';
+import type { ListNotificationsQuery, SendNotificationBody } from './notification.validators';
 
 async function sendNotificationToUser(body: SendNotificationBody) {
   // Notification.userId có FK cứng tới User (onDelete: Cascade) — kiểm tra tồn tại trước để trả 404 rõ
@@ -36,8 +36,21 @@ async function sendNotificationToUser(body: SendNotificationBody) {
   return notification;
 }
 
-async function getUserNotifications(userId: string) {
-  return notificationRepository.findNotificationsByUserId(userId);
+async function getUserNotifications(userId: string, query: ListNotificationsQuery) {
+  const paginated = query.page !== undefined || query.limit !== undefined;
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 500;
+  const skip = paginated ? (page - 1) * limit : undefined;
+  const take = paginated ? limit : undefined;
+
+  const { rows, totalItems } = await notificationRepository.findNotificationsByUserId(userId, skip, take);
+
+  return {
+    data: rows,
+    meta: paginated
+      ? { page, limit, totalItems, totalPages: Math.ceil(totalItems / limit) }
+      : { page: null, limit: null, totalItems, totalPages: null },
+  };
 }
 
 async function markAsRead(notificationId: string, callerId: string) {

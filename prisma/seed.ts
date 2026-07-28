@@ -949,6 +949,8 @@ async function main(): Promise<void> {
                       create: {
                         checkInAt: new Date(startTime.getTime() - randomInt(5, 20) * 60000),
                         checkInEvidenceId: randomEvidence(0.5) ?? null,
+                        latitude: 10.762622 + (Math.random() - 0.5) * 0.01, // Around HCMC
+                        longitude: 106.660172 + (Math.random() - 0.5) * 0.01,
                         checkOutAt: cfg.planStatus === 'COMPLETED' ? endTime : null,
                       },
                     }

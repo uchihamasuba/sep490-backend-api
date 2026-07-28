@@ -24,6 +24,11 @@ export const listOrdersQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(10),
 });
 
+export const listOrderDepositsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(10),
+});
+
 const orderItemInputSchema = z.object({
   itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
   quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
@@ -164,6 +169,7 @@ export type ListPicklistsQuery = z.infer<typeof listPicklistsQuerySchema>;
 export type OrderIdParam = z.infer<typeof orderIdParamSchema>;
 export type OrderItemIdParam = z.infer<typeof orderItemIdParamSchema>;
 export type ListOrdersQuery = z.infer<typeof listOrdersQuerySchema>;
+export type ListOrderDepositsQuery = z.infer<typeof listOrderDepositsQuerySchema>;
 export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
 export type CreateOrderBody = z.infer<typeof createOrderBodySchema>;
 export type UpdateOrderStatusBody = z.infer<typeof updateOrderStatusBodySchema>;

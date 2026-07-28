@@ -6,6 +6,7 @@ import type {
   CreateSupplierBody,
   ListSupplierTransactionsQuery,
   ListSuppliersQuery,
+  ListSupplierItemsQuery,
   ReceiveTransactionItemBody,
   SupplierIdParam,
   TransactionIdParam,
@@ -51,8 +52,9 @@ async function updateStatus(req: Request, res: Response) {
 
 async function getItems(req: Request, res: Response) {
   const { id } = req.params as unknown as SupplierIdParam;
-  const items = await supplierService.getSupplierItems(id);
-  ok(res, items);
+  const query = req.query as unknown as ListSupplierItemsQuery;
+  const result = await supplierService.getSupplierItems(id, query);
+  ok(res, result.data, result.meta);
 }
 
 async function listTransactions(req: Request, res: Response) {

@@ -291,7 +291,7 @@ describe('scheduleService.checkIn / checkOut', () => {
     mockedRepo.updateStatus.mockResolvedValue({} as never);
 
     await scheduleService.checkIn('plan-1', 'leader-1', leader);
-    expect(mockedRepo.checkIn).toHaveBeenCalledWith('assignee-1', undefined);
+    expect(mockedRepo.checkIn).toHaveBeenCalledWith('assignee-1', undefined, undefined, undefined);
     expect(mockedRepo.updateStatus).toHaveBeenCalledWith('plan-1', 'IN_PROGRESS', undefined, undefined);
   });
 
@@ -304,7 +304,7 @@ describe('scheduleService.checkIn / checkOut', () => {
     mockedRepo.checkIn.mockResolvedValue({} as never);
 
     await scheduleService.checkIn('plan-1', 'tech-1', technical);
-    expect(mockedRepo.checkIn).toHaveBeenCalledWith('assignee-2', undefined);
+    expect(mockedRepo.checkIn).toHaveBeenCalledWith('assignee-2', undefined, undefined, undefined);
     expect(mockedRepo.updateStatus).not.toHaveBeenCalled();
   });
 
@@ -316,7 +316,7 @@ describe('scheduleService.checkIn / checkOut', () => {
     mockedRepo.updateStatus.mockResolvedValue({} as never);
 
     await scheduleService.checkIn('plan-1', 'leader-1', leader, 'evidence-1');
-    expect(mockedRepo.checkIn).toHaveBeenCalledWith('assignee-1', 'evidence-1');
+    expect(mockedRepo.checkIn).toHaveBeenCalledWith('assignee-1', 'evidence-1', undefined, undefined);
   });
 
   it('check-in by the LEAD assignee does NOT revive a CANCELLED plan', async () => {
@@ -339,7 +339,7 @@ describe('scheduleService.checkIn / checkOut', () => {
     mockedRepo.updateStatus.mockResolvedValue({} as never);
 
     await scheduleService.checkOut('plan-1', 'leader-1', leader);
-    expect(mockedRepo.checkOut).toHaveBeenCalledWith('assignee-1');
+    expect(mockedRepo.checkOut).toHaveBeenCalledWith('assignee-1', undefined, undefined);
     expect(mockedRepo.updateStatus).toHaveBeenCalledWith('plan-1', 'COMPLETED', undefined, undefined);
   });
 });

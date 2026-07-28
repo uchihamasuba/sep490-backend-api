@@ -25,6 +25,7 @@ import type {
   CreateOrderBody,
   CreateSettlementBody,
   ListOrdersQuery,
+  ListOrderDepositsQuery,
   ListPicklistsQuery,
   UpdateLiveChecklistBody,
   UpdateOrderItemBody,
@@ -381,10 +382,22 @@ function mapDeposit(row: Deposit): DepositDTO {
   };
 }
 
-async function getOrderDeposits(orderId: string): Promise<DepositDTO[]> {
+async function getOrderDeposits(orderId: string, query: ListOrderDepositsQuery) {
   await findOrderOrThrow(orderId);
-  const rows = await orderRepository.findDeposits(orderId);
-  return rows.map(mapDeposit);
+
+  const paginated = query.page !== undefined || query.limit !== undefined;
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 500;
+  const skip = paginated ? (page - 1) * limit : undefined;
+  const take = paginated ? limit : undefined;
+
+  const { rows, totalItems } = await orderRepository.findDeposits(orderId, skip, take);
+  return {
+    data: rows.map(mapDeposit),
+    meta: paginated
+      ? { page, limit, totalItems, totalPages: Math.ceil(totalItems / limit) }
+      : { page: null, limit: null, totalItems, totalPages: null },
+  };
 }
 
 function mapSettlement(row: Settlement): SettlementDTO {

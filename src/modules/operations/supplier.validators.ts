@@ -15,8 +15,11 @@ export const listSuppliersQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),
   status: activeStatusEnum.optional(),
   page: z.coerce.number().int().positive().default(1),
-  // max cao hơn các list khác (docs/api/supplier_api.md mục 2) — UI hiện chưa có phân trang, FE có thể
-  // gọi ?limit=200 để "hiện hết" trong lúc chưa dựng UI phân trang.
+  limit: z.coerce.number().int().positive().max(200).default(20),
+});
+
+export const listSupplierItemsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
 
@@ -97,6 +100,7 @@ export const receiveTransactionItemBodySchema = z.object({
 
 export type SupplierIdParam = z.infer<typeof supplierIdParamSchema>;
 export type ListSuppliersQuery = z.infer<typeof listSuppliersQuerySchema>;
+export type ListSupplierItemsQuery = z.infer<typeof listSupplierItemsQuerySchema>;
 export type CreateSupplierBody = z.infer<typeof createSupplierBodySchema>;
 export type UpdateSupplierBody = z.infer<typeof updateSupplierBodySchema>;
 export type UpdateSupplierStatusBody = z.infer<typeof updateSupplierStatusBodySchema>;

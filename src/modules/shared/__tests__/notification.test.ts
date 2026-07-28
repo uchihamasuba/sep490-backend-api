@@ -140,14 +140,15 @@ describe('notificationService.sendNotificationToUser', () => {
 describe('notificationService.getUserNotifications', () => {
   it('returns the list of notifications for a user in the correct shape, ordered as returned by the repository', async () => {
     const notifications = [fakeNotification(), fakeNotification({ notificationId: 'noti-2', isRead: true })];
-    mockedRepo.findNotificationsByUserId.mockResolvedValue(notifications as never);
+    mockedRepo.findNotificationsByUserId.mockResolvedValue({ rows: notifications, totalItems: 2 } as never);
 
-    const result = await notificationService.getUserNotifications('user-1');
+    const result = await notificationService.getUserNotifications('user-1', { page: 1, limit: 10 });
 
-    expect(mockedRepo.findNotificationsByUserId).toHaveBeenCalledWith('user-1');
-    expect(result).toHaveLength(2);
-    expect(result[0]).toMatchObject({ notificationId: 'noti-1', userId: 'user-1', title: 'Test title' });
-    expect(result[1]).toMatchObject({ notificationId: 'noti-2', isRead: true });
+    expect(mockedRepo.findNotificationsByUserId).toHaveBeenCalledWith('user-1', 0, 10);
+    expect(result.data).toHaveLength(2);
+    expect(result.data[0]).toMatchObject({ notificationId: 'noti-1', userId: 'user-1', title: 'Test title' });
+    expect(result.data[1]).toMatchObject({ notificationId: 'noti-2', isRead: true });
+    expect(result.meta).toMatchObject({ page: 1, limit: 10, totalItems: 2, totalPages: 1 });
   });
 });
 
@@ -252,13 +253,16 @@ describe('HTTP routes', () => {
   });
 
   it('GET /api/v1/notifications returns 200 with the caller\'s notifications', async () => {
-    mockedRepo.findNotificationsByUserId.mockResolvedValue([fakeNotification()] as never);
+    mockedRepo.findNotificationsByUserId.mockResolvedValue({
+      rows: [fakeNotification()],
+      totalItems: 1
+    } as never);
 
     const res = await request(app).get('/api/v1/notifications').set('Authorization', authHeader('ADMIN'));
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(1);
-    expect(mockedRepo.findNotificationsByUserId).toHaveBeenCalledWith('user-1');
+    expect(mockedRepo.findNotificationsByUserId).toHaveBeenCalledWith('user-1', undefined, undefined);
   });
 
   it('GET /api/v1/notifications rejects an unauthenticated request with 401', async () => {
