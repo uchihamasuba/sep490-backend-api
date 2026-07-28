@@ -38,7 +38,7 @@ supplierRouter.get(
 // có quyền ghi, giữ nhất quán với CLAUDE.md mục 1 (Admin không xử lý vận hành hằng ngày).
 supplierRouter.post(
   '/',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(createSupplierBodySchema, 'body'),
   asyncHandler(supplierController.create),
 );
@@ -66,7 +66,7 @@ supplierRouter.get(
 // Dùng chung cho Sửa và Khóa/Mở khóa — chỉ gửi { status } (docs/api/supplier_api.md mục 3, cột Thao tác).
 supplierRouter.put(
   '/:id',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(supplierIdParamSchema, 'params'),
   validate(updateSupplierBodySchema, 'body'),
   asyncHandler(supplierController.update),
@@ -74,7 +74,7 @@ supplierRouter.put(
 
 supplierRouter.patch(
   '/:id/status',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(supplierIdParamSchema, 'params'),
   validate(updateSupplierStatusBodySchema, 'body'),
   asyncHandler(supplierController.updateStatus),
@@ -82,14 +82,14 @@ supplierRouter.patch(
 
 supplierRouter.delete(
   '/:id',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(supplierIdParamSchema, 'params'),
   asyncHandler(supplierController.remove),
 );
 
 supplierRouter.post(
   '/:id/items',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(supplierIdParamSchema, 'params'),
   validate(assignSupplierItemBodySchema, 'body'),
   asyncHandler(supplierController.assignItem),
@@ -97,7 +97,7 @@ supplierRouter.post(
 
 supplierRouter.put(
   '/:id/items/:itemId',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(supplierItemParamSchema, 'params'),
   validate(updateSupplierItemBodySchema, 'body'),
   asyncHandler(supplierController.updateItem),
@@ -105,7 +105,7 @@ supplierRouter.put(
 
 supplierRouter.delete(
   '/:id/items/:itemId',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(supplierItemParamSchema, 'params'),
   asyncHandler(supplierController.removeItem),
 );
@@ -137,7 +137,7 @@ supplierTransactionRouter.get(
 // phân công (assertActorCanAccessTransaction); MANAGER hỗ trợ sửa lại trên web khi cần.
 supplierTransactionRouter.patch(
   '/:transactionId/items/:stItemId',
-  requireRole('STAFF', 'MANAGER'),
+  requireRole('STAFF', 'MANAGER', 'ADMIN'),
   validate(transactionItemParamSchema, 'params'),
   validate(receiveTransactionItemBodySchema, 'body'),
   asyncHandler(supplierController.receiveTransactionItem),

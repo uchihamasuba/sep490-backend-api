@@ -159,7 +159,7 @@ describe('POST /api/v1/suppliers', () => {
   it('is forbidden for non-manager roles', async () => {
     const res = await request(app)
       .post('/api/v1/suppliers')
-      .set('Authorization', authHeader('ADMIN'))
+      .set('Authorization', authHeader('STAFF'))
       .send({ supplierCode: 'SUP002', supplierName: 'A', serviceType: 'B' });
     expect(res.status).toBe(403);
   });
