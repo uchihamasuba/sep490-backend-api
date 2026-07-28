@@ -657,7 +657,7 @@ model SupplierTransaction {
   transactionId   String                    @id @default(dbgenerated("(uuid())")) @map("transaction_id") @db.VarChar(36)
   transactionCode String                    @unique @map("transaction_code") @db.VarChar(50)
   supplierId      String                    @map("supplier_id") @db.VarChar(36)
-  orderId         String                    @map("order_id") @db.VarChar(36)
+  orderId         String?                   @map("order_id") @db.VarChar(36)
   transactionType SupplierTransactionType   @map("transaction_type")
   serviceTitle    String                    @map("service_title") @db.VarChar(255)
   estimatedCost   Decimal                   @default(0) @map("estimated_cost") @db.Decimal(14, 2)
@@ -668,7 +668,7 @@ model SupplierTransaction {
   updatedAt       DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   supplier                  Supplier                   @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
-  order                     Order                      @relation(fields: [orderId], references: [orderId], onDelete: Restrict)
+  order                     Order?                     @relation(fields: [orderId], references: [orderId], onDelete: SetNull)
   items                     SupplierTransactionItem[]
   collectedEquipmentReports CollectedEquipmentReport[]
 

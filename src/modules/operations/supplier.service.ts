@@ -56,8 +56,8 @@ export interface SupplierTransactionDTO {
   transactionCode: string;
   supplierId: string;
   supplierName: string;
-  orderId: string;
-  orderCode: string;
+  orderId: string | null;
+  orderCode: string | null;
   transactionType: string;
   serviceTitle: string;
   estimatedCost: number;
@@ -142,7 +142,7 @@ function mapTransaction(row: SupplierTransactionWithDetails): SupplierTransactio
     supplierId: row.supplierId,
     supplierName: row.supplier.supplierName,
     orderId: row.orderId,
-    orderCode: row.order.orderCode,
+    orderCode: row.order?.orderCode ?? null,
     transactionType: row.transactionType,
     serviceTitle: row.serviceTitle,
     estimatedCost: toNumber(row.estimatedCost),
@@ -193,8 +193,11 @@ function mapTransactionDetail(row: SupplierTransactionWithItems): SupplierTransa
 
 // STAFF chỉ thao tác được trên transaction thuộc order của plan họ giữ vai trò LEAD (docs/api/api.md
 // gap (h)/(i)) — MANAGER/ADMIN không bị giới hạn phạm vi này.
-async function assertActorCanAccessTransaction(actor: Actor, orderId: string): Promise<void> {
+async function assertActorCanAccessTransaction(actor: Actor, orderId: string | null): Promise<void> {
   if (actor.role === 'STAFF') {
+    if (!orderId) {
+      throw AppError.forbidden('Nhân viên không được phép thao tác giao dịch không gắn đơn hàng');
+    }
     const isLead = await scheduleRepository.isUserLeadOnOrder(actor.id, orderId);
     if (!isLead) {
       throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được thao tác');
@@ -482,10 +485,12 @@ async function createSupplierTransaction(body: CreateSupplierTransactionBody, ac
   
   await findSupplierOrThrow(body.supplierId);
   
-  const order = await prisma.order.findUnique({ where: { orderId: body.orderId } });
-  if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
+  if (body.orderId) {
+    const order = await prisma.order.findUnique({ where: { orderId: body.orderId } });
+    if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
+  }
   
-  await assertActorCanAccessTransaction(actor, body.orderId);
+  await assertActorCanAccessTransaction(actor, body.orderId || null);
 
   // Validate items
   let estimatedCost = 0;
@@ -530,7 +535,7 @@ async function createSupplierTransaction(body: CreateSupplierTransactionBody, ac
     estimatedCost,
     depositAmount: body.depositAmount,
     status: 'PENDING',
-    paymentStatus: 'UNPAID',
+    paymentStatus: body.depositAmount > 0 ? 'DEPOSITED' : 'UNPAID',
   }, itemsToCreate);
 
   return mapTransactionDetail(transaction!);
@@ -581,7 +586,11 @@ async function updateSupplierTransaction(transactionId: string, body: UpdateSupp
 
   const updateData: any = {};
   if (body.serviceTitle !== undefined) updateData.serviceTitle = body.serviceTitle;
-  if (body.depositAmount !== undefined) updateData.depositAmount = body.depositAmount;
+  
+  if (body.depositAmount !== undefined) {
+    updateData.depositAmount = body.depositAmount;
+    updateData.paymentStatus = body.depositAmount > 0 ? 'DEPOSITED' : 'UNPAID';
+  }
   if (body.items) updateData.estimatedCost = estimatedCost;
 
   const transaction = await supplierTransactionRepository.updateTransaction(transactionId, updateData, itemsToCreate);

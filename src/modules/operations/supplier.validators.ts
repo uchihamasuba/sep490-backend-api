@@ -97,11 +97,19 @@ const transactionItemInputSchema = z.object({
 
 export const createSupplierTransactionBodySchema = z.object({
   supplierId: z.string().trim().min(1, 'Thiếu mã nhà cung cấp'),
-  orderId: z.string().trim().min(1, 'Thiếu mã đơn hàng'),
+  orderId: z.string().trim().optional(),
   transactionType: supplierTransactionTypeEnum,
   serviceTitle: z.string().trim().min(1, 'Thiếu tiêu đề dịch vụ'),
   depositAmount: z.coerce.number().nonnegative('Tiền cọc không được âm').default(0),
   items: z.array(transactionItemInputSchema).min(1, 'Phải có ít nhất 1 hàng hóa'),
+}).superRefine((data, ctx) => {
+  if (data.transactionType === 'RENTAL' && !data.orderId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Giao dịch thuê (RENTAL) bắt buộc phải gắn với một đơn hàng (orderId)',
+      path: ['orderId'],
+    });
+  }
 });
 
 export const updateSupplierTransactionBodySchema = z.object({
