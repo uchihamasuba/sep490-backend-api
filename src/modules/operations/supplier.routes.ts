@@ -18,6 +18,8 @@ import {
   supplierItemParamSchema,
   createSupplierTransactionBodySchema,
   updateSupplierTransactionBodySchema,
+  updateSupplierTransactionStatusBodySchema,
+  updateSupplierTransactionPaymentStatusBodySchema,
 } from './supplier.validators';
 
 // Mounted at /api/v1/suppliers
@@ -161,4 +163,20 @@ supplierTransactionRouter.delete(
   requireRole('MANAGER', 'ADMIN'),
   validate(transactionIdParamSchema, 'params'),
   asyncHandler(supplierController.deleteTransaction),
+);
+
+supplierTransactionRouter.patch(
+  '/:id/status',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(transactionIdParamSchema, 'params'),
+  validate(updateSupplierTransactionStatusBodySchema, 'body'),
+  asyncHandler(supplierController.updateTransactionStatus),
+);
+
+supplierTransactionRouter.patch(
+  '/:id/payment-status',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(transactionIdParamSchema, 'params'),
+  validate(updateSupplierTransactionPaymentStatusBodySchema, 'body'),
+  asyncHandler(supplierController.updateTransactionPaymentStatus),
 );

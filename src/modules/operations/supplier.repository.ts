@@ -1,4 +1,4 @@
-import type { ActiveStatus, Prisma, Supplier, SupplierTransactionStatus } from '@prisma/client';
+import type { ActiveStatus, Prisma, Supplier, SupplierTransactionStatus, PaymentStatus } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 
 export interface SupplierListFilter {
@@ -239,6 +239,22 @@ export const supplierTransactionRepository = {
   async deleteTransaction(transactionId: string) {
     // cascade delete items as per schema
     return prisma.supplierTransaction.delete({ where: { transactionId } });
+  },
+
+  async updateTransactionStatus(transactionId: string, status: SupplierTransactionStatus) {
+    return prisma.supplierTransaction.update({
+      where: { transactionId },
+      data: { status },
+      include: transactionDetailInclude,
+    });
+  },
+
+  async updateTransactionPaymentStatus(transactionId: string, paymentStatus: PaymentStatus) {
+    return prisma.supplierTransaction.update({
+      where: { transactionId },
+      data: { paymentStatus },
+      include: transactionDetailInclude,
+    });
   },
 
 };

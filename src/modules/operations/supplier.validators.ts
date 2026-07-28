@@ -110,6 +110,18 @@ export const updateSupplierTransactionBodySchema = z.object({
   items: z.array(transactionItemInputSchema).min(1, 'Phải có ít nhất 1 hàng hóa').optional(),
 }).refine((data) => Object.keys(data).length > 0, { message: 'Vui lòng cung cấp ít nhất một trường thông tin' });
 
+export const updateSupplierTransactionStatusBodySchema = z.object({
+  status: supplierTransactionStatusEnum,
+});
+
+const paymentStatusEnum = z.enum(['UNPAID', 'DEPOSITED', 'PAID'], {
+  message: 'paymentStatus không hợp lệ',
+});
+
+export const updateSupplierTransactionPaymentStatusBodySchema = z.object({
+  paymentStatus: paymentStatusEnum,
+});
+
 export const transactionIdParamSchema = z.object({
   id: z.string().trim().min(1, 'Thiếu mã giao dịch'),
 });
@@ -140,3 +152,5 @@ export type ReceiveTransactionItemBody = z.infer<typeof receiveTransactionItemBo
 export type SupplierItemParam = z.infer<typeof supplierItemParamSchema>;
 export type CreateSupplierTransactionBody = z.infer<typeof createSupplierTransactionBodySchema>;
 export type UpdateSupplierTransactionBody = z.infer<typeof updateSupplierTransactionBodySchema>;
+export type UpdateSupplierTransactionStatusBody = z.infer<typeof updateSupplierTransactionStatusBodySchema>;
+export type UpdateSupplierTransactionPaymentStatusBody = z.infer<typeof updateSupplierTransactionPaymentStatusBodySchema>;

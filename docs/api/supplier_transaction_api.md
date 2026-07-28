@@ -112,3 +112,37 @@ Chỉ cho phép xóa khi giao dịch đang ở trạng thái **PENDING (Chờ du
 ```
 *Ghi chú:* 
 - Nếu giao dịch ở trạng thái khác (vd: `APPROVED`), API sẽ trả về lỗi HTTP 400 (Bad Request).
+
+---
+
+## 5. Đổi trạng thái giao dịch (PATCH status)
+- **Endpoint**: `PATCH /api/v1/supplier-transactions/:id/status`
+- **Auth**: `MANAGER`, `ADMIN`
+
+**Request Body (`UpdateSupplierTransactionStatusBody`):**
+```json
+{
+  "status": "APPROVED"
+}
+```
+*Ghi chú:*
+- Giá trị `status` phải là một trong: `PENDING`, `APPROVED`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED`.
+
+**Response (200 OK):** Trả về chi tiết `SupplierTransaction` sau khi cập nhật.
+
+---
+
+## 6. Đổi trạng thái thanh toán (PATCH payment-status)
+- **Endpoint**: `PATCH /api/v1/supplier-transactions/:id/payment-status`
+- **Auth**: `MANAGER`, `ADMIN`
+
+**Request Body (`UpdateSupplierTransactionPaymentStatusBody`):**
+```json
+{
+  "paymentStatus": "PAID"
+}
+```
+*Ghi chú:*
+- Giá trị `paymentStatus` phải là một trong: `UNPAID`, `DEPOSITED`, `PAID`.
+
+**Response (200 OK):** Trả về chi tiết `SupplierTransaction` sau khi cập nhật.

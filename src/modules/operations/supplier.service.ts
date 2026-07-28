@@ -12,12 +12,14 @@ import type {
   ListSupplierTransactionsQuery,
   ListSuppliersQuery,
   ListSupplierItemsQuery,
-  ReceiveTransactionItemBody,
   UpdateSupplierBody,
   AssignSupplierItemBody,
   UpdateSupplierItemBody,
   CreateSupplierTransactionBody,
   UpdateSupplierTransactionBody,
+  ReceiveTransactionItemBody,
+  UpdateSupplierTransactionStatusBody,
+  UpdateSupplierTransactionPaymentStatusBody,
 } from './supplier.validators';
 import type { Actor } from './schedule.service';
 
@@ -598,7 +600,25 @@ async function deleteSupplierTransaction(transactionId: string, actor: Actor): P
 
   await supplierTransactionRepository.deleteTransaction(transactionId);
 }
+async function updateTransactionStatus(transactionId: string, body: UpdateSupplierTransactionStatusBody, actor: Actor): Promise<SupplierTransactionDetailDTO> {
+  const existingTx = await supplierTransactionRepository.findById(transactionId);
+  if (!existingTx) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
 
+  await assertActorCanAccessTransaction(actor, existingTx.orderId);
+
+  const updated = await supplierTransactionRepository.updateTransactionStatus(transactionId, body.status);
+  return mapTransactionDetail(updated!);
+}
+
+async function updateTransactionPaymentStatus(transactionId: string, body: UpdateSupplierTransactionPaymentStatusBody, actor: Actor): Promise<SupplierTransactionDetailDTO> {
+  const existingTx = await supplierTransactionRepository.findById(transactionId);
+  if (!existingTx) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
+
+  await assertActorCanAccessTransaction(actor, existingTx.orderId);
+
+  const updated = await supplierTransactionRepository.updateTransactionPaymentStatus(transactionId, body.paymentStatus);
+  return mapTransactionDetail(updated!);
+}
 
 export const supplierService = {
   getSupplierById,
@@ -618,4 +638,6 @@ export const supplierService = {
   createSupplierTransaction,
   updateSupplierTransaction,
   deleteSupplierTransaction,
+  updateTransactionStatus,
+  updateTransactionPaymentStatus,
 };

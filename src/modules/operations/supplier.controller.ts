@@ -18,6 +18,8 @@ import type {
   SupplierItemParam,
   CreateSupplierTransactionBody,
   UpdateSupplierTransactionBody,
+  UpdateSupplierTransactionStatusBody,
+  UpdateSupplierTransactionPaymentStatusBody,
 } from './supplier.validators';
 
 async function list(req: Request, res: Response) {
@@ -133,6 +135,22 @@ async function deleteTransaction(req: Request, res: Response) {
   ok(res, { message: 'Đã xóa giao dịch nhà cung cấp' });
 }
 
+async function updateTransactionStatus(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as unknown as TransactionIdParam;
+  const body = req.body as UpdateSupplierTransactionStatusBody;
+  const transaction = await supplierService.updateTransactionStatus(id, body, req.user);
+  ok(res, transaction);
+}
+
+async function updateTransactionPaymentStatus(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as unknown as TransactionIdParam;
+  const body = req.body as UpdateSupplierTransactionPaymentStatusBody;
+  const transaction = await supplierService.updateTransactionPaymentStatus(id, body, req.user);
+  ok(res, transaction);
+}
+
 export const supplierController = {
   list,
   create,
@@ -151,4 +169,6 @@ export const supplierController = {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  updateTransactionStatus,
+  updateTransactionPaymentStatus,
 };
