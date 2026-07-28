@@ -548,11 +548,11 @@ async function updateSupplierTransaction(transactionId: string, body: UpdateSupp
 
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
-  let estimatedCost = existingTx.estimatedCost;
+  let estimatedCost: any = toNumber(existingTx.estimatedCost);
   let itemsToCreate: any[] | undefined = undefined;
 
   if (body.items) {
-    estimatedCost = new (require('decimal.js').Decimal)(0);
+    estimatedCost = 0;
     itemsToCreate = [];
 
     for (const itemInput of body.items) {
@@ -571,7 +571,7 @@ async function updateSupplierTransaction(transactionId: string, body: UpdateSupp
       }
 
       const subtotal = itemInput.quantity * unitCost;
-      estimatedCost = estimatedCost.plus(subtotal);
+      estimatedCost += subtotal;
 
       itemsToCreate.push({
         itemId: itemInput.itemId,
