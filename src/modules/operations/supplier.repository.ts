@@ -147,6 +147,7 @@ export interface SupplierTransactionListParams extends SupplierTransactionListFi
 const transactionInclude = {
   supplier: { select: { supplierId: true, supplierName: true } },
   order: { select: { orderId: true, orderCode: true } },
+  updater: { select: { fullName: true } },
 } satisfies Prisma.SupplierTransactionInclude;
 
 export type SupplierTransactionWithDetails = Prisma.SupplierTransactionGetPayload<{ include: typeof transactionInclude }>;
@@ -192,8 +193,14 @@ export const supplierTransactionRepository = {
     return prisma.supplierTransactionItem.findUnique({ where: { stItemId } });
   },
 
-  updateItemReceivedQuantity(stItemId: string, receivedQuantity: number) {
-    return prisma.supplierTransactionItem.update({ where: { stItemId }, data: { receivedQuantity } });
+  updateItemReceivedQuantity(stItemId: string, receivedQuantity: number, updatedBy?: string) {
+    return prisma.supplierTransactionItem.update({
+      where: { stItemId },
+      data: {
+        receivedQuantity,
+        ...(updatedBy ? { transaction: { update: { updatedBy } } } : {}),
+      },
+    });
   },
 
   async generateNextTransactionCode(): Promise<string> {
@@ -252,18 +259,24 @@ export const supplierTransactionRepository = {
     return prisma.supplierTransaction.delete({ where: { transactionId } });
   },
 
-  async updateTransactionStatus(transactionId: string, status: SupplierTransactionStatus) {
+  async updateTransactionStatus(transactionId: string, status: SupplierTransactionStatus, updatedBy?: string) {
     return prisma.supplierTransaction.update({
       where: { transactionId },
-      data: { status },
+      data: {
+        status,
+        ...(updatedBy ? { updatedBy } : {}),
+      },
       include: transactionDetailInclude,
     });
   },
 
-  async updateTransactionPaymentStatus(transactionId: string, paymentStatus: PaymentStatus) {
+  async updateTransactionPaymentStatus(transactionId: string, paymentStatus: PaymentStatus, updatedBy?: string) {
     return prisma.supplierTransaction.update({
       where: { transactionId },
-      data: { paymentStatus },
+      data: {
+        paymentStatus,
+        ...(updatedBy ? { updatedBy } : {}),
+      },
       include: transactionDetailInclude,
     });
   },

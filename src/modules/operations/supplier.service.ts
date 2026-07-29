@@ -379,7 +379,7 @@ async function receiveTransactionItem(
     throw AppError.badRequest(`receivedQuantity không được vượt quá quantity đã đặt (${item.quantity})`);
   }
 
-  const updated = await supplierTransactionRepository.updateItemReceivedQuantity(stItemId, body.receivedQuantity);
+  const updated = await supplierTransactionRepository.updateItemReceivedQuantity(stItemId, body.receivedQuantity, actor.id);
   return mapTransactionItem(updated);
 }
 
@@ -584,7 +584,7 @@ async function updateSupplierTransaction(transactionId: string, body: UpdateSupp
     }
   }
 
-  const updateData: any = {};
+  const updateData: any = { updatedBy: actor.id };
   if (body.serviceTitle !== undefined) updateData.serviceTitle = body.serviceTitle;
   
   if (body.depositAmount !== undefined) {
@@ -615,7 +615,7 @@ async function deleteSupplierTransaction(transactionId: string, actor: Actor): P
 
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
-  const updated = await supplierTransactionRepository.updateTransactionStatus(transactionId, body.status);
+  const updated = await supplierTransactionRepository.updateTransactionStatus(transactionId, body.status, actor.id);
   return mapTransactionDetail(updated!);
 }
 
@@ -625,7 +625,7 @@ async function updateTransactionPaymentStatus(transactionId: string, body: Updat
 
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
-  const updated = await supplierTransactionRepository.updateTransactionPaymentStatus(transactionId, body.paymentStatus);
+  const updated = await supplierTransactionRepository.updateTransactionPaymentStatus(transactionId, body.paymentStatus, actor.id);
   return mapTransactionDetail(updated!);
 }
 

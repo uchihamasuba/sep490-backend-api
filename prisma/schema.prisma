@@ -208,6 +208,7 @@ model User {
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   evidencesUploaded                  Evidence[]                 @relation("EvidenceUploadedBy")
+  updatedSupplierTransactions        SupplierTransaction[]      @relation("SupplierTransactionUpdater")
   quotationsCreated                  Quotation[]                @relation("QuotationCreatedBy")
   ordersCreated                      Order[]                    @relation("OrderCreatedBy")
   ordersClosed                       Order[]                    @relation("OrderClosedBy")
@@ -666,9 +667,11 @@ model SupplierTransaction {
   status          SupplierTransactionStatus @default(PENDING)
   createdAt       DateTime                  @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt       DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  updatedBy       String?                   @map("updated_by") @db.VarChar(36)
 
   supplier                  Supplier                   @relation(fields: [supplierId], references: [supplierId], onDelete: Restrict)
   order                     Order?                     @relation(fields: [orderId], references: [orderId], onDelete: SetNull)
+  updater                   User?                      @relation("SupplierTransactionUpdater", fields: [updatedBy], references: [userId], onDelete: SetNull)
   items                     SupplierTransactionItem[]
   collectedEquipmentReports CollectedEquipmentReport[]
 

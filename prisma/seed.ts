@@ -1025,6 +1025,7 @@ async function main(): Promise<void> {
       const subtotalCost = round2(qty * unitCost);
       const txStatus: SupplierTransactionStatus = order.status === 'CONFIRMED' ? 'APPROVED' : order.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'COMPLETED';
       const txPaymentStatus: PaymentStatus = txStatus === 'COMPLETED' ? 'PAID' : 'DEPOSITED';
+      const updater = Math.random() < 0.5 ? randomChoice(admins) : randomChoice(managers);
       await prisma.supplierTransaction.create({
         data: {
           transactionId: genId(),
@@ -1037,6 +1038,7 @@ async function main(): Promise<void> {
           depositAmount: round2(subtotalCost * 0.3),
           paymentStatus: txPaymentStatus,
           status: txStatus,
+          updatedBy: updater?.userId,
           items: {
             create: [
               {
