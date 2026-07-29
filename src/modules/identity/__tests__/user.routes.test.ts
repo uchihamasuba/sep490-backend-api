@@ -55,16 +55,22 @@ function fakeUser(overrides: Partial<User> = {}): User {
 }
 
 describe('GET /api/v1/users', () => {
-  it('lists users filtered by role, without exposing email/phone', async () => {
+  it('lists users filtered by role, exposing email/phone for contact columns', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [fakeUser()], totalItems: 1 });
 
     const res = await request(app).get('/api/v1/users?role=STAFF').set('Authorization', authHeader());
 
     expect(res.status).toBe(200);
     expect(mockedRepo.findMany).toHaveBeenCalledWith(expect.objectContaining({ role: 'STAFF' }));
-    expect(res.body.data[0]).toEqual({ userId: 'leader-1', username: 'leader1', fullName: 'Le Van Leader', role: 'STAFF', status: 'ACTIVE' });
-    expect(res.body.data[0].email).toBeUndefined();
-    expect(res.body.data[0].phone).toBeUndefined();
+    expect(res.body.data[0]).toEqual({ 
+      userId: 'leader-1', 
+      username: 'leader1', 
+      fullName: 'Le Van Leader', 
+      role: 'STAFF', 
+      status: 'ACTIVE',
+      email: 'leader1@example.com',
+      phone: '0900000003'
+    });
   });
 
   it('rejects an invalid role filter with 400', async () => {

@@ -5,15 +5,16 @@ import { hashPassword, hashPasswordRequiringChange } from '../../utils/password'
 import { userRepository } from './user.repository';
 import type { CreateUserBody, ListUsersQuery, UpdateUserBody } from './user.validators';
 
-// GET /api/v1/users (danh sách) KHÔNG trả email/phone/bio/avatarUrl — đã chốt ở docs/api/
-// lichtrinhkythuat_api.md mục 4 điểm 3 ("chỉ có ở GET /auth/profile"); GET /users/:id (chi tiết) vẫn
-// cần các trường này để hiển thị hồ sơ 1 nhân sự cụ thể.
+// GET /api/v1/users (danh sách) trả email/phone để hiển thị cột thông tin liên hệ trên bảng quản lý
+// người dùng. GET /users/:id (chi tiết) trả thêm bio/avatarUrl/createdAt/updatedAt.
 export interface UserListItemDTO {
   userId: string;
   username: string;
   fullName: string;
   role: string;
   status: string;
+  email: string | null;
+  phone: string | null;
 }
 
 export interface UserDetailDTO extends UserListItemDTO {
@@ -33,7 +34,15 @@ export interface UserListMeta {
 }
 
 function mapListItem(user: User): UserListItemDTO {
-  return { userId: user.userId, username: user.username, fullName: user.fullName, role: user.role, status: user.status };
+  return {
+    userId: user.userId,
+    username: user.username,
+    fullName: user.fullName,
+    role: user.role,
+    status: user.status,
+    email: user.email,
+    phone: user.phone,
+  };
 }
 
 function buildAccountEmailHtml(username: string, password: string): string {
@@ -86,7 +95,7 @@ async function listUsers(query: ListUsersQuery): Promise<{ data: UserListItemDTO
 }
 
 async function getUserById(userId: string): Promise<UserDetailDTO> {
-  const user = await userRepository.findById(userId);
+const user = await userRepository.findById(userId);
   if (!user) throw AppError.notFound('Không tìm thấy người dùng');
   return mapDetail(user);
 }
@@ -156,7 +165,7 @@ async function resetUserPassword(userId: string, newPassword: string): Promise<U
         buildPasswordResetEmailHtml(existing.username, newPassword),
       );
     } catch (err) {
-      console.error('Gửi email thông báo đặt lại mật khẩu thất bại:', err);
+console.error('Gửi email thông báo đặt lại mật khẩu thất bại:', err);
     }
   }
 
