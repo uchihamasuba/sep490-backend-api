@@ -102,6 +102,19 @@ export const orderRepository = {
   },
 
   async generateNextOrderCode(): Promise<string> {
+    const latest = await prisma.order.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { orderCode: true },
+    });
+    if (!latest || !latest.orderCode.startsWith('ORD-')) {
+      const count = await prisma.order.count();
+      return `ORD-${String(count + 1).padStart(3, '0')}`;
+    }
+    const match = latest.orderCode.match(/^ORD-(\d+)$/);
+    if (match) {
+      const nextNum = parseInt(match[1], 10) + 1;
+      return `ORD-${String(nextNum).padStart(3, '0')}`;
+    }
     const count = await prisma.order.count();
     return `ORD-${String(count + 1).padStart(3, '0')}`;
   },
@@ -252,6 +265,19 @@ export const orderRepository = {
   },
 
   async generateNextDepositCode(): Promise<string> {
+    const latest = await prisma.deposit.findFirst({
+      orderBy: { createdAt: 'desc' },
+      select: { depositCode: true },
+    });
+    if (!latest || !latest.depositCode.startsWith('DEP-')) {
+      const count = await prisma.deposit.count();
+      return `DEP-${String(count + 1).padStart(3, '0')}`;
+    }
+    const match = latest.depositCode.match(/^DEP-(\d+)$/);
+    if (match) {
+      const nextNum = parseInt(match[1], 10) + 1;
+      return `DEP-${String(nextNum).padStart(3, '0')}`;
+    }
     const count = await prisma.deposit.count();
     return `DEP-${String(count + 1).padStart(3, '0')}`;
   },
