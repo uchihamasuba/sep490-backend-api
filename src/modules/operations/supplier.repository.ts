@@ -281,4 +281,16 @@ export const supplierTransactionRepository = {
     });
   },
 
+  async countTransactionsByItemAndStatus(itemId: string, statuses: SupplierTransactionStatus[]) {
+    return prisma.supplierTransaction.count({
+      where: {
+        status: { in: statuses },
+        items: {
+          some: {
+            itemId: itemId,
+          },
+        },
+      },
+    });
+  },
 };

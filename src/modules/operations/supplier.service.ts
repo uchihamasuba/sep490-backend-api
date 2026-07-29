@@ -373,6 +373,11 @@ async function deleteSupplier(supplierId: string): Promise<void> {
   const supplier = await supplierRepository.findById(supplierId);
   if (!supplier) throw AppError.notFound('Không tìm thấy nhà cung cấp');
 
+  const sum = await supplierRepository.sumOutstandingForSupplier(supplierId);
+  if (computeDebtBalance(sum) > 0) {
+    throw new AppError(400, 'CANNOT_DEACTIVATE_WITH_DEBT', 'Không thể ngừng hợp tác nhà cung cấp đang có công nợ');
+  }
+
   await supplierRepository.delete(supplierId);
 }
 
@@ -457,6 +462,11 @@ async function removeSupplierItem(supplierId: string, itemId: string): Promise<v
   
   const existing = await prisma.supplierItem.findUnique({ where: { supplierId_itemId: { supplierId, itemId } } });
   if (!existing) throw AppError.notFound('Nhà cung cấp chưa được gán mặt hàng này');
+
+  const activeTransactionsCount = await supplierTransactionRepository.countTransactionsByItemAndStatus(itemId, ['PENDING', 'APPROVED', 'RECEIVED']);
+  if (activeTransactionsCount > 0) {
+    throw AppError.badRequest('Không thể xóa hạng mục đang được sử dụng trong giao dịch chưa hoàn thành');
+  }
 
   await supplierRepository.removeItem(supplierId, itemId);
 }
@@ -605,7 +615,28 @@ async function deleteSupplierTransaction(transactionId: string, actor: Actor): P
 
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
-  let finalStatus = body.status;
+  if (existingTx.status === 'COMPLETED' || existingTx.status === 'CANCELLED') {
+    throw AppError.badRequest(`Không thể cập nhật trạng thái khi giao dịch đã ở trạng thái ${existingTx.status}`);
+  }
+
+  const currentStatus = existingTx.status;
+  const newStatus = body.status;
+
+  if (currentStatus === 'PENDING') {
+    if (newStatus !== 'APPROVED' && newStatus !== 'CANCELLED') {
+      throw AppError.badRequest('Giao dịch Chờ duyệt chỉ có thể chuyển sang Đã duyệt hoặc Đã hủy');
+    }
+  } else if (currentStatus === 'APPROVED') {
+    if (newStatus !== 'RECEIVED' && newStatus !== 'CANCELLED') {
+      throw AppError.badRequest('Giao dịch Đã duyệt chỉ có thể chuyển sang Đã nhận hoặc Đã hủy');
+    }
+  } else if (currentStatus === 'RECEIVED') {
+    if (newStatus !== 'COMPLETED') {
+      throw AppError.badRequest('Giao dịch Đã nhận chỉ có thể chuyển sang Hoàn thành');
+    }
+  }
+
+  let finalStatus = newStatus;
   if (finalStatus === 'RECEIVED' && existingTx.paymentStatus === 'PAID') {
     finalStatus = 'COMPLETED';
   }
