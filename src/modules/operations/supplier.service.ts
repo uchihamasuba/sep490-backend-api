@@ -615,10 +615,6 @@ async function deleteSupplierTransaction(transactionId: string, actor: Actor): P
 
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
-  if (existingTx.status === 'COMPLETED' || existingTx.status === 'CANCELLED') {
-    throw AppError.badRequest(`Không thể cập nhật trạng thái khi giao dịch đã ở trạng thái ${existingTx.status}`);
-  }
-
   const currentStatus = existingTx.status;
   const newStatus = body.status;
 
@@ -634,6 +630,8 @@ async function deleteSupplierTransaction(transactionId: string, actor: Actor): P
     if (newStatus !== 'COMPLETED') {
       throw AppError.badRequest('Giao dịch Đã nhận chỉ có thể chuyển sang Hoàn thành');
     }
+  } else {
+    throw AppError.badRequest(`Không thể thay đổi trạng thái khi giao dịch đã ${currentStatus === 'COMPLETED' ? 'Hoàn thành' : 'Hủy'}`);
   }
 
   let finalStatus = newStatus;
