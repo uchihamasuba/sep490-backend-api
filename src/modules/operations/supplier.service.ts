@@ -121,20 +121,6 @@ function mapSupplier(row: Supplier, debtBalance: number): SupplierDTO {
   };
 }
 
-const paymentStatusMap: Record<string, string> = {
-  UNPAID: 'Chưa thanh toán',
-  DEPOSITED: 'Đã đặt cọc',
-  PAID: 'Đã thanh toán',
-};
-
-const transactionStatusMap: Record<string, string> = {
-  PENDING: 'Chờ duyệt',
-  APPROVED: 'Đã duyệt',
-  IN_PROGRESS: 'Đang thực hiện',
-  COMPLETED: 'Hoàn thành',
-  CANCELLED: 'Đã hủy',
-};
-
 function mapTransaction(row: SupplierTransactionWithDetails): SupplierTransactionDTO {
   return {
     transactionId: row.transactionId,
@@ -147,8 +133,8 @@ function mapTransaction(row: SupplierTransactionWithDetails): SupplierTransactio
     serviceTitle: row.serviceTitle,
     estimatedCost: toNumber(row.estimatedCost),
     depositAmount: toNumber(row.depositAmount),
-    paymentStatus: paymentStatusMap[row.paymentStatus] || row.paymentStatus,
-    status: transactionStatusMap[row.status] || row.status,
+    paymentStatus: row.paymentStatus,
+    status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
