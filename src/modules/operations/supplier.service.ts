@@ -546,6 +546,10 @@ async function updateSupplierTransaction(transactionId: string, body: UpdateSupp
   const existingTx = await supplierTransactionRepository.findById(transactionId);
   if (!existingTx) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
 
+  if (existingTx.status !== 'PENDING') {
+    throw AppError.badRequest('Không thể sửa nội dung giao dịch khi đã được duyệt');
+  }
+
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
   let estimatedCost: any = toNumber(existingTx.estimatedCost);
