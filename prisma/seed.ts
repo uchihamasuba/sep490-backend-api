@@ -1023,7 +1023,7 @@ async function main(): Promise<void> {
       const qty = randomInt(1, 6);
       const unitCost = refItem.purchasePrice > 0 ? Math.round(refItem.rentalPrice * 1.2) : 500000;
       const subtotalCost = round2(qty * unitCost);
-      const txStatus: SupplierTransactionStatus = order.status === 'CONFIRMED' ? 'APPROVED' : order.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'COMPLETED';
+      const txStatus: SupplierTransactionStatus = order.status === 'CONFIRMED' ? 'APPROVED' : order.status === 'IN_PROGRESS' ? 'RECEIVED' : 'COMPLETED';
       const txPaymentStatus: PaymentStatus = txStatus === 'COMPLETED' ? 'PAID' : 'DEPOSITED';
       const updater = Math.random() < 0.5 ? randomChoice(admins) : randomChoice(managers);
       await prisma.supplierTransaction.create({

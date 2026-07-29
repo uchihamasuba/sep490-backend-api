@@ -615,7 +615,12 @@ async function deleteSupplierTransaction(transactionId: string, actor: Actor): P
 
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
-  const updated = await supplierTransactionRepository.updateTransactionStatus(transactionId, body.status, actor.id);
+  let finalStatus = body.status;
+  if (finalStatus === 'RECEIVED' && existingTx.paymentStatus === 'PAID') {
+    finalStatus = 'COMPLETED';
+  }
+
+  const updated = await supplierTransactionRepository.updateTransactionStatus(transactionId, finalStatus, actor.id);
   return mapTransactionDetail(updated!);
 }
 
@@ -625,7 +630,17 @@ async function updateTransactionPaymentStatus(transactionId: string, body: Updat
 
   await assertActorCanAccessTransaction(actor, existingTx.orderId);
 
-  const updated = await supplierTransactionRepository.updateTransactionPaymentStatus(transactionId, body.paymentStatus, actor.id);
+  let finalStatus = existingTx.status;
+  if (body.paymentStatus === 'PAID' && finalStatus === 'RECEIVED') {
+    finalStatus = 'COMPLETED';
+  }
+
+  let updated;
+  if (finalStatus !== existingTx.status) {
+    updated = await supplierTransactionRepository.updateTransaction(transactionId, { paymentStatus: body.paymentStatus, status: finalStatus, updatedBy: actor.id });
+  } else {
+    updated = await supplierTransactionRepository.updateTransactionPaymentStatus(transactionId, body.paymentStatus, actor.id);
+  }
   return mapTransactionDetail(updated!);
 }
 

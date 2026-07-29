@@ -138,7 +138,7 @@ enum SupplierTransactionType {
 enum SupplierTransactionStatus {
   PENDING
   APPROVED
-  IN_PROGRESS
+  RECEIVED
   COMPLETED
   CANCELLED
 }

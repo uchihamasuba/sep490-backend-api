@@ -74,7 +74,7 @@ export const updateSupplierItemBodySchema = z.object({
   supplierItemCode: z.string().max(50, 'Mã mặt hàng NCC quá dài').nullable().optional(),
 });
 
-const supplierTransactionStatusEnum = z.enum(['PENDING', 'APPROVED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'], {
+const supplierTransactionStatusEnum = z.enum(['PENDING', 'APPROVED', 'RECEIVED', 'COMPLETED', 'CANCELLED'], {
   message: 'status không hợp lệ',
 });
 
