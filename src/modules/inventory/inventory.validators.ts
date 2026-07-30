@@ -25,7 +25,7 @@ const reportStatusEnum = z.enum(['SUBMITTED', 'CONFIRMED'], {
 export const listInventoryQuerySchema = z.object({
   itemId: z.string().trim().min(1).optional(),
   search: z.string().trim().min(1).optional(),
-  date: z.string().datetime().optional(),
+  date: z.coerce.date().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
