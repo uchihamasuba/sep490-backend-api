@@ -104,15 +104,34 @@ export const inventoryRepository = {
       },
       select: {
         orderItems: { where: { itemId, source: 'INTERNAL' }, select: { quantity: true } },
-        schedulePlans: { select: { startTime: true } }
+        schedulePlans: { select: { startTime: true, task: { select: { taskCode: true } } } }
       }
     });
+
+    const queryTime = date.getTime();
+    const nextDayTime = queryTime + 24 * 60 * 60 * 1000;
 
     let totalLocked = 0;
     for (const order of orders) {
       if (order.schedulePlans.length === 0) continue;
-      const minStartTime = new Date(Math.min(...order.schedulePlans.map(p => p.startTime.getTime())));
-      if (date >= minStartTime) {
+
+      let lockStartTime: number;
+      const setupPlan = order.schedulePlans.find(p => p.task.taskCode === 'SETUP');
+      if (setupPlan) {
+        lockStartTime = setupPlan.startTime.getTime();
+      } else {
+        lockStartTime = Math.min(...order.schedulePlans.map(p => p.startTime.getTime()));
+      }
+
+      let lockEndTime: number;
+      const collectPlan = order.schedulePlans.find(p => p.task.taskCode === 'COLLECT');
+      if (collectPlan) {
+        lockEndTime = collectPlan.startTime.getTime();
+      } else {
+        lockEndTime = Infinity;
+      }
+
+      if (lockStartTime < nextDayTime && lockEndTime >= queryTime) {
         totalLocked += order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
       }
     }
