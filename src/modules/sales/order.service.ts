@@ -5,7 +5,7 @@ import type { Actor } from '../operations/schedule.service';
 import { changeRequestRepository } from './changeRequest.repository';
 import { changeRequestService, mapChangeRequest, type ChangeRequestDTO } from './changeRequest.service';
 import { customerRepository } from './customer.repository';
-import { inventoryRepository } from '../inventory/inventory.repository';
+
 import { quotationRepository } from './quotation.repository';
 import {
   DEFAULT_LIVE_SHOW_CHECKLIST,
@@ -300,51 +300,12 @@ async function createOrder(body: CreateOrderBody, createdByUserId: string): Prom
   return { orderId: created.orderId, orderCode: created.orderCode };
 }
 
-// Khi CONFIRMED: giữ chỗ kho cho item INTERNAL, warning nếu thiếu (không chặn)
-async function autoReserveOrderItems(
-  items: OrderWithDetails['orderItems'],
-): Promise<{ itemId: string; itemName: string; required: number; available: number }[]> {
-  const warnings = [];
-  for (const item of items) {
-    if (item.source !== 'INTERNAL') continue;
-    const inv = await inventoryRepository.findByItemId(item.itemId);
-    if (!inv) { console.warn(`[autoReserve] No inventory for ${item.itemId}`); continue; }
-    if (inv.quantityAvailable < item.quantity) {
-      warnings.push({ itemId: item.itemId, itemName: (item as any).item?.itemName ?? item.itemId,
-        required: item.quantity, available: inv.quantityAvailable });
-      continue; // warning, không chặn confirm
-    }
-    await inventoryRepository.reserve(item.itemId, item.quantity);
-  }
-  return warnings;
-}
-
-// Khi CANCELLED: giải phóng kho đã giữ, clamp bằng Math.min để tránh âm
-async function autoReleaseOrderItems(items: OrderWithDetails['orderItems']): Promise<void> {
-  for (const item of items) {
-    if (item.source !== 'INTERNAL') continue;
-    const inv = await inventoryRepository.findByItemId(item.itemId);
-    if (!inv) { console.warn(`[autoRelease] No inventory for ${item.itemId}`); continue; }
-    const qty = Math.min(inv.quantityReserved, item.quantity);
-    if (qty > 0) await inventoryRepository.release(item.itemId, qty);
-  }
-}
-
 async function updateOrderStatus(orderId: string, body: UpdateOrderStatusBody): Promise<OrderDetailDTO> {
   const existing = await findOrderOrThrow(orderId);
   assertNotTerminal(existing);
 
   const cancelReason = body.orderStatus === 'CANCELLED' ? (body.cancelReason ?? null) : null;
   const updated = await orderRepository.updateStatus(orderId, body.orderStatus, cancelReason);
-  
-  if (body.orderStatus === 'CONFIRMED') {
-    const warnings = await autoReserveOrderItems(updated.orderItems);
-    if (warnings.length > 0)
-      console.warn(`[autoReserve] ${updated.orderCode} thiếu hàng:`, warnings);
-  }
-  if (body.orderStatus === 'CANCELLED') {
-    await autoReleaseOrderItems(updated.orderItems);
-  }
 
   return mapDetail(updated);
 }

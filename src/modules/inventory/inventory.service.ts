@@ -16,8 +16,6 @@ import type {
   ListInventoryQuery,
   ListMovementsQuery,
   ListReportsQuery,
-  ReleaseInventoryBody,
-  ReserveInventoryBody,
 } from './inventory.validators';
 
 export interface InventoryDTO {
@@ -93,7 +91,7 @@ export interface ListMeta {
   totalPages: number;
 }
 
-function mapInventory(row: InventoryWithItem): InventoryDTO {
+function mapInventory(row: InventoryWithItem, lockedQty: number): InventoryDTO {
   return {
     itemId: row.itemId,
     itemName: row.item.itemName,
@@ -105,8 +103,8 @@ function mapInventory(row: InventoryWithItem): InventoryDTO {
     purchasePrice: row.item.purchasePrice === null ? null : Number(row.item.purchasePrice),
     quantityTotal: row.quantityTotal,
     quantityDamaged: row.quantityDamaged,
-    quantityReserved: row.quantityReserved,
-    quantityAvailable: row.quantityAvailable,
+    quantityReserved: lockedQty,
+    quantityAvailable: row.quantityTotal - row.quantityDamaged - lockedQty,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -166,12 +164,22 @@ async function findInventoryOrThrow(itemId: string): Promise<InventoryWithItem> 
 async function listInventory(query: ListInventoryQuery): Promise<{ data: InventoryDTO[]; meta: ListMeta }> {
   const skip = (query.page - 1) * query.limit;
   const { rows, totalItems } = await inventoryRepository.findMany({ itemId: query.itemId, search: query.search }, skip, query.limit);
-  return { data: rows.map(mapInventory), meta: toMeta(query.page, query.limit, totalItems) };
+  const queryDate = query.date ? new Date(query.date) : new Date();
+  
+  const data = await Promise.all(
+    rows.map(async (row) => {
+      const lockedQty = await inventoryRepository.getLockedQuantityByDate(row.itemId, queryDate);
+      return mapInventory(row, lockedQty);
+    })
+  );
+
+  return { data, meta: toMeta(query.page, query.limit, totalItems) };
 }
 
 async function getInventoryByItemId(itemId: string): Promise<InventoryDTO> {
   const row = await findInventoryOrThrow(itemId);
-  return mapInventory(row);
+  const lockedQty = await inventoryRepository.getLockedQuantityByDate(itemId, new Date());
+  return mapInventory(row, lockedQty);
 }
 
 async function listMovements(query: ListMovementsQuery): Promise<{ data: MovementDTO[]; meta: ListMeta }> {
@@ -189,14 +197,23 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
   if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   const rows = await inventoryRepository.findOrderItemsForPicklist(orderId);
-  return rows.map((row) => ({
-    orderItemId: row.orderItemId,
-    itemId: row.itemId,
-    itemName: row.item.itemName,
-    unit: row.item.unit,
-    source: row.source,
-    quantityOrdered: row.quantity,
-    quantityAvailable: row.item.inventory ? row.item.inventory.quantityAvailable : null,
+  const now = new Date();
+  
+  return Promise.all(rows.map(async (row) => {
+    let quantityAvailable = null;
+    if (row.item.inventory) {
+      const locked = await inventoryRepository.getLockedQuantityByDate(row.itemId, now);
+      quantityAvailable = row.item.inventory.quantityTotal - row.item.inventory.quantityDamaged - locked;
+    }
+    return {
+      orderItemId: row.orderItemId,
+      itemId: row.itemId,
+      itemName: row.item.itemName,
+      unit: row.item.unit,
+      source: row.source,
+      quantityOrdered: row.quantity,
+      quantityAvailable,
+    };
   }));
 }
 
@@ -219,18 +236,19 @@ async function createInventory(body: CreateInventoryBody): Promise<InventoryDTO>
     itemId: body.itemId,
     quantityTotal: body.quantityTotal,
     quantityDamaged: body.quantityDamaged,
-    quantityAvailable: body.quantityTotal - body.quantityDamaged,
   });
 
-  return mapInventory(created);
+  return mapInventory(created, 0);
 }
 
 async function adjustInventory(body: AdjustInventoryBody, actorId: string): Promise<InventoryDTO> {
   const current = await findInventoryOrThrow(body.itemId);
+  const lockedQty = await inventoryRepository.getLockedQuantityByDate(body.itemId, new Date());
+  const quantityAvailable = current.quantityTotal - current.quantityDamaged - lockedQty;
 
-  if (body.deltaTotal < 0 && current.quantityAvailable < Math.abs(body.deltaTotal)) {
+  if (body.deltaTotal < 0 && quantityAvailable < Math.abs(body.deltaTotal)) {
     throw AppError.badRequest('Không đủ số lượng khả dụng để giảm tồn kho', {
-      quantityAvailable: current.quantityAvailable,
+      quantityAvailable,
       requested: Math.abs(body.deltaTotal),
     });
   }
@@ -246,43 +264,7 @@ async function adjustInventory(body: AdjustInventoryBody, actorId: string): Prom
     notes: body.notes || null,
   });
 
-  return mapInventory(updated);
-}
-
-// actorId nhận vào để đồng nhất chữ ký với các thao tác ghi khác (adjust/report) và sẵn sàng cho nhu
-// cầu audit sau này — reserve/release hiện chưa ghi inventory_movements (đây là chuyển trạng thái nội
-// bộ available<->reserved, không phải 1 dịch chuyển vật lý trong/ngoài kho như OUTBOUND/INBOUND/ADJUSTMENT).
-async function reserveInventory(body: ReserveInventoryBody, _actorId: string): Promise<InventoryDTO> {
-  const current = await findInventoryOrThrow(body.itemId);
-
-  if (body.quantity > current.quantityAvailable) {
-    throw AppError.badRequest('Không đủ số lượng khả dụng để giữ chỗ', {
-      quantityAvailable: current.quantityAvailable,
-      requested: body.quantity,
-    });
-  }
-
-  if (body.orderId) {
-    const order = await inventoryRepository.orderExists(body.orderId);
-    if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
-  }
-
-  const updated = await inventoryRepository.reserve(body.itemId, body.quantity);
-  return mapInventory(updated);
-}
-
-async function releaseInventory(body: ReleaseInventoryBody, _actorId: string): Promise<InventoryDTO> {
-  const current = await findInventoryOrThrow(body.itemId);
-
-  if (body.quantity > current.quantityReserved) {
-    throw AppError.badRequest('Số lượng cần giải phóng vượt quá số lượng đang giữ chỗ', {
-      quantityReserved: current.quantityReserved,
-      requested: body.quantity,
-    });
-  }
-
-  const updated = await inventoryRepository.release(body.itemId, body.quantity);
-  return mapInventory(updated);
+  return mapInventory(updated, lockedQty);
 }
 
 async function listReports(query: ListReportsQuery): Promise<{ data: ReportDTO[]; meta: ListMeta }> {
@@ -423,8 +405,6 @@ export const inventoryService = {
   listMovements,
   getPicklist,
   adjustInventory,
-  reserveInventory,
-  releaseInventory,
   listReports,
   getReportById,
   createReport,

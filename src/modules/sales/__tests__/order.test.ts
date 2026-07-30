@@ -45,8 +45,8 @@ jest.mock('../order.repository', () => {
 const mockedCustomerRepo = customerRepository as jest.Mocked<typeof customerRepository>;
 const mockedQuotationRepo = quotationRepository as jest.Mocked<typeof quotationRepository>;
 const mockedOrderRepo = orderRepository as jest.Mocked<typeof orderRepository>;
-const { inventoryRepository } = require('../../inventory/inventory.repository');
-const mockedInventoryRepo = inventoryRepository as jest.Mocked<typeof inventoryRepository>;
+
+
 
 function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
@@ -288,45 +288,6 @@ describe('orderService.updateOrderStatus / updateOrderItems — terminal-state g
     expect(result.orderStatus).toBe('CANCELLED');
   });
 
-  it('auto-reserves INTERNAL items when status is updated to CONFIRMED', async () => {
-    mockedOrderRepo.findById.mockResolvedValue(
-      buildOrderRow({ orderStatus: 'NEW', items: [{ itemId: 'item-1', quantity: 2, unitPrice: 100 }] }) as never,
-    );
-    mockedOrderRepo.updateStatus.mockResolvedValue(
-      buildOrderRow({ orderStatus: 'CONFIRMED', items: [{ itemId: 'item-1', quantity: 2, unitPrice: 100 }] }) as never,
-    );
-    mockedInventoryRepo.findByItemId.mockResolvedValue({
-      itemId: 'item-1',
-      quantityAvailable: 10,
-      quantityReserved: 0,
-      quantityTotal: 10,
-    } as never);
-
-    await orderService.updateOrderStatus('ord-1', { orderStatus: 'CONFIRMED' } as never);
-
-    expect(mockedInventoryRepo.findByItemId).toHaveBeenCalledWith('item-1');
-    expect(mockedInventoryRepo.reserve).toHaveBeenCalledWith('item-1', 2);
-  });
-
-  it('auto-releases INTERNAL items when status is updated to CANCELLED', async () => {
-    mockedOrderRepo.findById.mockResolvedValue(
-      buildOrderRow({ orderStatus: 'CONFIRMED', items: [{ itemId: 'item-1', quantity: 2, unitPrice: 100 }] }) as never,
-    );
-    mockedOrderRepo.updateStatus.mockResolvedValue(
-      buildOrderRow({ orderStatus: 'CANCELLED', items: [{ itemId: 'item-1', quantity: 2, unitPrice: 100 }] }) as never,
-    );
-    mockedInventoryRepo.findByItemId.mockResolvedValue({
-      itemId: 'item-1',
-      quantityAvailable: 8,
-      quantityReserved: 2,
-      quantityTotal: 10,
-    } as never);
-
-    await orderService.updateOrderStatus('ord-1', { orderStatus: 'CANCELLED', cancelReason: 'Test' } as never);
-
-    expect(mockedInventoryRepo.findByItemId).toHaveBeenCalledWith('item-1');
-    expect(mockedInventoryRepo.release).toHaveBeenCalledWith('item-1', 2); // min(2, 2)
-  });
 });
 
 describe('orderService.listOrders', () => {

@@ -13,9 +13,7 @@ import {
   listMovementsQuerySchema,
   listReportsQuerySchema,
   orderIdParamSchema,
-  releaseInventoryBodySchema,
   reportIdParamSchema,
-  reserveInventoryBodySchema,
 } from './inventory.validators';
 
 const router = Router();
@@ -37,26 +35,12 @@ router.post(
 
 // Ghi tồn kho — CHỈ Manager, Admin luôn nhận 403 (đã chốt ở docs/api/thietbikhohang_api.md đầu file:
 // "bản Admin phải read-only ở tầng backend cho mọi endpoint ghi", áp dụng nhất quán cho cả cụm Kho vận).
-// CẬP NHẬT: Hiện đã cấp quyền ADMIN cho các thao tác /adjust, /reserve, /release, /
+// CẬP NHẬT: Hiện đã cấp quyền ADMIN cho các thao tác /adjust, /
 router.post(
   '/adjust',
   requireRole('MANAGER', 'ADMIN'),
   validate(adjustInventoryBodySchema, 'body'),
   asyncHandler(inventoryController.adjust),
-);
-
-router.post(
-  '/reserve',
-  requireRole('MANAGER', 'ADMIN'),
-  validate(reserveInventoryBodySchema, 'body'),
-  asyncHandler(inventoryController.reserve),
-);
-
-router.post(
-  '/release',
-  requireRole('MANAGER', 'ADMIN'),
-  validate(releaseInventoryBodySchema, 'body'),
-  asyncHandler(inventoryController.release),
 );
 
 router.get('/movements', validate(listMovementsQuerySchema, 'query'), asyncHandler(inventoryController.listMovements));

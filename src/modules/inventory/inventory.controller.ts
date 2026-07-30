@@ -12,9 +12,7 @@ import type {
   ListMovementsQuery,
   ListReportsQuery,
   OrderIdParam,
-  ReleaseInventoryBody,
   ReportIdParam,
-  ReserveInventoryBody,
 } from './inventory.validators';
 
 function requireActor(req: Request) {
@@ -59,20 +57,6 @@ async function adjust(req: Request, res: Response) {
   ok(res, inventory);
 }
 
-async function reserve(req: Request, res: Response) {
-  const actor = requireActor(req);
-  const body = req.body as ReserveInventoryBody;
-  const inventory = await inventoryService.reserveInventory(body, actor.id);
-  ok(res, inventory);
-}
-
-async function release(req: Request, res: Response) {
-  const actor = requireActor(req);
-  const body = req.body as ReleaseInventoryBody;
-  const inventory = await inventoryService.releaseInventory(body, actor.id);
-  ok(res, inventory);
-}
-
 async function listReports(req: Request, res: Response) {
   const query = req.query as unknown as ListReportsQuery;
   const result = await inventoryService.listReports(query);
@@ -107,8 +91,6 @@ export const inventoryController = {
   listMovements,
   getPicklist,
   adjust,
-  reserve,
-  release,
   listReports,
   getReportById,
   createReport,

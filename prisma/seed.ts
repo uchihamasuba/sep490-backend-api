@@ -1217,8 +1217,6 @@ async function main(): Promise<void> {
         itemId: it.itemId,
         quantityTotal: reserved + damaged + available,
         quantityDamaged: damaged,
-        quantityReserved: reserved,
-        quantityAvailable: available,
       };
     }),
   });

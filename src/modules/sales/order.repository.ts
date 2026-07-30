@@ -514,7 +514,7 @@ export const orderRepository = {
 
       const inventories = await tx.inventory.findMany({
         where: { itemId: { in: unionItemIds } },
-        select: { itemId: true, quantityAvailable: true, quantityReserved: true },
+        select: { itemId: true, quantityTotal: true },
       });
       const inventoryByItem = new Map(inventories.map((inv) => [inv.itemId, inv]));
 
@@ -547,14 +547,14 @@ export const orderRepository = {
 
         if (delta > 0) {
           // Item chưa có dòng inventory coi như available = 0 — báo thiếu luôn thay vì lỗi update mù mờ.
-          const available = inventoryByItem.get(itemId)?.quantityAvailable ?? 0;
+          const available = inventoryByItem.get(itemId)?.quantityTotal ?? 0;
           if (available < delta) {
             insufficient.push({ itemId, itemName, required: delta, available });
             continue;
           }
           const updated = await tx.inventory.updateMany({
-            where: { itemId, quantityAvailable: { gte: delta } },
-            data: { quantityAvailable: { decrement: delta }, quantityReserved: { increment: delta } },
+            where: { itemId, quantityTotal: { gte: delta } },
+            data: { quantityTotal: { decrement: delta } },
           });
           if (updated.count === 0) {
             insufficient.push({ itemId, itemName, required: delta, available });
@@ -573,11 +573,9 @@ export const orderRepository = {
           movements.push({ itemId, itemName, quantity: delta, movementType: 'OUTBOUND' });
         } else {
           const recall = -delta;
-          // Clamp reserved về 0 — movement cũ có thể được ghi trước khi có cơ chế reserved theo đơn.
-          const reservedDelta = Math.min(inventoryByItem.get(itemId)?.quantityReserved ?? 0, recall);
           await tx.inventory.updateMany({
             where: { itemId },
-            data: { quantityAvailable: { increment: recall }, quantityReserved: { decrement: reservedDelta } },
+            data: { quantityTotal: { increment: recall } },
           });
           movementRows.push({
             itemId,

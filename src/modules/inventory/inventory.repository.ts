@@ -79,9 +79,9 @@ export const inventoryRepository = {
     return prisma.item.findUnique({ where: { itemId }, select: { itemId: true, itemName: true } });
   },
 
-  create(data: { itemId: string; quantityTotal: number; quantityDamaged: number; quantityAvailable: number }): Promise<InventoryWithItem> {
+  create(data: { itemId: string; quantityTotal: number; quantityDamaged: number }): Promise<InventoryWithItem> {
     return prisma.inventory.create({
-      data: { itemId: data.itemId, quantityTotal: data.quantityTotal, quantityDamaged: data.quantityDamaged, quantityReserved: 0, quantityAvailable: data.quantityAvailable },
+      data: { itemId: data.itemId, quantityTotal: data.quantityTotal, quantityDamaged: data.quantityDamaged },
       include: inventoryItemInclude,
     });
   },
@@ -94,29 +94,35 @@ export const inventoryRepository = {
     return prisma.collectedEquipmentReport.findUnique({ where: { reportId }, select: { reportId: true } });
   },
 
-  // reserve/release/adjust dùng increment/decrement nguyên tử của Prisma thay vì đọc-rồi-ghi thủ công —
-  // an toàn hơn dưới điều kiện ghi đồng thời. Service đã validate điều kiện (available/reserved đủ) từ
-  // bản đọc gần nhất trước khi gọi các hàm này.
-  reserve(itemId: string, quantity: number): Promise<InventoryWithItem> {
-    return prisma.inventory.update({
-      where: { itemId },
-      data: { quantityAvailable: { decrement: quantity }, quantityReserved: { increment: quantity } },
-      include: inventoryItemInclude,
+  async getLockedQuantityByDate(itemId: string, date: Date): Promise<number> {
+    const orders = await prisma.order.findMany({
+      where: {
+        orderStatus: { in: ['CONFIRMED', 'IN_PROGRESS'] },
+        pickedUpAt: null,
+        orderItems: { some: { itemId, source: 'INTERNAL' } },
+        schedulePlans: { some: {} }
+      },
+      select: {
+        orderItems: { where: { itemId, source: 'INTERNAL' }, select: { quantity: true } },
+        schedulePlans: { select: { startTime: true } }
+      }
     });
-  },
 
-  release(itemId: string, quantity: number): Promise<InventoryWithItem> {
-    return prisma.inventory.update({
-      where: { itemId },
-      data: { quantityReserved: { decrement: quantity }, quantityAvailable: { increment: quantity } },
-      include: inventoryItemInclude,
-    });
+    let totalLocked = 0;
+    for (const order of orders) {
+      if (order.schedulePlans.length === 0) continue;
+      const minStartTime = new Date(Math.min(...order.schedulePlans.map(p => p.startTime.getTime())));
+      if (date >= minStartTime) {
+        totalLocked += order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+      }
+    }
+    return totalLocked;
   },
 
   adjustTotal(itemId: string, deltaTotal: number): Promise<InventoryWithItem> {
     return prisma.inventory.update({
       where: { itemId },
-      data: { quantityTotal: { increment: deltaTotal }, quantityAvailable: { increment: deltaTotal } },
+      data: { quantityTotal: { increment: deltaTotal } },
       include: inventoryItemInclude,
     });
   },
@@ -150,7 +156,7 @@ export const inventoryRepository = {
     return prisma.orderItem.findMany({
       where: { orderId },
       include: {
-        item: { select: { itemName: true, unit: true, inventory: { select: { quantityAvailable: true } } } },
+        item: { select: { itemName: true, unit: true, inventory: { select: { quantityTotal: true, quantityDamaged: true } } } },
       },
     });
   },
@@ -208,23 +214,11 @@ export const inventoryRepository = {
       });
 
       for (const line of items) {
-        // Hoàn lại phần "đang giữ cho đơn" đã cộng lúc xuất thiết bị (OUTBOUND — xem
-        // order.repository.ts#exportEquipment): mọi thiết bị về (tốt/hỏng/mất) đều rời trạng thái
-        // reserved. Clamp về 0 vì có biên bản thu hồi cho đơn chưa từng đi qua luồng export
-        // (dữ liệu trước khi có endpoint, hoặc reserve thủ công không theo đơn).
-        const inv = await tx.inventory.findUnique({
-          where: { itemId: line.itemId },
-          select: { quantityReserved: true },
-        });
-        const returnedTotal = line.goodQuantity + line.damagedQuantity + line.lostQuantity;
-        const reservedDelta = Math.min(inv?.quantityReserved ?? 0, returnedTotal);
         await tx.inventory.update({
           where: { itemId: line.itemId },
           data: {
-            quantityAvailable: { increment: line.goodQuantity },
             quantityDamaged: { increment: line.damagedQuantity },
-            quantityTotal: { decrement: line.lostQuantity },
-            quantityReserved: { decrement: reservedDelta },
+            quantityTotal: { increment: line.goodQuantity + line.damagedQuantity }, // Khôi phục lại total trừ phần lost
           },
         });
       }
@@ -269,12 +263,12 @@ export const inventoryRepository = {
       const created: string[] = [];
       for (const line of params.items) {
         const updated = await tx.inventory.updateMany({
-          where: { itemId: line.itemId, quantityAvailable: { gte: line.quantity } },
-          data: { quantityAvailable: { decrement: line.quantity }, quantityReserved: { increment: line.quantity } },
+          where: { itemId: line.itemId, quantityTotal: { gte: line.quantity } },
+          data: { quantityTotal: { decrement: line.quantity } },
         });
         if (updated.count === 0) {
-          const inv = await tx.inventory.findUnique({ where: { itemId: line.itemId }, select: { quantityAvailable: true } });
-          throw new InsufficientFieldStockError(line.itemId, inv?.quantityAvailable ?? 0, line.quantity);
+          const inv = await tx.inventory.findUnique({ where: { itemId: line.itemId }, select: { quantityTotal: true } });
+          throw new InsufficientFieldStockError(line.itemId, inv?.quantityTotal ?? 0, line.quantity);
         }
 
         const movement = await tx.inventoryMovement.create({

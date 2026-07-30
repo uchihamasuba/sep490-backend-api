@@ -25,6 +25,7 @@ const reportStatusEnum = z.enum(['SUBMITTED', 'CONFIRMED'], {
 export const listInventoryQuerySchema = z.object({
   itemId: z.string().trim().min(1).optional(),
   search: z.string().trim().min(1).optional(),
+  date: z.string().datetime().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(200).default(20),
 });
@@ -48,15 +49,6 @@ export const adjustInventoryBodySchema = z.object({
   deltaTotal: z.coerce.number().int().refine((v) => v !== 0, 'Số lượng điều chỉnh không được bằng 0'),
   notes: z.string().trim().optional(),
 });
-
-export const reserveInventoryBodySchema = z.object({
-  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
-  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
-  orderId: z.string().trim().min(1).optional(),
-  notes: z.string().trim().optional(),
-});
-
-export const releaseInventoryBodySchema = reserveInventoryBodySchema;
 
 export const listReportsQuerySchema = z.object({
   status: reportStatusEnum.optional(),
@@ -92,8 +84,6 @@ export type CreateInventoryBody = z.infer<typeof createInventoryBodySchema>;
 export type ListInventoryQuery = z.infer<typeof listInventoryQuerySchema>;
 export type ListMovementsQuery = z.infer<typeof listMovementsQuerySchema>;
 export type AdjustInventoryBody = z.infer<typeof adjustInventoryBodySchema>;
-export type ReserveInventoryBody = z.infer<typeof reserveInventoryBodySchema>;
-export type ReleaseInventoryBody = z.infer<typeof releaseInventoryBodySchema>;
 export type ListReportsQuery = z.infer<typeof listReportsQuerySchema>;
 export type CreateReportBody = z.infer<typeof createReportBodySchema>;
 export type ConfirmReportBody = z.infer<typeof confirmReportBodySchema>;

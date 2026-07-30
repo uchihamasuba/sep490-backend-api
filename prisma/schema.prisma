@@ -821,8 +821,6 @@ model Inventory {
   itemId            String   @unique @map("item_id") @db.VarChar(36)
   quantityTotal     Int      @default(0) @map("quantity_total")
   quantityDamaged   Int      @default(0) @map("quantity_damaged")
-  quantityReserved  Int      @default(0) @map("quantity_reserved")
-  quantityAvailable Int      @default(0) @map("quantity_available")
   updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   item Item @relation(fields: [itemId], references: [itemId], onDelete: Cascade)

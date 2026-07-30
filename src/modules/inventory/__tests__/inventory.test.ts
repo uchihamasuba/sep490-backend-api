@@ -16,8 +16,7 @@ jest.mock('../inventory.repository', () => ({
     create: jest.fn(),
     orderExists: jest.fn(),
     reportExists: jest.fn(),
-    reserve: jest.fn(),
-    release: jest.fn(),
+    getLockedQuantityByDate: jest.fn(),
     adjustTotal: jest.fn(),
     createMovement: jest.fn(),
     findMovements: jest.fn(),
@@ -111,6 +110,7 @@ function fakeReport(overrides: Record<string, unknown> = {}) {
 describe('GET /api/v1/inventory', () => {
   it('lists inventory rows with correct joined fields', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [fakeInventory()], totalItems: 1 } as never);
+    mockedRepo.getLockedQuantityByDate.mockResolvedValue(2);
 
     const res = await request(app).get('/api/v1/inventory?limit=50').set('Authorization', authHeader('MANAGER'));
 
@@ -130,8 +130,9 @@ describe('GET /api/v1/inventory', () => {
 describe('GET /api/v1/inventory/:itemId', () => {
   it('returns the inventory row for the given item', async () => {
     mockedRepo.findByItemId.mockResolvedValue(
-      fakeInventory({ itemId: 'item-den', quantityTotal: 15, quantityDamaged: 1, quantityReserved: 2, quantityAvailable: 12, item: { ...fakeInventory().item, itemName: 'Đèn Beam 230' } }) as never,
+      fakeInventory({ itemId: 'item-den', quantityTotal: 15, quantityDamaged: 1, item: { ...fakeInventory().item, itemName: 'Đèn Beam 230' } }) as never,
     );
+    mockedRepo.getLockedQuantityByDate.mockResolvedValue(2);
 
     const res = await request(app).get('/api/v1/inventory/item-den').set('Authorization', authHeader('MANAGER'));
 
@@ -176,9 +177,10 @@ describe('GET /api/v1/inventory/picklist/:orderId', () => {
         itemId: 'item-loa',
         source: 'INTERNAL',
         quantity: 2,
-        item: { itemName: 'Loa JBL 1000W', unit: 'Cái', inventory: { quantityAvailable: 8 } },
+        item: { itemName: 'Loa JBL 1000W', unit: 'Cái', inventory: { quantityTotal: 10, quantityDamaged: 0 } },
       },
     ] as never);
+    mockedRepo.getLockedQuantityByDate.mockResolvedValue(2);
 
     const res = await request(app).get('/api/v1/inventory/picklist/order-1').set('Authorization', authHeader('MANAGER'));
 
@@ -219,22 +221,6 @@ describe('Write endpoints — Admin must get 403 on older endpoints, but allowed
     expect(res.status).toBe(400); // Passed auth, failed validation
   });
 
-  it('POST /api/v1/inventory/reserve is allowed for ADMIN (returns 400 for bad payload instead of 403)', async () => {
-    const res = await request(app)
-      .post('/api/v1/inventory/reserve')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({});
-    expect(res.status).toBe(400); // Passed auth, failed validation
-  });
-
-  it('POST /api/v1/inventory/release is allowed for ADMIN (returns 400 for bad payload instead of 403)', async () => {
-    const res = await request(app)
-      .post('/api/v1/inventory/release')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({});
-    expect(res.status).toBe(400); // Passed auth, failed validation
-  });
-
   it('POST /api/v1/inventory/collected-equipment-reports is forbidden for ADMIN', async () => {
     const res = await request(app)
       .post('/api/v1/inventory/collected-equipment-reports')
@@ -262,8 +248,9 @@ describe('Write endpoints — Admin must get 403 on older endpoints, but allowed
 
 describe('Write endpoints — successful quantity updates (Manager)', () => {
   it('POST /api/v1/inventory/adjust increases quantityTotal and quantityAvailable together (200)', async () => {
-    mockedRepo.findByItemId.mockResolvedValue(fakeInventory({ quantityTotal: 50, quantityAvailable: 45, quantityReserved: 5 }) as never);
-    mockedRepo.adjustTotal.mockResolvedValue(fakeInventory({ quantityTotal: 60, quantityAvailable: 55, quantityReserved: 5 }) as never);
+    mockedRepo.findByItemId.mockResolvedValue(fakeInventory({ quantityTotal: 50 }) as never);
+    mockedRepo.adjustTotal.mockResolvedValue(fakeInventory({ quantityTotal: 60 }) as never);
+    mockedRepo.getLockedQuantityByDate.mockResolvedValue(5);
     mockedRepo.createMovement.mockResolvedValue({} as never);
 
     const res = await request(app)
@@ -276,45 +263,6 @@ describe('Write endpoints — successful quantity updates (Manager)', () => {
     expect(mockedRepo.createMovement).toHaveBeenCalledWith(
       expect.objectContaining({ itemId: 'item-loa', movementType: 'ADJUSTMENT', quantity: 10 }),
     );
-  });
-
-  it('POST /api/v1/inventory/reserve moves stock from available to reserved (200)', async () => {
-    mockedRepo.findByItemId.mockResolvedValue(fakeInventory({ quantityAvailable: 55, quantityReserved: 5 }) as never);
-    mockedRepo.reserve.mockResolvedValue(fakeInventory({ quantityAvailable: 52, quantityReserved: 8 }) as never);
-
-    const res = await request(app)
-      .post('/api/v1/inventory/reserve')
-      .set('Authorization', authHeader('MANAGER'))
-      .send({ itemId: 'item-loa', quantity: 3 });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ quantityAvailable: 52, quantityReserved: 8 });
-  });
-
-  it('POST /api/v1/inventory/reserve rejects a request exceeding quantityAvailable (400)', async () => {
-    mockedRepo.findByItemId.mockResolvedValue(fakeInventory({ quantityAvailable: 55 }) as never);
-
-    const res = await request(app)
-      .post('/api/v1/inventory/reserve')
-      .set('Authorization', authHeader('MANAGER'))
-      .send({ itemId: 'item-loa', quantity: 999999 });
-
-    expect(res.status).toBe(400);
-    expect(res.body.error.message).toBe('Không đủ số lượng khả dụng để giữ chỗ');
-    expect(mockedRepo.reserve).not.toHaveBeenCalled();
-  });
-
-  it('POST /api/v1/inventory/release moves stock back from reserved to available (200)', async () => {
-    mockedRepo.findByItemId.mockResolvedValue(fakeInventory({ quantityAvailable: 52, quantityReserved: 8 }) as never);
-    mockedRepo.release.mockResolvedValue(fakeInventory({ quantityAvailable: 55, quantityReserved: 5 }) as never);
-
-    const res = await request(app)
-      .post('/api/v1/inventory/release')
-      .set('Authorization', authHeader('MANAGER'))
-      .send({ itemId: 'item-loa', quantity: 3 });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ quantityAvailable: 55, quantityReserved: 5 });
   });
 
   it('creates a collected-equipment report as STAFF who is the LEAD assignee (201), confirming it as MANAGER applies inventory effects (200)', async () => {

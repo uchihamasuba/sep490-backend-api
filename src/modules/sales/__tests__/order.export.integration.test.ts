@@ -62,8 +62,6 @@ beforeAll(async () => {
         itemId,
         quantityTotal: STOCK_PER_ITEM,
         quantityDamaged: 0,
-        quantityReserved: 0,
-        quantityAvailable: STOCK_PER_ITEM,
       },
     });
   }
@@ -136,8 +134,8 @@ describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5
     expect(orderItems.every((line) => line.quantity === QTY_PER_ITEM && line.source === 'INTERNAL')).toBe(true);
 
     const inventories = await prisma.inventory.findMany({ where: { itemId: { in: itemIds } } });
-    expect(inventories.every((inv) => inv.quantityAvailable === STOCK_PER_ITEM - QTY_PER_ITEM)).toBe(true);
-    expect(inventories.every((inv) => inv.quantityReserved === QTY_PER_ITEM)).toBe(true);
+    expect(inventories).toHaveLength(ITEM_COUNT);
+    expect(inventories.every((inv) => inv.quantityTotal === STOCK_PER_ITEM - QTY_PER_ITEM)).toBe(true);
   });
 
   it('lần 2 không đổi gì: no-op 200 unchanged: true, không sinh movement mới', async () => {
@@ -173,8 +171,7 @@ describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5
     ]);
 
     const inv = await prisma.inventory.findUniqueOrThrow({ where: { itemId: bumpedItemId } });
-    expect(inv.quantityAvailable).toBe(STOCK_PER_ITEM - QTY_PER_ITEM - 3);
-    expect(inv.quantityReserved).toBe(QTY_PER_ITEM + 3);
+    expect(inv.quantityTotal).toBe(STOCK_PER_ITEM - QTY_PER_ITEM - 3);
 
     const line = await prisma.orderItem.findFirstOrThrow({ where: { orderId, itemId: bumpedItemId } });
     expect(line.quantity).toBe(QTY_PER_ITEM + 3);
