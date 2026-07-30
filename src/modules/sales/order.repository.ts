@@ -103,7 +103,7 @@ export const orderRepository = {
 
   async generateNextOrderCode(): Promise<string> {
     const latest = await prisma.order.findFirst({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { orderCode: 'desc' },
       select: { orderCode: true },
     });
     if (!latest || !latest.orderCode.startsWith('ORD-')) {
