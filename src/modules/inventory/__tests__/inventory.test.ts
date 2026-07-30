@@ -210,22 +210,29 @@ describe('GET /api/v1/inventory/collected-equipment-reports', () => {
   });
 });
 
-describe('Write endpoints — Admin must get 403 (read-only role, backend-enforced)', () => {
-  it('POST /api/v1/inventory/adjust is forbidden for ADMIN', async () => {
+describe('Write endpoints — Admin must get 403 on older endpoints, but allowed on basic operations', () => {
+  it('POST /api/v1/inventory/adjust is allowed for ADMIN (returns 400 for bad payload instead of 403)', async () => {
     const res = await request(app)
       .post('/api/v1/inventory/adjust')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ itemId: 'item-loa', deltaTotal: 5 });
-    expect(res.status).toBe(403);
-    expect(res.body.error.message).toBe('Bạn không đủ quyền để thực hiện thao tác này');
+      .send({});
+    expect(res.status).toBe(400); // Passed auth, failed validation
   });
 
-  it('POST /api/v1/inventory/reserve is forbidden for ADMIN', async () => {
+  it('POST /api/v1/inventory/reserve is allowed for ADMIN (returns 400 for bad payload instead of 403)', async () => {
     const res = await request(app)
       .post('/api/v1/inventory/reserve')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ itemId: 'item-loa', quantity: 1 });
-    expect(res.status).toBe(403);
+      .send({});
+    expect(res.status).toBe(400); // Passed auth, failed validation
+  });
+
+  it('POST /api/v1/inventory/release is allowed for ADMIN (returns 400 for bad payload instead of 403)', async () => {
+    const res = await request(app)
+      .post('/api/v1/inventory/release')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({});
+    expect(res.status).toBe(400); // Passed auth, failed validation
   });
 
   it('POST /api/v1/inventory/collected-equipment-reports is forbidden for ADMIN', async () => {
@@ -244,12 +251,12 @@ describe('Write endpoints — Admin must get 403 (read-only role, backend-enforc
     expect(res.status).toBe(403);
   });
 
-  it('POST /api/v1/inventory is forbidden for ADMIN', async () => {
+  it('POST /api/v1/inventory is allowed for ADMIN (returns 400 for bad payload instead of 403)', async () => {
     const res = await request(app)
       .post('/api/v1/inventory')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ itemId: 'item-loa', quantityTotal: 5 });
-    expect(res.status).toBe(403);
+      .send({});
+    expect(res.status).toBe(400); // Passed auth, failed validation
   });
 });
 

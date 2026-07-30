@@ -30,30 +30,31 @@ router.get('/', validate(listInventoryQuerySchema, 'query'), asyncHandler(invent
 // inventory.service.ts#createInventory) — cùng mức quyền với các thao tác ghi khác trong module này.
 router.post(
   '/',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(createInventoryBodySchema, 'body'),
   asyncHandler(inventoryController.create),
 );
 
 // Ghi tồn kho — CHỈ Manager, Admin luôn nhận 403 (đã chốt ở docs/api/thietbikhohang_api.md đầu file:
 // "bản Admin phải read-only ở tầng backend cho mọi endpoint ghi", áp dụng nhất quán cho cả cụm Kho vận).
+// CẬP NHẬT: Hiện đã cấp quyền ADMIN cho các thao tác /adjust, /reserve, /release, /
 router.post(
   '/adjust',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(adjustInventoryBodySchema, 'body'),
   asyncHandler(inventoryController.adjust),
 );
 
 router.post(
   '/reserve',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(reserveInventoryBodySchema, 'body'),
   asyncHandler(inventoryController.reserve),
 );
 
 router.post(
   '/release',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(releaseInventoryBodySchema, 'body'),
   asyncHandler(inventoryController.release),
 );
