@@ -435,6 +435,8 @@ model Order {
   eventName         String?       @map("event_name") @db.VarChar(255)
   eventDate         DateTime      @map("event_date") @db.Timestamp(0)
   location          String        @db.Text
+  latitude          Float?        @db.Float
+  longitude         Float?        @db.Float
   /// CHECK (guest_count >= 0) trong DDL — validate ở Zod.
   guestCount        Int?          @map("guest_count")
   totalAmount       Decimal       @default(0) @map("total_amount") @db.Decimal(14, 2)

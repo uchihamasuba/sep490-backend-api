@@ -291,6 +291,8 @@ async function createOrder(body: CreateOrderBody, createdByUserId: string): Prom
     eventName: body.eventName ?? null,
     eventDate: body.eventDate,
     location: body.location,
+    latitude: body.latitude,
+    longitude: body.longitude,
     guestCount: body.guestCount ?? null,
     notes: body.notes || null,
     createdBy: createdByUserId,

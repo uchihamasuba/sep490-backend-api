@@ -44,6 +44,8 @@ export const createOrderBodySchema = z.object({
   eventName: z.string().trim().min(1).optional(),
   eventDate: z.coerce.date(),
   location: z.string().trim().min(1, 'Vui lòng nhập địa điểm'),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
   guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'Số lượng khách quá lớn').optional(),
   items: z.array(orderItemInputSchema).default([]),
   notes: z.string().trim().optional(),

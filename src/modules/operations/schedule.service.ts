@@ -1,4 +1,5 @@
 import type { PlanMemberRole, ScheduleStatus } from '@prisma/client';
+import { calculateDistanceMeters } from '../../utils/geo.utils';
 import { AppError } from '../../utils/AppError';
 import { inventoryService, type MovementDTO } from '../inventory/inventory.service';
 import { scheduleRepository, type SchedulePlanWithDetails } from './schedule.repository';
@@ -304,6 +305,20 @@ async function checkIn(
   }
 
   const plan = await findPlanOrThrow(planId);
+
+  if (latitude !== undefined && longitude !== undefined) {
+    const orderLat = plan.order.latitude;
+    const orderLng = plan.order.longitude;
+    if (orderLat !== null && orderLng !== null) {
+      const distance = calculateDistanceMeters(latitude, longitude, orderLat, orderLng);
+      const maxDistance = Number(process.env.MAX_CHECKIN_DISTANCE_METERS) || 500;
+      if (distance > maxDistance) {
+        throw AppError.badRequest('Vị trí check-in nằm ngoài phạm vi cho phép');
+      }
+    }
+  }
+
+
   const assignee = plan.assignees.find((a) => a.userId === userId);
   if (!assignee) throw AppError.notFound('Không tìm thấy nhân sự được phân công trong kế hoạch này');
   if (assignee.attendance?.checkInAt) {

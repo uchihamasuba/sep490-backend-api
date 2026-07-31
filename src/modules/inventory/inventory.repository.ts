@@ -171,6 +171,14 @@ export const inventoryRepository = {
     return { rows, totalItems };
   },
 
+  async getExportedQuantity(orderId: string, itemId: string): Promise<number> {
+    const agg = await prisma.inventoryMovement.aggregate({
+      where: { orderId, itemId, movementType: 'OUTBOUND' },
+      _sum: { quantity: true },
+    });
+    return agg._sum.quantity ?? 0;
+  },
+
   findOrderItemsForPicklist(orderId: string) {
     return prisma.orderItem.findMany({
       where: { orderId },

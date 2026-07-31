@@ -409,16 +409,16 @@ const EVENT_TYPES = [
 const COMPLEX_EVENT_TYPES = new Set(['Hội nghị doanh nghiệp', 'Hội thảo chuyên đề', 'Gala Dinner', 'Lễ ra mắt sản phẩm']);
 
 const VENUES = [
-  'Trung tâm Hội nghị Quốc gia, Hà Nội',
-  'Gem Center, Q.1, TP.HCM',
-  'White Palace, Phú Nhuận, TP.HCM',
-  'Ana Mandara Resort, Nha Trang',
-  'Khách sạn Rex Sài Gòn, Q.1, TP.HCM',
-  'Furama Resort, Đà Nẵng',
-  'Trung tâm Tiệc cưới Adora, Tân Bình, TP.HCM',
-  'Sân vận động Mỹ Đình, Hà Nội',
-  'Khuôn viên Trường Đại học HUTECH, Bình Thạnh, TP.HCM',
-  'Nhà hàng Tiệc cưới Riverside Palace, Q.7, TP.HCM',
+  { name: 'Trung tâm Hội nghị Quốc gia, Hà Nội', lat: 21.0069, lng: 105.7869 },
+  { name: 'Gem Center, Q.1, TP.HCM', lat: 10.7877, lng: 106.6998 },
+  { name: 'White Palace, Phú Nhuận, TP.HCM', lat: 10.8016, lng: 106.6782 },
+  { name: 'Ana Mandara Resort, Nha Trang', lat: 12.2359, lng: 109.1963 },
+  { name: 'Khách sạn Rex Sài Gòn, Q.1, TP.HCM', lat: 10.7761, lng: 106.7018 },
+  { name: 'Furama Resort, Đà Nẵng', lat: 16.0371, lng: 108.2483 },
+  { name: 'Trung tâm Tiệc cưới Adora, Tân Bình, TP.HCM', lat: 10.7966, lng: 106.6620 },
+  { name: 'Sân vận động Mỹ Đình, Hà Nội', lat: 21.0187, lng: 105.7635 },
+  { name: 'Khuôn viên Trường Đại học HUTECH, Bình Thạnh, TP.HCM', lat: 10.8018, lng: 106.7146 },
+  { name: 'Nhà hàng Tiệc cưới Riverside Palace, Q.7, TP.HCM', lat: 10.7523, lng: 106.6963 },
 ];
 
 const EVIDENCE_DESCRIPTIONS = [
@@ -793,6 +793,7 @@ async function main(): Promise<void> {
     const isPickedUp = status === 'IN_PROGRESS' || status === 'COMPLETED';
     const closer = isCompleted ? randomChoice(managers) : null;
     const pickedUpByUser = isPickedUp ? leader : null;
+        const venue = randomChoice(VENUES);
 
     await prisma.order.create({
       data: {
@@ -804,7 +805,9 @@ async function main(): Promise<void> {
         eventType,
         eventName: `${eventType} - ${orderCode}`,
         eventDate,
-        location: randomChoice(VENUES),
+        location: venue.name,
+        latitude: venue.lat,
+        longitude: venue.lng,
         guestCount,
         totalAmount,
         paymentStatus: paymentStatusForOrder(status),
@@ -936,7 +939,7 @@ async function main(): Promise<void> {
           taskId: taskIdByCode.get(cfg.taskCode)!,
           startTime,
           endTime,
-          location: randomChoice(VENUES),
+          location: randomChoice(VENUES).name,
           status: cfg.planStatus,
           evidenceId: cfg.planStatus === 'COMPLETED' ? randomEvidence(0.5) ?? null : null,
           createdBy: randomChoice(managers).userId,
@@ -979,7 +982,7 @@ async function main(): Promise<void> {
           planId: surveyPlanId,
           evidenceId: randomEvidence(0.7) ?? null,
           surveyDate: addDays(order.eventDate, -14),
-          location: randomChoice(VENUES),
+          location: randomChoice(VENUES).name,
           area: randomInt(150, 600),
           length: randomInt(15, 40),
           width: randomInt(8, 20),

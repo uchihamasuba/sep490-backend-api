@@ -23,6 +23,8 @@ const detailInclude = {
       eventName: true,
       eventDate: true,
       location: true,
+      latitude: true,
+      longitude: true,
       // customer.phone/address (docs/api/api.md gap (o)) — Staff app cần hiển thị số điện thoại/địa
       // chỉ khách hàng ở mọi loại việc, không chỉ SETUP/COLLECT.
       customer: { select: { customerName: true, phone: true, address: true } },

@@ -20,6 +20,7 @@ jest.mock('../inventory.repository', () => ({
     adjustTotal: jest.fn(),
     createMovement: jest.fn(),
     findMovements: jest.fn(),
+    getExportedQuantity: jest.fn(),
     findOrderItemsForPicklist: jest.fn(),
     findReports: jest.fn(),
     findReportById: jest.fn(),
@@ -181,11 +182,12 @@ describe('GET /api/v1/inventory/picklist/:orderId', () => {
       },
     ] as never);
     mockedRepo.getLockedQuantityByDate.mockResolvedValue(2);
+    mockedRepo.getExportedQuantity.mockResolvedValue(0);
 
     const res = await request(app).get('/api/v1/inventory/picklist/order-1').set('Authorization', authHeader('MANAGER'));
 
     expect(res.status).toBe(200);
-    expect(res.body.data[0]).toMatchObject({ itemName: 'Loa JBL 1000W', quantityOrdered: 2, quantityAvailable: 8 });
+    expect(res.body.data[0]).toMatchObject({ itemName: 'Loa JBL 1000W', quantityOrdered: 2, quantityAvailable: 8, quantityExported: 0 });
   });
 
   it('returns 404 when the order does not exist', async () => {

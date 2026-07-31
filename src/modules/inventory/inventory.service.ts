@@ -56,6 +56,7 @@ export interface PicklistItemDTO {
   source: string;
   quantityOrdered: number;
   quantityAvailable: number | null;
+  quantityExported: number;
 }
 
 export interface ReportItemDTO {
@@ -201,10 +202,13 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
   
   return Promise.all(rows.map(async (row) => {
     let quantityAvailable = null;
+    let quantityExported = 0;
     if (row.item.inventory) {
       const locked = await inventoryRepository.getLockedQuantityByDate(row.itemId, now);
       quantityAvailable = row.item.inventory.quantityTotal - row.item.inventory.quantityDamaged - locked;
     }
+    quantityExported = await inventoryRepository.getExportedQuantity(orderId, row.itemId);
+
     return {
       orderItemId: row.orderItemId,
       itemId: row.itemId,
@@ -213,6 +217,7 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
       source: row.source,
       quantityOrdered: row.quantity,
       quantityAvailable,
+      quantityExported,
     };
   }));
 }

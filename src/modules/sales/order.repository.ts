@@ -159,6 +159,8 @@ export const orderRepository = {
     eventName: string | null;
     eventDate: Date;
     location: string;
+    latitude?: number;
+    longitude?: number;
     guestCount: number | null;
     notes: string | null;
     createdBy: string;
@@ -176,6 +178,8 @@ export const orderRepository = {
         eventName: params.eventName,
         eventDate: params.eventDate,
         location: params.location,
+        latitude: params.latitude,
+        longitude: params.longitude,
         guestCount: params.guestCount,
         notes: params.notes,
         createdBy: params.createdBy,
