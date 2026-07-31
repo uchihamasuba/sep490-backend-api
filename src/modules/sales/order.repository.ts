@@ -419,8 +419,9 @@ export const orderRepository = {
     notes: string | null;
     quotationCode: string;
     targetLines: ExportEquipmentTargetLine[];
+    force?: boolean;
   }): Promise<ExportEquipmentResult> {
-    const { orderId, performedBy, notes, quotationCode, targetLines } = params;
+    const { orderId, performedBy, notes, quotationCode, targetLines, force } = params;
 
     // BUG mục 7 (docs/api/xuatthietbi_tubaogia_api.md): DB Aiven latency ~200ms/round-trip nên
     // transaction phải (a) nới timeout khỏi mặc định 5000ms, (b) gộp INSERT thành createMany và đọc
@@ -548,15 +549,37 @@ export const orderRepository = {
         if (delta > 0) {
           // Item chưa có dòng inventory coi như available = 0 — báo thiếu luôn thay vì lỗi update mù mờ.
           const available = inventoryByItem.get(itemId)?.quantityTotal ?? 0;
-          if (available < delta) {
+          if (!force && available < delta) {
             insufficient.push({ itemId, itemName, required: delta, available });
             continue;
           }
-          const updated = await tx.inventory.updateMany({
-            where: { itemId, quantityTotal: { gte: delta } },
-            data: { quantityTotal: { decrement: delta } },
-          });
-          if (updated.count === 0) {
+          
+          let updatedCount = 0;
+          if (force) {
+            const updated = await tx.inventory.updateMany({
+              where: { itemId },
+              data: { quantityTotal: { decrement: delta } },
+            });
+            updatedCount = updated.count;
+            if (updatedCount === 0) {
+              await tx.inventory.create({
+                data: {
+                  itemId,
+                  quantityTotal: -delta,
+                  quantityDamaged: 0,
+                },
+              });
+              updatedCount = 1;
+            }
+          } else {
+            const updated = await tx.inventory.updateMany({
+              where: { itemId, quantityTotal: { gte: delta } },
+              data: { quantityTotal: { decrement: delta } },
+            });
+            updatedCount = updated.count;
+          }
+
+          if (updatedCount === 0) {
             insufficient.push({ itemId, itemName, required: delta, available });
             continue;
           }

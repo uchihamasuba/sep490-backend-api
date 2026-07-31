@@ -176,4 +176,45 @@ describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5
     const line = await prisma.orderItem.findFirstOrThrow({ where: { orderId, itemId: bumpedItemId } });
     expect(line.quantity).toBe(QTY_PER_ITEM + 3);
   });
+
+  it('lần 3: tăng vượt tồn kho, không có force -> báo 400 InsufficientStockError', async () => {
+    const bumpedItemId = itemIds[0];
+    await prisma.quotationItem.updateMany({
+      where: { quotationId, itemId: bumpedItemId },
+      data: { quantity: STOCK_PER_ITEM + 10, lineTotal: (STOCK_PER_ITEM + 10) * 100000 },
+    });
+
+    const res = await request(app)
+      .post(`/api/v1/orders/${orderId}/export-equipment`)
+      .set('Authorization', authHeader(managerId))
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('BAD_REQUEST');
+    expect(res.body.error.details.items).toEqual([
+      expect.objectContaining({ itemId: bumpedItemId, required: STOCK_PER_ITEM + 10 - (QTY_PER_ITEM + 3) }),
+    ]);
+  });
+
+  it('lần 4: tăng vượt tồn kho, có force: true -> cho phép xuất, tồn kho xuống số âm', async () => {
+    const bumpedItemId = itemIds[0];
+    // Hiện tại net exported là QTY_PER_ITEM + 3, quantityTotal là STOCK_PER_ITEM - (QTY_PER_ITEM + 3).
+    // Báo giá đòi STOCK_PER_ITEM + 10, tức là delta = STOCK_PER_ITEM + 10 - (QTY_PER_ITEM + 3).
+    // Do force = true, sẽ được giảm xuống âm.
+
+    const res = await request(app)
+      .post(`/api/v1/orders/${orderId}/export-equipment`)
+      .set('Authorization', authHeader(managerId))
+      .send({ force: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.unchanged).toBe(false);
+    expect(res.body.data.movements).toEqual([
+      expect.objectContaining({ itemId: bumpedItemId, movementType: 'OUTBOUND' }),
+    ]);
+
+    const inv = await prisma.inventory.findUniqueOrThrow({ where: { itemId: bumpedItemId } });
+    // Tồn kho cuối cùng = STOCK_PER_ITEM - (STOCK_PER_ITEM + 10) = -10
+    expect(inv.quantityTotal).toBe(-10);
+  });
 });

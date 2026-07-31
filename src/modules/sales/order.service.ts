@@ -637,6 +637,7 @@ async function exportEquipment(
   orderId: string,
   performedBy: string,
   notes: string | null,
+  force?: boolean,
 ): Promise<ExportEquipmentResultDTO> {
   const existing = await findOrderOrThrow(orderId);
 
@@ -679,6 +680,7 @@ async function exportEquipment(
       notes,
       quotationCode: quotation.quotationCode,
       targetLines,
+      force,
     });
 
     return {

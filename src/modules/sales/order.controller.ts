@@ -162,7 +162,7 @@ async function exportEquipment(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { orderId } = req.params as unknown as OrderIdParam;
   const body = req.body as ExportEquipmentBody;
-  const result = await orderService.exportEquipment(orderId, req.user.id, body.notes ?? null);
+  const result = await orderService.exportEquipment(orderId, req.user.id, body.notes ?? null, body.force);
   ok(res, result);
 }
 
