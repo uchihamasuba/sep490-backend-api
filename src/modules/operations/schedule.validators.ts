@@ -21,6 +21,11 @@ export const listSchedulePlansQuerySchema = z
     taskId: z.string().trim().min(1).optional(),
     dateFrom: z.coerce.date().optional(),
     dateTo: z.coerce.date().optional(),
+    // 'timeline' (mặc định, giữ nguyên hành vi cũ) lọc theo [orders.event_date, MAX(end_time)] của cả
+    // đơn — dùng cho view timeline theo đơn hàng. 'plan' lọc trực tiếp theo start_time của TỪNG dòng
+    // schedule_plan — dùng cho lịch tuần/ngày cá nhân (mobile-manager) nơi cần đúng các plan thật sự
+    // diễn ra trong khoảng ngày đang xem, không kèm việc của đơn khác chỉ vì event_date rơi vào cửa sổ.
+    dateMode: z.enum(['timeline', 'plan']).optional(),
     // Lọc "chỉ plan của tôi" (docs/api/api.md gap (b)) — Leader/Technical gọi kèm assigneeUserId =
     // chính user.id đang đăng nhập thay vì tải toàn bộ hệ thống về lọc client-side.
     assigneeUserId: z.string().trim().min(1).optional(),

@@ -158,6 +158,7 @@ async function listSchedulePlans(
     taskId: query.taskId,
     dateFrom: query.dateFrom,
     dateTo: query.dateTo,
+    dateMode: query.dateMode ?? 'timeline',
     assigneeUserId: query.assigneeUserId,
     skip,
     take,
