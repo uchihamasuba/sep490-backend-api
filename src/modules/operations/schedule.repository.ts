@@ -253,6 +253,22 @@ export const scheduleRepository = {
     return { rows, totalItems };
   },
 
+  getWorkTaskById(taskId: string) {
+    return prisma.workTask.findUnique({ where: { taskId } });
+  },
+
+  getWorkTaskByCode(taskCode: string) {
+    return prisma.workTask.findUnique({ where: { taskCode } });
+  },
+
+  createWorkTask(data: Prisma.WorkTaskUncheckedCreateInput) {
+    return prisma.workTask.create({ data });
+  },
+
+  updateWorkTask(taskId: string, data: Prisma.WorkTaskUpdateInput) {
+    return prisma.workTask.update({ where: { taskId }, data });
+  },
+
   delete(planId: string) {
     return prisma.schedulePlan.delete({ where: { planId } });
   },

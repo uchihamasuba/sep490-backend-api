@@ -13,9 +13,12 @@ import {
   createSchedulePlansBatchBodySchema,
   listSchedulePlansQuerySchema,
   planIdParamSchema,
-  updateSchedulePlanBodySchema,
   updateSchedulePlanStatusBodySchema,
+  updateSchedulePlanBodySchema,
   warehouseMovementBodySchema,
+  taskIdParamSchema,
+  createWorkTaskBodySchema,
+  updateWorkTaskBodySchema,
 } from './schedule.validators';
 
 // Mounted at /api/v1/schedule-plans
@@ -139,3 +142,31 @@ export const workTaskRouter = Router();
 
 workTaskRouter.use(requireAuth);
 workTaskRouter.get('/', asyncHandler(scheduleController.listWorkTasks));
+
+workTaskRouter.get(
+  '/:taskId',
+  validate(taskIdParamSchema, 'params'),
+  asyncHandler(scheduleController.getWorkTask),
+);
+
+workTaskRouter.post(
+  '/',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(createWorkTaskBodySchema, 'body'),
+  asyncHandler(scheduleController.createWorkTask),
+);
+
+workTaskRouter.put(
+  '/:taskId',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(taskIdParamSchema, 'params'),
+  validate(updateWorkTaskBodySchema, 'body'),
+  asyncHandler(scheduleController.updateWorkTask),
+);
+
+workTaskRouter.delete(
+  '/:taskId',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(taskIdParamSchema, 'params'),
+  asyncHandler(scheduleController.deleteWorkTask),
+);

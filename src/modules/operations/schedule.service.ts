@@ -13,6 +13,8 @@ import type {
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
   WarehouseMovementBody,
+  CreateWorkTaskBody,
+  UpdateWorkTaskBody,
 } from './schedule.validators';
 
 export interface Actor {
@@ -388,6 +390,52 @@ async function listWorkTasks(query: ListWorkTasksQuery) {
   };
 }
 
+async function getWorkTask(taskId: string) {
+  const task = await scheduleRepository.getWorkTaskById(taskId);
+  if (!task) throw AppError.notFound('Không tìm thấy Work Task');
+  return { taskId: task.taskId, taskCode: task.taskCode, taskName: task.taskName, description: task.description, isActive: task.isActive };
+}
+
+async function createWorkTask(data: CreateWorkTaskBody) {
+  const existing = await scheduleRepository.getWorkTaskByCode(data.taskCode);
+  if (existing) throw AppError.badRequest('Mã công việc đã tồn tại');
+  
+  const created = await scheduleRepository.createWorkTask({
+    taskCode: data.taskCode,
+    taskName: data.taskName,
+    description: data.description,
+    isActive: data.isActive ?? true,
+  });
+  
+  return { taskId: created.taskId, taskCode: created.taskCode, taskName: created.taskName, description: created.description, isActive: created.isActive };
+}
+
+async function updateWorkTask(taskId: string, data: UpdateWorkTaskBody) {
+  const existing = await scheduleRepository.getWorkTaskById(taskId);
+  if (!existing) throw AppError.notFound('Không tìm thấy Work Task');
+
+  if (data.taskCode && data.taskCode !== existing.taskCode) {
+    const codeConflict = await scheduleRepository.getWorkTaskByCode(data.taskCode);
+    if (codeConflict) throw AppError.badRequest('Mã công việc đã tồn tại');
+  }
+
+  const updated = await scheduleRepository.updateWorkTask(taskId, {
+    taskCode: data.taskCode,
+    taskName: data.taskName,
+    description: data.description,
+    isActive: data.isActive,
+  });
+
+  return { taskId: updated.taskId, taskCode: updated.taskCode, taskName: updated.taskName, description: updated.description, isActive: updated.isActive };
+}
+
+async function deleteWorkTask(taskId: string) {
+  const existing = await scheduleRepository.getWorkTaskById(taskId);
+  if (!existing) throw AppError.notFound('Không tìm thấy Work Task');
+  
+  await scheduleRepository.updateWorkTask(taskId, { isActive: false });
+}
+
 // Không có DELETE thật trong đặc tả gốc (docs/api/kehoachvaphancong_api.md mục 11.1 khuyến nghị dùng
 // PATCH .../status CANCELLED) — cung cấp thêm endpoint xóa cứng theo yêu cầu, nhưng chỉ cho phép khi
 // kế hoạch CHƯA từng CONFIRMED/thi công (PENDING) hoặc ĐÃ hủy (CANCELLED), để không mất dấu vết của kế
@@ -491,6 +539,10 @@ export const scheduleService = {
   checkOut,
   attachEvidence,
   listWorkTasks,
+  getWorkTask,
+  createWorkTask,
+  updateWorkTask,
+  deleteWorkTask,
   deleteSchedulePlan,
   createSchedulePlansBatch,
   updateSchedulePlansStatusBatch,

@@ -14,6 +14,9 @@ import type {
   ListSchedulePlansQuery,
   ListWorkTasksQuery,
   PlanIdParam,
+  TaskIdParam,
+  CreateWorkTaskBody,
+  UpdateWorkTaskBody,
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
   WarehouseMovementBody,
@@ -101,6 +104,31 @@ async function listWorkTasks(req: Request, res: Response) {
   ok(res, result.data, result.meta);
 }
 
+async function getWorkTask(req: Request, res: Response) {
+  const { taskId } = req.params as unknown as TaskIdParam;
+  const result = await scheduleService.getWorkTask(taskId);
+  ok(res, result);
+}
+
+async function createWorkTask(req: Request, res: Response) {
+  const body = req.body as CreateWorkTaskBody;
+  const result = await scheduleService.createWorkTask(body);
+  created(res, result);
+}
+
+async function updateWorkTask(req: Request, res: Response) {
+  const { taskId } = req.params as unknown as TaskIdParam;
+  const body = req.body as UpdateWorkTaskBody;
+  const result = await scheduleService.updateWorkTask(taskId, body);
+  ok(res, result);
+}
+
+async function deleteWorkTask(req: Request, res: Response) {
+  const { taskId } = req.params as unknown as TaskIdParam;
+  await scheduleService.deleteWorkTask(taskId);
+  ok(res, { taskId });
+}
+
 async function remove(req: Request, res: Response) {
   const { planId } = req.params as unknown as PlanIdParam;
   await scheduleService.deleteSchedulePlan(planId);
@@ -140,6 +168,10 @@ export const scheduleController = {
   checkOut,
   attachEvidence,
   listWorkTasks,
+  getWorkTask,
+  createWorkTask,
+  updateWorkTask,
+  deleteWorkTask,
   remove,
   createBatch,
   updateStatusBatch,

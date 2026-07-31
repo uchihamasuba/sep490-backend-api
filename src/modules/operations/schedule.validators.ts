@@ -167,3 +167,25 @@ export type UpdateSchedulePlanStatusBody = z.infer<typeof updateSchedulePlanStat
 export type AddAssigneeBody = z.infer<typeof addAssigneeBodySchema>;
 export type CreateSchedulePlansBatchBody = z.infer<typeof createSchedulePlansBatchBodySchema>;
 export type BatchPlanInput = z.infer<typeof batchPlanInputSchema>;
+
+export const taskIdParamSchema = z.object({
+  taskId: z.string().uuid('Mã công việc không hợp lệ (phải là UUID)'),
+});
+
+export const createWorkTaskBodySchema = z.object({
+  taskCode: z.string().trim().min(1, 'Mã công việc không được để trống'),
+  taskName: z.string().trim().min(1, 'Tên công việc không được để trống'),
+  description: z.string().trim().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export const updateWorkTaskBodySchema = z.object({
+  taskCode: z.string().trim().min(1, 'Mã công việc không được để trống').optional(),
+  taskName: z.string().trim().min(1, 'Tên công việc không được để trống').optional(),
+  description: z.string().trim().optional(),
+  isActive: z.boolean().optional(),
+});
+
+export type TaskIdParam = z.infer<typeof taskIdParamSchema>;
+export type CreateWorkTaskBody = z.infer<typeof createWorkTaskBodySchema>;
+export type UpdateWorkTaskBody = z.infer<typeof updateWorkTaskBodySchema>;
