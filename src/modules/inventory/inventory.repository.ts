@@ -103,10 +103,31 @@ export const inventoryRepository = {
         schedulePlans: { some: {} }
       },
       select: {
+        orderId: true,
         orderItems: { where: { itemId, source: 'INTERNAL' }, select: { quantity: true } },
         schedulePlans: { select: { startTime: true, task: { select: { taskCode: true } } } }
       }
     });
+
+    if (orders.length === 0) return 0;
+
+    // Phần nhu cầu của đơn đã có giao dịch thuê Nhà cung cấp (chưa hủy) cho đúng item này — không tính
+    // vào "đã khóa" của kho nội bộ, vì phần đó được cung ứng từ bên ngoài, không lấy từ kho nội bộ. Nếu
+    // không trừ phần này, 1 đơn có `order_items.quantity` lớn hơn nhiều tồn kho thật (vì phần lớn đã
+    // thuê bù NCC) sẽ khiến "đã khóa" vượt xa tổng tồn kho, kéo "khả dụng" xuống âm sai lệch.
+    const supplierCoveredRows = await prisma.supplierTransactionItem.findMany({
+      where: {
+        itemId,
+        transaction: { orderId: { in: orders.map((o) => o.orderId) }, status: { not: 'CANCELLED' } },
+      },
+      select: { quantity: true, transaction: { select: { orderId: true } } },
+    });
+    const supplierCoveredByOrder = new Map<string, number>();
+    for (const row of supplierCoveredRows) {
+      const orderId = row.transaction.orderId;
+      if (!orderId) continue;
+      supplierCoveredByOrder.set(orderId, (supplierCoveredByOrder.get(orderId) ?? 0) + row.quantity);
+    }
 
     const queryTime = date.getTime();
     const nextDayTime = queryTime + 24 * 60 * 60 * 1000;
@@ -132,7 +153,9 @@ export const inventoryRepository = {
       }
 
       if (lockStartTime < nextDayTime && lockEndTime >= queryTime) {
-        totalLocked += order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+        const orderNeed = order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+        const supplierCovered = supplierCoveredByOrder.get(order.orderId) ?? 0;
+        totalLocked += Math.max(orderNeed - supplierCovered, 0);
       }
     }
     return totalLocked;

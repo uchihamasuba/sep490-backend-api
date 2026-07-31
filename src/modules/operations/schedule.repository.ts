@@ -8,6 +8,7 @@ export interface SchedulePlanListFilter {
   taskId?: string;
   dateFrom?: Date;
   dateTo?: Date;
+  dateMode?: 'timeline' | 'plan';
   assigneeUserId?: string;
 }
 
@@ -48,6 +49,21 @@ function buildWhere(filter: SchedulePlanListFilter, dateMatchedOrderIds?: string
   if (filter.status) where.status = filter.status;
   if (filter.taskId) where.taskId = filter.taskId;
   if (filter.assigneeUserId) where.assignees = { some: { userId: filter.assigneeUserId } };
+
+  // dateMode 'plan' (lịch tuần/ngày cá nhân — mobile-manager): lọc trực tiếp theo start_time của từng
+  // dòng, KHÔNG kéo theo các dòng khác của cùng order nằm ngoài cửa sổ. dateTo lấy hết cả ngày cuối
+  // (cộng 1 ngày, dùng lt) để khớp với cách hiểu "dateFrom..dateTo" là khoảng ngày trọn vẹn ở chế độ
+  // timeline (vốn so sánh qua DATE(), luôn trọn ngày).
+  if (filter.dateMode === 'plan' && (filter.dateFrom || filter.dateTo)) {
+    const startTimeFilter: Prisma.DateTimeFilter = {};
+    if (filter.dateFrom) startTimeFilter.gte = filter.dateFrom;
+    if (filter.dateTo) {
+      const dateToExclusive = new Date(filter.dateTo);
+      dateToExclusive.setDate(dateToExclusive.getDate() + 1);
+      startTimeFilter.lt = dateToExclusive;
+    }
+    where.startTime = startTimeFilter;
+  }
 
   // orderId tường minh (trang chi tiết 1 đơn) VÀ orderId lọc theo cửa sổ ngày (tab timeline/lịch điều
   // phối đa đơn) có thể cùng xuất hiện — kết hợp bằng AND thay vì ghi đè lẫn nhau.
@@ -90,7 +106,8 @@ async function findDateMatchedOrderIds(dateFrom?: Date, dateTo?: Date): Promise<
 
 export const scheduleRepository = {
   async findMany(params: SchedulePlanListParams) {
-    const dateMatchedOrderIds = await findDateMatchedOrderIds(params.dateFrom, params.dateTo);
+    const dateMatchedOrderIds =
+      params.dateMode === 'plan' ? undefined : await findDateMatchedOrderIds(params.dateFrom, params.dateTo);
     const where = buildWhere(params, dateMatchedOrderIds);
     const [rows, totalItems] = await Promise.all([
       prisma.schedulePlan.findMany({
