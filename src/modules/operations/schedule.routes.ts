@@ -20,6 +20,7 @@ import {
   createWorkTaskBodySchema,
   updateWorkTaskBodySchema,
   listAttendancesQuerySchema,
+  listWorkTasksQuerySchema,
 } from './schedule.validators';
 
 // Mounted at /api/v1/schedule-plans
@@ -149,7 +150,11 @@ scheduleRouter.post(
 export const workTaskRouter = Router();
 
 workTaskRouter.use(requireAuth);
-workTaskRouter.get('/', asyncHandler(scheduleController.listWorkTasks));
+workTaskRouter.get(
+  '/',
+  validate(listWorkTasksQuerySchema, 'query'),
+  asyncHandler(scheduleController.listWorkTasks)
+);
 
 workTaskRouter.get(
   '/:taskId',

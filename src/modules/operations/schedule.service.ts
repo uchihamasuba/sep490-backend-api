@@ -383,7 +383,7 @@ async function listWorkTasks(query: ListWorkTasksQuery) {
 
   const { rows, totalItems } = await scheduleRepository.listWorkTasks(skip, take, query.search);
   return {
-    data: rows.map((t) => ({ taskId: t.taskId, taskCode: t.taskCode, taskName: t.taskName, description: t.description })),
+    data: rows.map((t) => ({ taskId: t.taskId, taskCode: t.taskCode, taskName: t.taskName, description: t.description, isActive: t.isActive })),
     meta: paginated
       ? { page, limit, totalItems, totalPages: Math.ceil(totalItems / limit) }
       : { page: null, limit: null, totalItems, totalPages: null },
