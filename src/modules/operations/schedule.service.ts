@@ -534,7 +534,7 @@ async function listAttendances(query: ListAttendancesQuery) {
   const skip = paginated ? (page - 1) * limit : undefined;
   const take = paginated ? limit : undefined;
 
-  const { rows, totalItems } = await scheduleRepository.listAttendances(skip, take, query.orderId);
+  const { rows, totalItems } = await scheduleRepository.listAttendances(skip, take, query.orderId, query.search, query.taskId);
   return {
     data: rows,
     meta: paginated

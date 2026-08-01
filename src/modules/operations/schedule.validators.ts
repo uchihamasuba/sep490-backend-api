@@ -154,6 +154,8 @@ export const listWorkTasksQuerySchema = z.object({
 
 export const listAttendancesQuerySchema = z.object({
   orderId: z.string().trim().optional(),
+  search: z.string().trim().optional(),
+  taskId: z.string().trim().optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });

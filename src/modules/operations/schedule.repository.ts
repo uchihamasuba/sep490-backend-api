@@ -281,10 +281,23 @@ export const scheduleRepository = {
     return prisma.schedulePlan.delete({ where: { planId } });
   },
 
-  async listAttendances(skip?: number, take?: number, orderId?: string) {
+  async listAttendances(skip?: number, take?: number, orderId?: string, search?: string, taskId?: string) {
     const where: Prisma.SchedulePlanAssigneeWhereInput = {};
-    if (orderId) {
-      where.plan = { orderId };
+    
+    const planConditions: Prisma.SchedulePlanWhereInput = {};
+    if (orderId) planConditions.orderId = orderId;
+    if (taskId) planConditions.taskId = taskId;
+    if (Object.keys(planConditions).length > 0) {
+      where.plan = planConditions;
+    }
+
+    if (search) {
+      where.user = {
+        OR: [
+          { fullName: { contains: search } },
+          { employeeCode: { contains: search } },
+        ],
+      };
     }
 
     const [rows, totalItems] = await Promise.all([
