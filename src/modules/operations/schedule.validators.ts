@@ -141,13 +141,13 @@ const warehouseMovementLineSchema = z.object({
   itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
   quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
 });
-
 export const warehouseMovementBodySchema = z.object({
   items: z.array(warehouseMovementLineSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
   notes: z.string().trim().optional(),
 });
 
 export const listWorkTasksQuerySchema = z.object({
+  search: z.string().trim().optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });

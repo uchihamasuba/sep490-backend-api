@@ -245,10 +245,18 @@ export const scheduleRepository = {
     return prisma.schedulePlan.update({ where: { planId }, data: { evidenceId } });
   },
 
-  async listWorkTasks(skip?: number, take?: number) {
+  async listWorkTasks(skip?: number, take?: number, search?: string) {
+    const where: Prisma.WorkTaskWhereInput = { isActive: true };
+    if (search) {
+      where.OR = [
+        { taskCode: { contains: search } },
+        { taskName: { contains: search } },
+      ];
+    }
+
     const [rows, totalItems] = await Promise.all([
-      prisma.workTask.findMany({ where: { isActive: true }, orderBy: { taskName: 'asc' }, skip, take }),
-      prisma.workTask.count({ where: { isActive: true } }),
+      prisma.workTask.findMany({ where, orderBy: { taskName: 'asc' }, skip, take }),
+      prisma.workTask.count({ where }),
     ]);
     return { rows, totalItems };
   },

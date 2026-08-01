@@ -373,7 +373,6 @@ async function attachEvidence(planId: string, evidenceId: string, actor: Actor):
   await scheduleRepository.attachEvidence(planId, evidenceId);
   return getSchedulePlanById(planId);
 }
-
 async function listWorkTasks(query: ListWorkTasksQuery) {
   const paginated = query.page !== undefined || query.limit !== undefined;
   const page = query.page ?? 1;
@@ -381,7 +380,7 @@ async function listWorkTasks(query: ListWorkTasksQuery) {
   const skip = paginated ? (page - 1) * limit : undefined;
   const take = paginated ? limit : undefined;
 
-  const { rows, totalItems } = await scheduleRepository.listWorkTasks(skip, take);
+  const { rows, totalItems } = await scheduleRepository.listWorkTasks(skip, take, query.search);
   return {
     data: rows.map((t) => ({ taskId: t.taskId, taskCode: t.taskCode, taskName: t.taskName, description: t.description })),
     meta: paginated
