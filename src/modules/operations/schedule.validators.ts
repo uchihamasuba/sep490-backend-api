@@ -152,6 +152,13 @@ export const listWorkTasksQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
 
+export const listAttendancesQuerySchema = z.object({
+  orderId: z.string().trim().optional(),
+  page: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().positive().max(500).optional(),
+});
+
+
 export type CheckInBody = z.infer<typeof checkInBodySchema>;
 export type CheckOutBody = z.infer<typeof checkOutBodySchema>;
 export type WarehouseMovementBody = z.infer<typeof warehouseMovementBodySchema>;
@@ -161,6 +168,7 @@ export type BatchUpdateSchedulePlanStatusBody = z.infer<typeof batchUpdateSchedu
 export type AssigneeParam = z.infer<typeof assigneeParamSchema>;
 export type ListSchedulePlansQuery = z.infer<typeof listSchedulePlansQuerySchema>;
 export type ListWorkTasksQuery = z.infer<typeof listWorkTasksQuerySchema>;
+export type ListAttendancesQuery = z.infer<typeof listAttendancesQuerySchema>;
 export type CreateSchedulePlanBody = z.infer<typeof createSchedulePlanBodySchema>;
 export type UpdateSchedulePlanBody = z.infer<typeof updateSchedulePlanBodySchema>;
 export type UpdateSchedulePlanStatusBody = z.infer<typeof updateSchedulePlanStatusBodySchema>;

@@ -19,6 +19,7 @@ import {
   taskIdParamSchema,
   createWorkTaskBodySchema,
   updateWorkTaskBodySchema,
+  listAttendancesQuerySchema,
 } from './schedule.validators';
 
 // Mounted at /api/v1/schedule-plans
@@ -27,6 +28,13 @@ export const scheduleRouter = Router();
 scheduleRouter.use(requireAuth);
 
 scheduleRouter.get('/', validate(listSchedulePlansQuerySchema, 'query'), asyncHandler(scheduleController.list));
+
+scheduleRouter.get(
+  '/attendances',
+  requireRole('ADMIN', 'MANAGER'),
+  validate(listAttendancesQuerySchema, 'query'),
+  asyncHandler(scheduleController.listAttendances)
+);
 
 scheduleRouter.get(
   '/:planId',

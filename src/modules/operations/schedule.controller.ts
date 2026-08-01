@@ -20,6 +20,7 @@ import type {
   UpdateSchedulePlanBody,
   UpdateSchedulePlanStatusBody,
   WarehouseMovementBody,
+  ListAttendancesQuery,
 } from './schedule.validators';
 
 function requireActor(req: Request) {
@@ -156,6 +157,13 @@ async function recordWarehouseMovement(req: Request, res: Response) {
   created(res, movements);
 }
 
+
+async function listAttendances(req: Request, res: Response) {
+  const query = req.query as unknown as ListAttendancesQuery;
+  const result = await scheduleService.listAttendances(query);
+  ok(res, result.data, { ...result.meta });
+}
+
 export const scheduleController = {
   list,
   getById,
@@ -176,4 +184,5 @@ export const scheduleController = {
   createBatch,
   updateStatusBatch,
   recordWarehouseMovement,
+  listAttendances,
 };

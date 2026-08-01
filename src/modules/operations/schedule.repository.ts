@@ -281,6 +281,30 @@ export const scheduleRepository = {
     return prisma.schedulePlan.delete({ where: { planId } });
   },
 
+  async listAttendances(skip?: number, take?: number, orderId?: string) {
+    const where: Prisma.SchedulePlanAssigneeWhereInput = {};
+    if (orderId) {
+      where.plan = { orderId };
+    }
+
+    const [rows, totalItems] = await Promise.all([
+      prisma.schedulePlanAssignee.findMany({
+        where,
+        include: {
+          attendance: true,
+          user: true,
+          plan: { include: { order: true, task: true } },
+        },
+        orderBy: { plan: { startTime: 'desc' } },
+        skip,
+        take,
+      }),
+      prisma.schedulePlanAssignee.count({ where }),
+    ]);
+
+    return { rows, totalItems };
+  },
+
   // Tạo nhiều dòng schedule_plans cùng orderId trong 1 transaction (docs/api/kehoachvaphancong_api.md
   // mục 8.5 điểm 2) — mã planCode sinh tuần tự TRƯỚC khi vào transaction vì mỗi create() độc lập, không
   // đọc được kết quả của create() khác trong cùng mảng $transaction.

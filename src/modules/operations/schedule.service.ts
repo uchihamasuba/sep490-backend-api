@@ -15,6 +15,7 @@ import type {
   WarehouseMovementBody,
   CreateWorkTaskBody,
   UpdateWorkTaskBody,
+  ListAttendancesQuery,
 } from './schedule.validators';
 
 export interface Actor {
@@ -526,6 +527,21 @@ function recordWarehouseMovement(planId: string, body: WarehouseMovementBody, ac
   return inventoryService.recordFieldOutbound(planId, body, actor);
 }
 
+async function listAttendances(query: ListAttendancesQuery) {
+  const paginated = query.page !== undefined || query.limit !== undefined;
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 500;
+  const skip = paginated ? (page - 1) * limit : undefined;
+  const take = paginated ? limit : undefined;
+
+  const { rows, totalItems } = await scheduleRepository.listAttendances(skip, take, query.orderId);
+  return {
+    data: rows,
+    meta: paginated
+      ? { page, limit, totalItems, totalPages: Math.ceil(totalItems / limit) }
+      : { page: null, limit: null, totalItems, totalPages: null },
+  };
+}
 export const scheduleService = {
   listSchedulePlans,
   getSchedulePlanById,
@@ -546,4 +562,5 @@ export const scheduleService = {
   createSchedulePlansBatch,
   updateSchedulePlansStatusBatch,
   recordWarehouseMovement,
+  listAttendances,
 };
