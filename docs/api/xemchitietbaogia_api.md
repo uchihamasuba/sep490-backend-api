@@ -113,66 +113,40 @@ không thuộc về đây** — nó nên hiển thị ở trang chi tiết Order
 liên kết trực tiếp và hợp lệ), Quotation detail chỉ nên **link sang** trang Order/Survey tương ứng (nếu
 đã có) thay vì tự vẽ lại toàn bộ thông tin phân công tại đây.
 
-**Đề xuất (cần Product xác nhận trước khi backend code)**:
-- **Hướng A (khuyến nghị, nhất quán với hướng đã chọn ở doc danh sách)**: bỏ khối "Phân công khảo sát báo
-  giá" khỏi trang chi tiết Quotation. Thay bằng 1 dòng liên kết nhỏ "Xem khảo sát hiện trường" trỏ sang
-  trang Order/Survey **chỉ khi** `orders` có bản ghi với `quotation_id` = báo giá này (dùng
-  `GET /api/v1/quotations/:id` mở rộng trả kèm `linkedOrderId` — xem mục 5.1).
-- **Hướng B (không khuyến nghị)**: thêm cột `quotation_id` (nullable) trực tiếp vào `survey_reports` và/hoặc
-  `schedule_plans` để cho phép gắn khảo sát/kế hoạch thẳng vào Quotation trước khi có Order — phá vỡ ý
-  nghĩa hiện tại của 2 bảng này (luôn thuộc về Order thi công thật) và tạo 2 nguồn sự thật song song cho
-  cùng 1 khái niệm "khảo sát", dễ gây double-tracking khi Order được tạo sau đó từ chính Quotation này.
+## 3. Trang 2/2 — Picklist chi tiết vật tư chuẩn bị kho
 
-## 3. Trang 2/2 — Picklist chi tiết vật tư chuẩn bị kho — vấn đề kiến trúc nghiêm trọng nhất tài liệu
+Trong phiên bản mới, hệ thống đã hỗ trợ bảng `item_components` để lưu trữ Bill of Materials (BOM) — tức là một hạng mục (vd "Hệ thống Loa Line Array RCF cao cấp") có thể cấu thành từ nhiều vật tư con (Củ loa, Loa Subwoofer, v.v.).
 
-### 3.1. Bóc tách hạng mục thành "vật tư cấu thành" (`getQuotationItemPicklist`)
+Để lấy dữ liệu cho trang này, Frontend sử dụng API chuyên dụng sau:
 
-Với mỗi hạng mục báo giá (vd "Hệ thống Loa Line Array RCF cao cấp"), Trang 2 hiển thị **một bảng con liệt
-kê 3-6 vật tư/thiết bị cấu thành cụ thể** (vd "Củ loa Line Array RCF...", "Loa Subwoofer...", "Khung giàn
-treo loa...", "Bàn điều khiển Mixer...", "Tủ rack thiết bị...", "Dây cáp tín hiệu..."), mỗi dòng có SL
-cần/ĐVT/tồn kho/nguồn/ghi chú kỹ thuật riêng.
-
-Toàn bộ nội dung này hiện là **hard-code theo từ khóa tên hạng mục** (`getQuotationItemPicklist` —
-`if (name.includes('loa'))`, `if (name.includes('beam'))`...) trong `src/mocks/db/quotations.ts`, **không
-đọc từ bất kỳ bảng dữ liệu nào**. Đối chiếu `SHOW TABLES` toàn bộ database thật (24 bảng) — **không tồn
-tại bảng nào biểu diễn quan hệ "1 item cấu thành từ nhiều item/vật tư con"** (không có `bill_of_materials`,
-`item_components`, `item_kits` hay tương tự). `items` là bảng phẳng (item_code/item_name/type_id/unit/giá),
-không có self-reference hay bảng trung gian nào cho phép 1 `item_id` "gồm" nhiều `item_id` khác.
-
-**Đây không phải thiếu 1 endpoint — là thiếu hẳn 1 khái niệm dữ liệu (BOM — Bill of Materials) chưa được
-model hóa trong schema.** Không thể viết endpoint thật cho phần này nếu không có bảng mới, ví dụ:
-
-```sql
--- Đề xuất minh họa, CHƯA CHỐT — cần Product xác nhận có thật sự cần khái niệm này
-CREATE TABLE item_components (
-  component_id varchar(36) PRIMARY KEY,
-  parent_item_id varchar(36) NOT NULL REFERENCES items(item_id), -- hạng mục báo giá (vd "Hệ thống loa...")
-  child_item_id varchar(36) NOT NULL REFERENCES items(item_id),  -- vật tư cấu thành (vd "Củ loa RCF")
-  quantity_per_unit int NOT NULL, -- số lượng vật tư con cần cho 1 đơn vị hạng mục cha
-  is_external tinyint(1) NOT NULL DEFAULT 0, -- Internal (kho BN) hay External (thuê ngoài) — hiện đang suy từ tên, không phải thuộc tính thật của item
-  notes text
-);
+- **Endpoint**: `GET /api/v1/quotations/:quotationId/picklist`
+- **Quyền**: `MANAGER`, `ADMIN`
+- **Logic xử lý**:
+  - Truy vấn tất cả các `QuotationItem` thuộc về `:quotationId`.
+  - Phân rã mỗi hạng mục (`item`) bằng cách JOIN với bảng `item_components` để lấy các thành phần con (`child`).
+  - **Trường hợp không có cấu kiện**: Nếu hạng mục là một sản phẩm độc lập không có thành phần con, API tự động biến chính nó thành một cấu kiện duy nhất (`quantityPerUnit: 1`) để Frontend dễ xử lý mảng đồng nhất.
+  - **Tồn kho khả dụng (`inventoryAvailable`)**: Với mỗi cấu kiện con, lấy thông tin từ bảng `inventory` và tính toán theo công thức: `inventoryAvailable = quantityTotal - quantityDamaged`. (Tạm thời chưa trừ lượng đã `reserve` cho đơn khác).
+- **Cấu trúc Response**:
+```json
+{
+  "quotationItems": [
+    {
+      "id": "qi_1",
+      "name": "Bộ bàn ghế tiệc",
+      "quantity": 3,
+      "components": [
+        {
+          "childItemId": "item_123",
+          "name": "Bàn nhựa",
+          "quantityPerUnit": 1,
+          "totalNeeded": 3,
+          "inventoryAvailable": 12
+        }
+      ]
+    }
+  ]
+}
 ```
-
-**Đề xuất (cần Product/Backend xác nhận)**:
-- **Hướng A (khuyến nghị nếu Picklist là tính năng thật sự cần)**: model hóa BOM như trên, `items` cần
-  phân biệt rõ "item bán/báo giá cho khách" (vd combo "Hệ thống Loa Line Array") và "item vật tư/thiết bị
-  vật lý trong kho" (vd "Củ loa RCF", "Dây cáp Sommer") — 2 loại `items` khác nhau nhưng cùng nằm 1 bảng
-  phẳng hiện tại, cần thêm cách phân loại (cột `item_kind ENUM('SELLABLE','COMPONENT')` hoặc tương tự).
-  Việc nhập liệu BOM cho hàng trăm item thiết bị sự kiện là khối lượng công việc lớn, cần Product cân nhắc
-  độ ưu tiên trước khi backend đầu tư model + endpoint.
-- **Hướng B (tối giản, ít việc nhất)**: bỏ hẳn khái niệm "bóc tách vật tư cấu thành" khỏi Trang 2 — Picklist
-  chỉ hiển thị **thẳng danh sách `quotation_items` gốc** (đã có sẵn từ `GET /api/v1/quotations/:id`) kèm
-  cột tồn kho (vẫn cần giải quyết mục 3.2), không giả lập thêm 1 tầng "vật tư con" không có căn cứ dữ liệu
-  thật. Đây là phiên bản Picklist đơn giản hơn ảnh mẫu nhưng **có thể code thật ngay** với schema hiện tại.
-- **Hướng C**: giữ nguyên hiển thị bóc tách nhưng chuyển hẳn thành **nội dung tĩnh soạn tay bởi
-  Admin/Manager cho từng loại hạng mục phổ biến** (không phải tính tự động từ tồn kho thật) — tương tự
-  cách 1 số hệ thống dùng "checklist mẫu" gắn theo `type_id`, không đòi hỏi model BOM đầy đủ số lượng/tồn
-  kho chính xác, chỉ là gợi ý chuẩn bị. Cần thêm bảng đơn giản hơn Hướng A (chỉ tên gợi ý theo `type_id`,
-  không cần số lượng/tồn kho join thật).
-
-Tài liệu này **không tự chọn hướng** vì đây là quyết định về phạm vi tính năng (Product), không phải chi
-tiết kỹ thuật thuần túy như các mục đã tự chốt ở 2 tài liệu trước.
 
 ### 3.2/3.3. Cột "Tồn kho" và khối "Kiểm tra & dự báo khả dụng tồn kho thiết bị" — không có bảng tồn kho thật
 

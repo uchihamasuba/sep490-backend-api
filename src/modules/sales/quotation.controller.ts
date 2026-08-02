@@ -59,6 +59,12 @@ async function remove(req: Request, res: Response) {
   ok(res, { quotationId });
 }
 
+async function getPicklist(req: Request, res: Response) {
+  const { quotationId } = req.params as unknown as QuotationIdParam;
+  const result = await quotationService.getPicklist(quotationId);
+  ok(res, result);
+}
+
 export const quotationController = {
   list,
   listByCustomer,
@@ -67,4 +73,5 @@ export const quotationController = {
   update,
   updateStatus,
   remove,
+  getPicklist,
 };

@@ -227,4 +227,26 @@ export const quotationRepository = {
     ]);
     return { rows, totalItems };
   },
+
+  getQuotationPicklist(quotationId: string) {
+    return prisma.quotationItem.findMany({
+      where: { quotationId },
+      include: {
+        item: {
+          include: {
+            inventory: true,
+            components: {
+              include: {
+                child: {
+                  include: {
+                    inventory: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  },
 };

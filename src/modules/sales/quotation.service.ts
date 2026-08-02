@@ -314,6 +314,59 @@ async function deleteQuotation(quotationId: string): Promise<void> {
   await quotationRepository.delete(quotationId);
 }
 
+async function getPicklist(quotationId: string) {
+  await findQuotationOrThrow(quotationId);
+  const quotationItems = await quotationRepository.getQuotationPicklist(quotationId);
+
+  const formattedItems = quotationItems.map((qi) => {
+    const components = qi.item.components;
+
+    if (!components || components.length === 0) {
+      const selfInventory = qi.item.inventory;
+      const quantityTotal = selfInventory?.quantityTotal ?? 0;
+      const quantityDamaged = selfInventory?.quantityDamaged ?? 0;
+      
+      return {
+        id: qi.quotationItemId,
+        name: qi.itemName,
+        quantity: qi.quantity,
+        components: [
+          {
+            childItemId: qi.item.itemId,
+            name: qi.item.itemName,
+            quantityPerUnit: 1,
+            totalNeeded: qi.quantity,
+            inventoryAvailable: quantityTotal - quantityDamaged,
+          },
+        ],
+      };
+    }
+
+    const formattedComponents = components.map((comp) => {
+      const childInventory = comp.child.inventory;
+      const quantityTotal = childInventory?.quantityTotal ?? 0;
+      const quantityDamaged = childInventory?.quantityDamaged ?? 0;
+
+      return {
+        childItemId: comp.child.itemId,
+        name: comp.child.itemName,
+        quantityPerUnit: comp.quantity,
+        totalNeeded: comp.quantity * qi.quantity,
+        inventoryAvailable: quantityTotal - quantityDamaged,
+      };
+    });
+
+    return {
+      id: qi.quotationItemId,
+      name: qi.itemName,
+      quantity: qi.quantity,
+      components: formattedComponents,
+    };
+  });
+
+  return { quotationItems: formattedItems };
+}
+
 export const quotationService = {
   listQuotations,
   listQuotationsByCustomer,
@@ -322,4 +375,5 @@ export const quotationService = {
   updateQuotation,
   updateQuotationStatus,
   deleteQuotation,
+  getPicklist,
 };

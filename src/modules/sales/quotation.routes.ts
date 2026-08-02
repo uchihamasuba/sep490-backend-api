@@ -32,6 +32,13 @@ quotationRouter.get(
   asyncHandler(quotationController.getById),
 );
 
+quotationRouter.get(
+  '/:quotationId/picklist',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(quotationIdParamSchema, 'params'),
+  asyncHandler(quotationController.getPicklist),
+);
+
 quotationRouter.put(
   '/:quotationId',
   requireRole('MANAGER'),

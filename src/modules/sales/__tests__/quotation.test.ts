@@ -27,6 +27,7 @@ jest.mock('../quotation.repository', () => {
       updateStatus: jest.fn(),
       delete: jest.fn(),
       findByCustomer: jest.fn(),
+      getQuotationPicklist: jest.fn(),
     },
   };
 });
@@ -397,6 +398,82 @@ describe('quotationService.listQuotations', () => {
       totalItems: 124,
       totalPages: 13,
       counts: { all: 124, draft: 32, approved: 58, rejected: 14, approvedValue: 13_617_613_000 },
+    });
+  });
+});
+
+describe('quotationService.getPicklist', () => {
+  it('maps components correctly for items with and without BOM', async () => {
+    // Mock the findById to bypass findQuotationOrThrow
+    mockedQuotationRepo.findById.mockResolvedValue({ status: 'APPROVED' } as never);
+
+    mockedQuotationRepo.getQuotationPicklist.mockResolvedValue([
+      {
+        quotationItemId: 'qi-1',
+        itemName: 'Bàn ghế',
+        quantity: 3,
+        item: {
+          itemId: 'item-1',
+          itemName: 'Bàn ghế',
+          components: [
+            {
+              quantity: 2,
+              child: {
+                itemId: 'child-1',
+                itemName: 'Bàn',
+                inventory: { quantityTotal: 10, quantityDamaged: 2 },
+              },
+            },
+          ],
+        },
+      },
+      {
+        quotationItemId: 'qi-2',
+        itemName: 'Micro',
+        quantity: 5,
+        item: {
+          itemId: 'item-2',
+          itemName: 'Micro',
+          inventory: { quantityTotal: 20, quantityDamaged: 5 },
+          components: [],
+        },
+      },
+    ] as never);
+
+    const result = await quotationService.getPicklist('quo-1');
+
+    expect(result.quotationItems).toHaveLength(2);
+
+    // Item with BOM
+    expect(result.quotationItems[0]).toEqual({
+      id: 'qi-1',
+      name: 'Bàn ghế',
+      quantity: 3,
+      components: [
+        {
+          childItemId: 'child-1',
+          name: 'Bàn',
+          quantityPerUnit: 2,
+          totalNeeded: 6, // 3 * 2
+          inventoryAvailable: 8, // 10 - 2
+        },
+      ],
+    });
+
+    // Item without BOM (self)
+    expect(result.quotationItems[1]).toEqual({
+      id: 'qi-2',
+      name: 'Micro',
+      quantity: 5,
+      components: [
+        {
+          childItemId: 'item-2',
+          name: 'Micro',
+          quantityPerUnit: 1,
+          totalNeeded: 5, // 5 * 1
+          inventoryAvailable: 15, // 20 - 5
+        },
+      ],
     });
   });
 });
