@@ -6,6 +6,7 @@ export interface CatalogItemListFilter {
   typeId?: string;
   categoryId?: string;
   search?: string;
+  isCombo?: boolean;
 }
 
 export interface CatalogItemListParams extends CatalogItemListFilter {
@@ -15,6 +16,8 @@ export interface CatalogItemListParams extends CatalogItemListFilter {
 
 const detailInclude = {
   type: { include: { category: true } },
+  inventory: true,
+  _count: { select: { components: true } },
 } satisfies Prisma.ItemInclude;
 
 export type CatalogItemWithType = Prisma.ItemGetPayload<{ include: typeof detailInclude }>;
@@ -25,6 +28,13 @@ function buildWhere(filter: CatalogItemListFilter): Prisma.ItemWhereInput {
   if (filter.typeId) where.typeId = filter.typeId;
   if (filter.categoryId) where.type = { categoryId: filter.categoryId };
   if (filter.search) where.itemName = { contains: filter.search };
+  if (filter.isCombo !== undefined) {
+    if (filter.isCombo) {
+      where.components = { some: {} };
+    } else {
+      where.components = { none: {} };
+    }
+  }
   return where;
 }
 
@@ -65,15 +75,30 @@ export const catalogRepository = {
     priceValidTo: Date | null;
     imageUrl: string | null;
     status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE';
+    components?: { componentItemId: string; quantity: number }[];
   }): Promise<CatalogItemWithType> {
-    return prisma.item.create({ data, include: detailInclude });
+    const { components, ...rest } = data;
+    return prisma.item.create({
+      data: {
+        ...rest,
+        components: components
+          ? {
+              create: components.map((c) => ({
+                childId: c.componentItemId,
+                quantity: c.quantity,
+              })),
+            }
+          : undefined,
+      },
+      include: detailInclude,
+    });
   },
 
   findById(itemId: string): Promise<CatalogItemWithType | null> {
     return prisma.item.findUnique({ where: { itemId }, include: detailInclude });
   },
 
-  update(
+  async update(
     itemId: string,
     data: {
       itemName: string;
@@ -85,9 +110,31 @@ export const catalogRepository = {
       priceValidFrom: Date | null;
       priceValidTo: Date | null;
       imageUrl: string | null;
+      components?: { componentItemId: string; quantity: number }[];
     },
   ): Promise<CatalogItemWithType> {
-    return prisma.item.update({ where: { itemId }, data, include: detailInclude });
+    const { components, ...rest } = data;
+
+    if (components) {
+      await prisma.$transaction([
+        prisma.itemComponent.deleteMany({ where: { parentId: itemId } }),
+        prisma.item.update({
+          where: { itemId },
+          data: {
+            ...rest,
+            components: {
+              create: components.map((c) => ({
+                childId: c.componentItemId,
+                quantity: c.quantity,
+              })),
+            },
+          },
+        }),
+      ]);
+      return prisma.item.findUniqueOrThrow({ where: { itemId }, include: detailInclude });
+    }
+
+    return prisma.item.update({ where: { itemId }, data: rest, include: detailInclude });
   },
 
   updateStatus(itemId: string, status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE'): Promise<CatalogItemWithType> {

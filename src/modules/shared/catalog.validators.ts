@@ -13,6 +13,7 @@ export const listCatalogItemsQuerySchema = z.object({
   typeId: z.string().trim().optional(),
   categoryId: z.string().trim().optional(),
   search: z.string().trim().optional(),
+  isCombo: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
@@ -25,6 +26,11 @@ const priceDateRangeRefinementOptions = {
   message: 'Ngày hiệu lực từ phải trước hoặc bằng ngày hiệu lực đến',
   path: ['priceValidTo'],
 };
+
+export const itemComponentSchema = z.object({
+  componentItemId: z.string().trim().min(1, 'Thiếu mã linh kiện'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
+});
 
 export const createCatalogItemBodySchema = z
   .object({
@@ -39,6 +45,7 @@ export const createCatalogItemBodySchema = z
     priceValidTo: z.coerce.date().optional(),
     imageUrl: z.string().trim().optional(),
     status: itemStatusEnum.default('ACTIVE'),
+    components: z.array(itemComponentSchema).optional(),
   })
   .refine(priceDateRangeRefinement, priceDateRangeRefinementOptions);
 
@@ -55,6 +62,7 @@ export const updateCatalogItemBodySchema = z
     priceValidFrom: z.coerce.date().optional(),
     priceValidTo: z.coerce.date().optional(),
     imageUrl: z.string().trim().optional(),
+    components: z.array(itemComponentSchema).optional(),
   })
   .refine(priceDateRangeRefinement, priceDateRangeRefinementOptions);
 

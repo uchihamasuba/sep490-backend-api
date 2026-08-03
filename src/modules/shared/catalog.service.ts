@@ -8,6 +8,7 @@ import {
   type ItemTypeWithCategory,
 } from './catalog.repository';
 import { supplierRepository } from '../operations/supplier.repository';
+import { inventoryService } from '../inventory/inventory.service';
 import type {
   CreateCatalogItemBody,
   CreateCategoryBody,
@@ -36,6 +37,9 @@ export interface CatalogItemDTO {
   priceValidTo: string | null;
   imageUrl: string | null;
   status: string;
+  quantityTotal: number;
+  quantityAvailable: number;
+  isCombo: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -68,6 +72,9 @@ function mapItem(row: CatalogItemWithType): CatalogItemDTO {
     priceValidTo: row.priceValidTo ? row.priceValidTo.toISOString() : null,
     imageUrl: row.imageUrl,
     status: row.status,
+    quantityTotal: row.inventory?.quantityTotal ?? 0,
+    quantityAvailable: (row.inventory?.quantityTotal ?? 0) - (row.inventory?.quantityDamaged ?? 0),
+    isCombo: (row._count?.components ?? 0) > 0,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -89,6 +96,7 @@ async function listItems(
     typeId: query.typeId,
     categoryId: query.categoryId,
     search: query.search,
+    isCombo: query.isCombo,
     skip,
     take,
   });
@@ -118,7 +126,17 @@ async function createItem(body: CreateCatalogItemBody): Promise<CatalogItemDTO> 
     priceValidTo: body.priceValidTo ?? null,
     imageUrl: body.imageUrl ?? null,
     status: body.status,
+    components: body.components,
   });
+
+  const isCombo = body.components && body.components.length > 0;
+  if (!isCombo) {
+    await inventoryService.createInventory({
+      itemId: created.itemId,
+      quantityTotal: 0,
+      quantityDamaged: 0,
+    });
+  }
 
   return mapItem(created);
 }
@@ -146,6 +164,7 @@ async function updateItem(itemId: string, body: UpdateCatalogItemBody): Promise<
     priceValidFrom: body.priceValidFrom ?? null,
     priceValidTo: body.priceValidTo ?? null,
     imageUrl: body.imageUrl ?? null,
+    components: body.components,
   });
 
   return mapItem(updated);

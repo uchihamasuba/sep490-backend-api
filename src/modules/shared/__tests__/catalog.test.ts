@@ -24,6 +24,12 @@ jest.mock('../../operations/supplier.repository', () => ({
   },
 }));
 
+jest.mock('../../inventory/inventory.service', () => ({
+  inventoryService: {
+    createInventory: jest.fn(),
+  },
+}));
+
 const mockedRepo = catalogRepository as jest.Mocked<typeof catalogRepository>;
 const mockedSupplierRepo = supplierRepository as jest.Mocked<typeof supplierRepository>;
 
