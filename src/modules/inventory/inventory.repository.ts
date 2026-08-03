@@ -97,15 +97,15 @@ export const inventoryRepository = {
   async getLockedQuantityByDate(itemId: string, date: Date): Promise<number> {
     const orders = await prisma.order.findMany({
       where: {
-        orderStatus: { in: ['CONFIRMED', 'IN_PROGRESS'] },
+        orderStatus: 'CONFIRMED',
         pickedUpAt: null,
         orderItems: { some: { itemId, source: 'INTERNAL' } },
-        schedulePlans: { some: {} }
       },
       select: {
         orderId: true,
+        eventDate: true,
+        endDate: true,
         orderItems: { where: { itemId, source: 'INTERNAL' }, select: { quantity: true } },
-        schedulePlans: { select: { startTime: true, task: { select: { taskCode: true } } } }
       }
     });
 
@@ -134,23 +134,8 @@ export const inventoryRepository = {
 
     let totalLocked = 0;
     for (const order of orders) {
-      if (order.schedulePlans.length === 0) continue;
-
-      let lockStartTime: number;
-      const setupPlan = order.schedulePlans.find(p => p.task.taskCode === 'SETUP');
-      if (setupPlan) {
-        lockStartTime = setupPlan.startTime.getTime();
-      } else {
-        lockStartTime = Math.min(...order.schedulePlans.map(p => p.startTime.getTime()));
-      }
-
-      let lockEndTime: number;
-      const collectPlan = order.schedulePlans.find(p => p.task.taskCode === 'COLLECT');
-      if (collectPlan) {
-        lockEndTime = collectPlan.startTime.getTime();
-      } else {
-        lockEndTime = Infinity;
-      }
+      let lockStartTime = order.eventDate.getTime();
+      let lockEndTime = order.endDate ? order.endDate.getTime() + 6 * 60 * 60 * 1000 : Infinity;
 
       if (lockStartTime < nextDayTime && lockEndTime >= queryTime) {
         const orderNeed = order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
