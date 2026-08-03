@@ -96,3 +96,20 @@ export type ListCategoriesQuery = z.infer<typeof listCategoriesQuerySchema>;
 export type CreateCategoryBody = z.infer<typeof createCategoryBodySchema>;
 export type UpdateCategoryBody = z.infer<typeof updateCategoryBodySchema>;
 export type ListTypesQuery = z.infer<typeof listTypesQuerySchema>;
+
+export const typeIdParamSchema = z.object({
+  typeId: z.string().trim().min(1, 'Thiếu mã nhóm thiết bị'),
+});
+export const createTypeBodySchema = z.object({
+  categoryId: z.string().trim().min(1, 'Thiếu mã danh mục'),
+  typeName: z.string().trim().min(1, 'Vui lòng nhập tên nhóm thiết bị'),
+  description: z.string().trim().optional(),
+});
+export const updateTypeBodySchema = createTypeBodySchema;
+export const updateTypeStatusBodySchema = z.object({
+  isActive: z.boolean(),
+});
+export type TypeIdParam = z.infer<typeof typeIdParamSchema>;
+export type CreateTypeBody = z.infer<typeof createTypeBodySchema>;
+export type UpdateTypeBody = z.infer<typeof updateTypeBodySchema>;
+export type UpdateTypeStatusBody = z.infer<typeof updateTypeStatusBodySchema>;

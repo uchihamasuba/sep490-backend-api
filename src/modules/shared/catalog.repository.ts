@@ -175,4 +175,16 @@ export const catalogTypeRepository = {
     ]);
     return { rows, totalItems };
   },
+  findById(typeId: string) {
+    return prisma.itemType.findUnique({ where: { typeId }, include: typeWithCategoryInclude });
+  },
+  create(data: { categoryId: string; typeName: string; description: string | null }) {
+    return prisma.itemType.create({ data, include: typeWithCategoryInclude });
+  },
+  update(typeId: string, data: { categoryId: string; typeName: string; description: string | null }) {
+    return prisma.itemType.update({ where: { typeId }, data, include: typeWithCategoryInclude });
+  },
+  updateStatus(typeId: string, isActive: boolean) {
+    return prisma.itemType.update({ where: { typeId }, data: { isActive }, include: typeWithCategoryInclude });
+  },
 };

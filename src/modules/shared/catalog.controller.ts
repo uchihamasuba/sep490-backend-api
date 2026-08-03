@@ -2,6 +2,10 @@ import type { Request, Response } from 'express';
 import { created, ok } from '../../utils/response';
 import { catalogService } from './catalog.service';
 import type {
+  TypeIdParam,
+  CreateTypeBody,
+  UpdateTypeBody,
+  UpdateTypeStatusBody,
   CategoryIdParam,
   CreateCatalogItemBody,
   CreateCategoryBody,
@@ -83,6 +87,26 @@ async function listTypes(req: Request, res: Response) {
   ok(res, result.data, { ...result.meta });
 }
 
+async function createType(req: Request, res: Response) {
+  const body = req.body as CreateTypeBody;
+  const type = await catalogService.createType(body);
+  created(res, type);
+}
+
+async function updateType(req: Request, res: Response) {
+  const { typeId } = req.params as unknown as TypeIdParam;
+  const body = req.body as UpdateTypeBody;
+  const type = await catalogService.updateType(typeId, body);
+  ok(res, type);
+}
+
+async function updateTypeStatus(req: Request, res: Response) {
+  const { typeId } = req.params as unknown as TypeIdParam;
+  const { isActive } = req.body as UpdateTypeStatusBody;
+  const type = await catalogService.updateTypeStatus(typeId, isActive);
+  ok(res, type);
+}
+
 export const catalogController = {
   list,
   create,
@@ -95,4 +119,7 @@ export const catalogController = {
   createCategory,
   updateCategory,
   listTypes,
+  createType,
+  updateType,
+  updateTypeStatus,
 };

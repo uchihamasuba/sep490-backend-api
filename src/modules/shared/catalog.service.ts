@@ -16,6 +16,8 @@ import type {
   ListTypesQuery,
   UpdateCatalogItemBody,
   UpdateCategoryBody,
+  CreateTypeBody,
+  UpdateTypeBody,
 } from './catalog.validators';
 
 export interface CatalogItemDTO {
@@ -328,6 +330,37 @@ async function listTypes(query: ListTypesQuery): Promise<{ data: TypeDTO[]; meta
   };
 }
 
+async function createType(body: CreateTypeBody): Promise<TypeDTO> {
+  const category = await catalogCategoryRepository.findById(body.categoryId);
+  if (!category) throw AppError.notFound('Không tìm thấy danh mục');
+  const created = await catalogTypeRepository.create({
+    categoryId: body.categoryId,
+    typeName: body.typeName,
+    description: body.description ?? null,
+  });
+  return mapType(created);
+}
+
+async function updateType(typeId: string, body: UpdateTypeBody): Promise<TypeDTO> {
+  const existing = await catalogTypeRepository.findById(typeId);
+  if (!existing) throw AppError.notFound('Không tìm thấy nhóm thiết bị');
+  const category = await catalogCategoryRepository.findById(body.categoryId);
+  if (!category) throw AppError.notFound('Không tìm thấy danh mục');
+  const updated = await catalogTypeRepository.update(typeId, {
+    categoryId: body.categoryId,
+    typeName: body.typeName,
+    description: body.description ?? null,
+  });
+  return mapType(updated);
+}
+
+async function updateTypeStatus(typeId: string, isActive: boolean): Promise<TypeDTO> {
+  const existing = await catalogTypeRepository.findById(typeId);
+  if (!existing) throw AppError.notFound('Không tìm thấy nhóm thiết bị');
+  const updated = await catalogTypeRepository.updateStatus(typeId, isActive);
+  return mapType(updated);
+}
+
 export const catalogService = {
   listItems,
   createItem,
@@ -340,4 +373,7 @@ export const catalogService = {
   createCategory,
   updateCategory,
   listTypes,
+  createType,
+  updateType,
+  updateTypeStatus,
 };
