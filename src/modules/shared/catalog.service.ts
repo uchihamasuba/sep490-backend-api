@@ -181,9 +181,11 @@ async function updateItemStatus(itemId: string, status: 'ACTIVE' | 'INACTIVE' | 
 export interface ItemComponentDTO {
   componentId: string;
   childItemId: string;
+  childItemCode: string;
   childItemName: string;
   unit: string;
   quantity: number;
+  quantityAvailable: number;
 }
 
 async function getItemComponents(itemId: string): Promise<ItemComponentDTO[]> {
@@ -194,9 +196,11 @@ async function getItemComponents(itemId: string): Promise<ItemComponentDTO[]> {
   return components.map((c) => ({
     componentId: c.id,
     childItemId: c.childId,
+    childItemCode: c.child.itemCode,
     childItemName: c.child.itemName,
     unit: c.child.unit,
     quantity: c.quantity,
+    quantityAvailable: (c.child.inventory?.quantityTotal ?? 0) - (c.child.inventory?.quantityDamaged ?? 0),
   }));
 }
 

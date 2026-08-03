@@ -144,7 +144,7 @@ export const catalogRepository = {
   findComponentsByItemId(itemId: string) {
     return prisma.itemComponent.findMany({
       where: { parentId: itemId },
-      include: { child: true },
+      include: { child: { include: { inventory: true } } },
     });
   },
 };

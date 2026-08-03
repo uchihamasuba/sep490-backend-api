@@ -279,7 +279,12 @@ describe('GET /api/v1/catalog/items/:itemId/components', () => {
         parentId: 'item-1',
         childId: 'child-1',
         quantity: 2,
-        child: { itemName: 'Micro Shure SM58', unit: 'Cái' },
+        child: { 
+          itemCode: 'CHL-001', 
+          itemName: 'Micro Shure SM58', 
+          unit: 'Cái',
+          inventory: { quantityTotal: 10, quantityDamaged: 2 },
+        },
       },
     ] as never);
 
@@ -292,9 +297,11 @@ describe('GET /api/v1/catalog/items/:itemId/components', () => {
     expect(res.body.data[0]).toMatchObject({
       componentId: 'comp-1',
       childItemId: 'child-1',
+      childItemCode: 'CHL-001',
       childItemName: 'Micro Shure SM58',
       unit: 'Cái',
       quantity: 2,
+      quantityAvailable: 8,
     });
   });
 
