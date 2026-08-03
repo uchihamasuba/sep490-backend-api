@@ -23,6 +23,7 @@ const detailInclude = {
       orderCode: true,
       eventName: true,
       eventDate: true,
+      endDate: true,
       location: true,
       latitude: true,
       longitude: true,

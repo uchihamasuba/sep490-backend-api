@@ -49,6 +49,7 @@ export interface SchedulePlanDTO {
   customerAddress: string | null;
   eventName: string | null;
   eventDate: string;
+  orderEndDate: string | null;
   orderLocation: string;
   taskId: string;
   // docs/api/api.md gap (o) — dùng để gate UI theo loại việc (SurveyReportSection/
@@ -106,6 +107,7 @@ function mapPlan(row: SchedulePlanWithDetails): SchedulePlanDTO {
     customerAddress: row.order.customer.address,
     eventName: row.order.eventName,
     eventDate: row.order.eventDate.toISOString(),
+    orderEndDate: row.order.endDate ? row.order.endDate.toISOString() : null,
     orderLocation: row.order.location,
     taskId: row.taskId,
     taskCode: row.task.taskCode,
