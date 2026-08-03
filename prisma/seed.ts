@@ -827,6 +827,7 @@ async function main(): Promise<void> {
         cancelReason: status === 'CANCELLED' ? randomChoice(['Khách hàng đổi lịch tổ chức', 'Khách hàng huỷ do thay đổi ngân sách', 'Trùng lịch với nhà cung cấp địa điểm']) : null,
         notes: `Đơn hàng chuyển đổi từ báo giá đã duyệt.`,
         createdBy: creator.userId,
+        confirmedAt: (status !== 'NEW' && status !== 'CANCELLED') ? TODAY : null,
         closedAt: isCompleted ? addHours(eventDate, randomInt(6, 30)) : null,
         closedBy: closer ? closer.userId : null,
         pickedUpAt: isPickedUp ? addHours(eventDate, -randomInt(2, 10)) : null,

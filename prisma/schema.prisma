@@ -448,6 +448,7 @@ model Order {
   createdBy         String        @map("created_by") @db.VarChar(36)
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt         DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  confirmedAt       DateTime?     @map("confirmed_at") @db.Timestamp(0)
   /// Mốc 4 "Live Show" (docs/api/tiendosukien_api.md mục 5, đã chốt hướng A) — checklist thao tác nhanh
   /// { backdrop, soundTest, powerBackup, operatorReady }, không có audit ai/lúc nào tick từng mục.
   liveShowChecklist Json?         @map("live_show_checklist")

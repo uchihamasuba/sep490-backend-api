@@ -105,6 +105,8 @@ export const inventoryRepository = {
         orderId: true,
         eventDate: true,
         endDate: true,
+        createdAt: true,
+        confirmedAt: true,
         orderItems: { where: { itemId, source: 'INTERNAL' }, select: { quantity: true } },
         schedulePlans: { select: { startTime: true, endTime: true } },
       }
@@ -143,9 +145,12 @@ export const inventoryRepository = {
       
       if (order.endDate) endCandidates.push(order.endDate.getTime());
       
+      const confirmThreshold = order.confirmedAt?.getTime() ?? order.createdAt.getTime();
       for (const plan of order.schedulePlans) {
-        startCandidates.push(plan.startTime.getTime());
-        if (plan.endTime) endCandidates.push(plan.endTime.getTime());
+        if (plan.startTime.getTime() >= confirmThreshold) {
+          startCandidates.push(plan.startTime.getTime());
+          if (plan.endTime) endCandidates.push(plan.endTime.getTime());
+        }
       }
       
       lockStartTime = Math.min(...startCandidates) - (6 * 60 * 60 * 1000);

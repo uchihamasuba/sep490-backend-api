@@ -310,7 +310,13 @@ async function updateOrderStatus(orderId: string, body: UpdateOrderStatusBody): 
   assertNotTerminal(existing);
 
   const cancelReason = body.orderStatus === 'CANCELLED' ? (body.cancelReason ?? null) : null;
-  const updated = await orderRepository.updateStatus(orderId, body.orderStatus, cancelReason);
+
+  let confirmedAt = existing.confirmedAt;
+  if (body.orderStatus === 'CONFIRMED' && existing.orderStatus !== 'CONFIRMED' && !confirmedAt) {
+    confirmedAt = new Date();
+  }
+
+  const updated = await orderRepository.updateStatus(orderId, body.orderStatus, cancelReason, confirmedAt);
 
   return mapDetail(updated);
 }

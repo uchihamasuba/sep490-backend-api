@@ -95,6 +95,7 @@ function buildOrderRow(params: {
   orderId?: string;
   orderCode?: string;
   orderStatus?: 'NEW' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  confirmedAt?: Date | null;
   items: { itemId: string; quantity: number; unitPrice: number }[];
 }) {
   const lines = computeOrderLines(params.items);
@@ -118,6 +119,7 @@ function buildOrderRow(params: {
     creator: { userId: 'user-1', fullName: 'Project Manager', role: 'MANAGER' },
     createdAt: new Date('2026-07-20T00:00:00Z'),
     updatedAt: new Date('2026-07-20T00:00:00Z'),
+    confirmedAt: params.confirmedAt ?? null,
     orderItems: lines.map((line, index) => ({
       orderItemId: `oi-${index + 1}`,
       itemId: line.itemId,
@@ -284,8 +286,27 @@ describe('orderService.updateOrderStatus / updateOrderItems — terminal-state g
       cancelReason: 'Khách hủy sự kiện',
     } as never);
 
-    expect(mockedOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'CANCELLED', 'Khách hủy sự kiện');
+    expect(mockedOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'CANCELLED', 'Khách hủy sự kiện', null);
     expect(result.orderStatus).toBe('CANCELLED');
+  });
+
+  it('sets confirmedAt when moving to CONFIRMED', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(
+      buildOrderRow({ orderStatus: 'NEW', confirmedAt: null, items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100 }] }) as never,
+    );
+    mockedOrderRepo.updateStatus.mockResolvedValue(
+      buildOrderRow({ orderStatus: 'CONFIRMED', confirmedAt: new Date('2026-08-03T00:00:00.000Z'), items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100 }] }) as never,
+    );
+
+    const result = await orderService.updateOrderStatus('ord-1', { orderStatus: 'CONFIRMED' } as never);
+
+    expect(mockedOrderRepo.updateStatus).toHaveBeenCalledWith(
+      'ord-1',
+      'CONFIRMED',
+      null,
+      expect.any(Date),
+    );
+    expect(result.orderStatus).toBe('CONFIRMED');
   });
 
 });

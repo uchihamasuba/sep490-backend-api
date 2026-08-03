@@ -203,10 +203,11 @@ export const orderRepository = {
     orderId: string,
     orderStatus: OrderStatus,
     cancelReason: string | null,
+    confirmedAt?: Date | null,
   ): Promise<OrderWithDetails> {
     return prisma.order.update({
       where: { orderId },
-      data: { orderStatus, cancelReason },
+      data: { orderStatus, cancelReason, confirmedAt },
       include: detailInclude,
     });
   },
