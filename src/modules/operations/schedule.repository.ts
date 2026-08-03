@@ -161,6 +161,8 @@ export const scheduleRepository = {
     startTime: Date;
     endTime: Date | null;
     location: string | null;
+    latitude: number | null;
+    longitude: number | null;
     notes: string | null;
     createdBy: string;
     assignees: { userId: string; role: PlanMemberRole }[];
@@ -173,6 +175,8 @@ export const scheduleRepository = {
         startTime: params.startTime,
         endTime: params.endTime,
         location: params.location,
+        latitude: params.latitude,
+        longitude: params.longitude,
         notes: params.notes,
         createdBy: params.createdBy,
         assignees: { create: params.assignees.map((a) => ({ userId: a.userId, role: a.role })) },
@@ -183,7 +187,7 @@ export const scheduleRepository = {
 
   update(
     planId: string,
-    data: { startTime?: Date; endTime?: Date | null; location?: string | null; notes?: string | null },
+    data: { startTime?: Date; endTime?: Date | null; location?: string | null; latitude?: number | null; longitude?: number | null; notes?: string | null },
   ): Promise<SchedulePlanWithDetails> {
     return prisma.schedulePlan.update({ where: { planId }, data, include: detailInclude });
   },
@@ -329,6 +333,8 @@ export const scheduleRepository = {
       startTime: Date;
       endTime: Date | null;
       location: string | null;
+      latitude: number | null;
+      longitude: number | null;
       notes: string | null;
       assignees: { userId: string; role: PlanMemberRole }[];
     }[],
@@ -344,6 +350,8 @@ export const scheduleRepository = {
             startTime: plan.startTime,
             endTime: plan.endTime,
             location: plan.location,
+            latitude: plan.latitude,
+            longitude: plan.longitude,
             notes: plan.notes,
             createdBy,
             assignees: { create: plan.assignees.map((a) => ({ userId: a.userId, role: a.role })) },
