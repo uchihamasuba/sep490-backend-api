@@ -97,7 +97,6 @@ export const closeOrderBodySchema = z.object({
 
 export const exportEquipmentBodySchema = z.object({
   notes: z.string().trim().optional(),
-  force: z.boolean().optional(),
 });
 
 const confirmPreparedItemSchema = z.object({
