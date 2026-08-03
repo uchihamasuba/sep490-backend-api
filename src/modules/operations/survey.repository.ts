@@ -68,8 +68,13 @@ export const surveyRepository = {
   },
 
   async generateNextReportCode(): Promise<string> {
-    const count = await prisma.surveyReport.count();
-    return `SUR-${String(count + 1).padStart(3, '0')}`;
+    const lastReport = await prisma.surveyReport.findFirst({
+      orderBy: { reportCode: 'desc' },
+      select: { reportCode: true },
+    });
+    if (!lastReport) return 'SUR-001';
+    const num = parseInt(lastReport.reportCode.replace(/\D/g, ''), 10) || 0;
+    return `SUR-${String(num + 1).padStart(3, '0')}`;
   },
 
   orderExists(orderId: string) {
