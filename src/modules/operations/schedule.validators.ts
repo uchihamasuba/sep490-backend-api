@@ -49,6 +49,8 @@ export const createSchedulePlanBodySchema = z
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
+    latitude: z.coerce.number().optional(),
+    longitude: z.coerce.number().optional(),
     notes: z.string().trim().optional(),
     assignees: z.array(assigneeInputSchema).default([]),
   })
@@ -62,6 +64,8 @@ export const updateSchedulePlanBodySchema = z
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
+    latitude: z.coerce.number().optional(),
+    longitude: z.coerce.number().optional(),
     notes: z.string().trim().optional(),
   })
   .refine((data) => !data.endTime || data.endTime > data.startTime, {
@@ -110,6 +114,8 @@ const batchPlanInputSchema = z
     startTime: z.coerce.date(),
     endTime: z.coerce.date().optional(),
     location: z.string().trim().min(1).optional(),
+    latitude: z.coerce.number().optional(),
+    longitude: z.coerce.number().optional(),
     notes: z.string().trim().optional(),
     assignees: z.array(assigneeInputSchema).default([]),
   })

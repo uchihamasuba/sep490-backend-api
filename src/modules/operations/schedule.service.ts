@@ -58,6 +58,8 @@ export interface SchedulePlanDTO {
   startTime: string;
   endTime: string | null;
   location: string | null;
+  latitude: number | null;
+  longitude: number | null;
   status: ScheduleStatus;
   evidenceId: string | null;
   notes: string | null;
@@ -111,6 +113,8 @@ function mapPlan(row: SchedulePlanWithDetails): SchedulePlanDTO {
     startTime: row.startTime.toISOString(),
     endTime: row.endTime ? row.endTime.toISOString() : null,
     location: row.location,
+    latitude: row.latitude,
+    longitude: row.longitude,
     status: row.status,
     evidenceId: row.evidenceId,
     notes: row.notes,
@@ -199,6 +203,8 @@ async function createSchedulePlan(body: CreateSchedulePlanBody, createdBy: strin
     startTime: body.startTime,
     endTime: body.endTime ?? null,
     location: body.location ?? null,
+    latitude: body.latitude ?? null,
+    longitude: body.longitude ?? null,
     notes: body.notes || null,
     createdBy,
     assignees: body.assignees,
@@ -217,6 +223,8 @@ async function updateSchedulePlan(planId: string, body: UpdateSchedulePlanBody):
     startTime: body.startTime,
     endTime: body.endTime ?? null,
     location: body.location ?? null,
+    latitude: body.latitude ?? null,
+    longitude: body.longitude ?? null,
     notes: body.notes || null,
   });
   return mapPlan(updated);
@@ -473,6 +481,8 @@ async function createSchedulePlansBatch(body: CreateSchedulePlansBatchBody, crea
       startTime: plan.startTime,
       endTime: plan.endTime ?? null,
       location: plan.location ?? null,
+      latitude: plan.latitude ?? null,
+      longitude: plan.longitude ?? null,
       notes: plan.notes ?? null,
       assignees: plan.assignees,
     })),
