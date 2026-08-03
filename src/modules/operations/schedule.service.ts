@@ -210,6 +210,7 @@ async function createSchedulePlan(body: CreateSchedulePlanBody, createdBy: strin
     assignees: body.assignees,
   });
 
+  await scheduleRepository.syncOrderDates(created.orderId);
   return mapPlan(created);
 }
 
@@ -227,6 +228,7 @@ async function updateSchedulePlan(planId: string, body: UpdateSchedulePlanBody):
     longitude: body.longitude ?? null,
     notes: body.notes || null,
   });
+  await scheduleRepository.syncOrderDates(updated.orderId);
   return mapPlan(updated);
 }
 
@@ -458,6 +460,7 @@ async function deleteSchedulePlan(planId: string): Promise<void> {
     );
   }
   await scheduleRepository.delete(planId);
+  await scheduleRepository.syncOrderDates(existing.orderId);
 }
 
 // POST /schedule-plans/batch (docs/api/kehoachvaphancong_api.md mục 8.5 điểm 2) — tạo nhiều dòng cùng
@@ -488,6 +491,7 @@ async function createSchedulePlansBatch(body: CreateSchedulePlansBatchBody, crea
     })),
   );
 
+  await scheduleRepository.syncOrderDates(body.orderId);
   return created.map(mapPlan);
 }
 

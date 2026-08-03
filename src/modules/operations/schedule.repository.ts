@@ -361,4 +361,18 @@ export const scheduleRepository = {
       ),
     );
   },
+  async syncOrderDates(orderId: string): Promise<void> {
+    const plans = await prisma.schedulePlan.findMany({
+      where: { orderId },
+      select: { startTime: true }
+    });
+    if (plans.length > 0) {
+      const minDate = new Date(Math.min(...plans.map(p => p.startTime.getTime())));
+      const maxDate = new Date(Math.max(...plans.map(p => p.startTime.getTime())));
+      await prisma.order.update({
+        where: { orderId },
+        data: { eventDate: minDate, endDate: maxDate }
+      });
+    }
+  },
 };
