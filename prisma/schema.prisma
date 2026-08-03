@@ -434,6 +434,7 @@ model Order {
   eventType         String        @map("event_type") @db.VarChar(100)
   eventName         String?       @map("event_name") @db.VarChar(255)
   eventDate         DateTime      @map("event_date") @db.Timestamp(0)
+  endDate           DateTime?     @map("end_date") @db.Timestamp(0)
   location          String        @db.Text
   latitude          Float?        @db.Float
   longitude         Float?        @db.Float
@@ -531,6 +532,8 @@ model SchedulePlan {
   startTime  DateTime       @map("start_time") @db.Timestamp(0)
   endTime    DateTime?      @map("end_time") @db.Timestamp(0)
   location   String?        @db.Text
+  latitude   Float?         @db.Float
+  longitude  Float?         @db.Float
   status     ScheduleStatus @default(PENDING)
   evidenceId String?        @map("evidence_id") @db.VarChar(36)
   notes      String?        @db.Text

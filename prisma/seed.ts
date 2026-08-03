@@ -795,6 +795,17 @@ async function main(): Promise<void> {
     const pickedUpByUser = isPickedUp ? leader : null;
         const venue = randomChoice(VENUES);
 
+    const planConfigs = planConfigsForStatus(status);
+    let minStartTime = new Date(8640000000000000);
+    let maxEndTime = new Date(-8640000000000000);
+
+    for (const cfg of planConfigs) {
+      const startTime = addHours(addDays(eventDate, cfg.offsetDays), cfg.hourOffset - eventDate.getUTCHours());
+      const endTime = addHours(startTime, cfg.durationHours);
+      if (startTime < minStartTime) minStartTime = startTime;
+      if (endTime > maxEndTime) maxEndTime = endTime;
+    }
+
     await prisma.order.create({
       data: {
         orderId,
@@ -804,7 +815,8 @@ async function main(): Promise<void> {
         policyId: depositPolicy.policyId,
         eventType,
         eventName: `${eventType} - ${orderCode}`,
-        eventDate,
+        eventDate: minStartTime,
+        endDate: maxEndTime,
         location: venue.name,
         latitude: venue.lat,
         longitude: venue.lng,
@@ -838,7 +850,7 @@ async function main(): Promise<void> {
       customerId: q.customerId,
       status,
       eventType,
-      eventDate,
+      eventDate: minStartTime,
       totalAmount,
       items: q.items,
       leaderId: leader.userId,
@@ -940,6 +952,8 @@ async function main(): Promise<void> {
           startTime,
           endTime,
           location: randomChoice(VENUES).name,
+          latitude: 10.762622 + (Math.random() - 0.5) * 0.1,
+          longitude: 106.660172 + (Math.random() - 0.5) * 0.1,
           status: cfg.planStatus,
           evidenceId: cfg.planStatus === 'COMPLETED' ? randomEvidence(0.5) ?? null : null,
           createdBy: randomChoice(managers).userId,
