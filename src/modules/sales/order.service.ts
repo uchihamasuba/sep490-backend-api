@@ -9,7 +9,6 @@ import { customerRepository } from './customer.repository';
 import { quotationRepository } from './quotation.repository';
 import {
   DEFAULT_LIVE_SHOW_CHECKLIST,
-  InsufficientStockError,
   orderPicklistRepository,
   orderRepository,
   type ExportEquipmentTargetLine,
@@ -648,7 +647,6 @@ async function exportEquipment(
   orderId: string,
   performedBy: string,
   notes: string | null,
-  force?: boolean,
 ): Promise<ExportEquipmentResultDTO> {
   const existing = await findOrderOrThrow(orderId);
 
@@ -684,35 +682,27 @@ async function exportEquipment(
   }
   const targetLines = [...targetByItem.values()];
 
-  try {
-    const result = await orderRepository.exportEquipment({
-      orderId,
-      performedBy,
-      notes,
-      quotationCode: quotation.quotationCode,
-      targetLines,
-      force,
-    });
+  const result = await orderRepository.exportEquipment({
+    orderId,
+    performedBy,
+    notes,
+    quotationCode: quotation.quotationCode,
+    targetLines,
+  });
 
-    return {
-      orderId: result.order.orderId,
-      orderCode: result.order.orderCode,
-      syncedQuotationId: quotation.quotationId,
-      syncedQuotationCode: quotation.quotationCode,
-      pickedUpAt: result.order.pickedUpAt ? result.order.pickedUpAt.toISOString() : null,
-      pickedUpBy: result.order.pickedUpBy,
-      movements: result.movements,
-      skippedSupplierItems: result.order.orderItems
-        .filter((line) => line.source === 'SUPPLIER')
-        .map((line) => ({ itemId: line.itemId, itemName: line.item.itemName, quantity: line.quantity })),
-      unchanged: result.movements.length === 0 && !result.itemsChanged,
-    };
-  } catch (err) {
-    if (err instanceof InsufficientStockError) {
-      throw AppError.badRequest('Tồn kho không đủ để xuất thiết bị', { items: err.items });
-    }
-    throw err;
-  }
+  return {
+    orderId: result.order.orderId,
+    orderCode: result.order.orderCode,
+    syncedQuotationId: quotation.quotationId,
+    syncedQuotationCode: quotation.quotationCode,
+    pickedUpAt: result.order.pickedUpAt ? result.order.pickedUpAt.toISOString() : null,
+    pickedUpBy: result.order.pickedUpBy,
+    movements: result.movements,
+    skippedSupplierItems: result.order.orderItems
+      .filter((line) => line.source === 'SUPPLIER')
+      .map((line) => ({ itemId: line.itemId, itemName: line.item.itemName, quantity: line.quantity })),
+    unchanged: !result.itemsChanged,
+  };
 }
 
 export interface PicklistItemDTO {

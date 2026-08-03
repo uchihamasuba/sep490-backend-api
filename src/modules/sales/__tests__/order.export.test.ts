@@ -2,7 +2,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { app } from '../../../app';
 import { env } from '../../../config/env';
-import { InsufficientStockError, orderRepository } from '../order.repository';
+import { orderRepository } from '../order.repository';
 import { quotationRepository } from '../quotation.repository';
 
 jest.mock('../order.repository', () => {
@@ -272,24 +272,6 @@ describe('POST /api/v1/orders/:orderId/export-equipment (v2 reconcile)', () => {
       .send({});
 
     expect(res.status).toBe(409);
-  });
-
-  it('returns 400 with delta-based details when stock cannot cover the top-up (transaction rolled back)', async () => {
-    mockedOrderRepo.findById.mockResolvedValue(fakeOrderDetail() as never);
-    mockedQuotationRepo.findById.mockResolvedValue(fakeQuotation() as never);
-    // required = phần cần xuất THÊM (delta), không phải tổng SL của dòng (mục 4.2).
-    mockedOrderRepo.exportEquipment.mockRejectedValue(
-      new InsufficientStockError([{ itemId: 'item-jbl', itemName: 'Loa JBL 1000W', required: 3, available: 1 }]),
-    );
-
-    const res = await request(app)
-      .post('/api/v1/orders/order-1/export-equipment')
-      .set('Authorization', authHeader())
-      .send({});
-
-    expect(res.status).toBe(400);
-    expect(JSON.stringify(res.body)).toContain('item-jbl');
-    expect(JSON.stringify(res.body)).toContain('"required":3');
   });
 
   it('rejects unauthenticated requests with 401', async () => {

@@ -116,8 +116,8 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5 hạng mục (BUG mục 7)', () => {
-  it('lần 1: sync 5 order_items từ báo giá + xuất kho 5 movement OUTBOUND trong 1 transaction, không timeout', async () => {
+describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5 hạng mục (BUG mục 7 cũ)', () => {
+  it('lần 1: sync 5 order_items từ báo giá trong 1 transaction, không timeout, KHÔNG đụng tồn kho', async () => {
     const res = await request(app)
       .post(`/api/v1/orders/${orderId}/export-equipment`)
       .set('Authorization', authHeader(managerId))
@@ -125,20 +125,22 @@ describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5
 
     expect(res.status).toBe(200);
     expect(res.body.data.unchanged).toBe(false);
-    expect(res.body.data.movements).toHaveLength(ITEM_COUNT);
-    expect(res.body.data.movements.every((m: { movementType: string }) => m.movementType === 'OUTBOUND')).toBe(true);
+    // docs/api/xuatthietbi_tubaogia_api.md mục 8: endpoint chỉ đồng bộ order_items, không còn tạo
+    // inventory_movements nữa — movements luôn rỗng.
+    expect(res.body.data.movements).toEqual([]);
     expect(res.body.data.pickedUpAt).not.toBeNull();
 
     const orderItems = await prisma.orderItem.findMany({ where: { orderId } });
     expect(orderItems).toHaveLength(ITEM_COUNT);
     expect(orderItems.every((line) => line.quantity === QTY_PER_ITEM && line.source === 'INTERNAL')).toBe(true);
 
+    // Không còn trừ tồn kho thật ở bước này — quantityTotal phải giữ nguyên như lúc tạo fixture.
     const inventories = await prisma.inventory.findMany({ where: { itemId: { in: itemIds } } });
     expect(inventories).toHaveLength(ITEM_COUNT);
-    expect(inventories.every((inv) => inv.quantityTotal === STOCK_PER_ITEM - QTY_PER_ITEM)).toBe(true);
+    expect(inventories.every((inv) => inv.quantityTotal === STOCK_PER_ITEM)).toBe(true);
   });
 
-  it('lần 2 không đổi gì: no-op 200 unchanged: true, không sinh movement mới', async () => {
+  it('lần 2 không đổi gì: no-op 200 unchanged: true, không sinh movement', async () => {
     const res = await request(app)
       .post(`/api/v1/orders/${orderId}/export-equipment`)
       .set('Authorization', authHeader(managerId))
@@ -146,17 +148,20 @@ describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5
 
     expect(res.status).toBe(200);
     expect(res.body.data.unchanged).toBe(true);
-    expect(res.body.data.movements).toHaveLength(0);
+    expect(res.body.data.movements).toEqual([]);
 
     const movementCount = await prisma.inventoryMovement.count({ where: { orderId } });
-    expect(movementCount).toBe(ITEM_COUNT);
+    expect(movementCount).toBe(0);
   });
 
-  it('sửa báo giá tăng SL 1 hạng mục rồi chạy lại: chỉ xuất bù đúng delta', async () => {
+  it('sửa báo giá tăng SL vượt xa tồn kho rồi chạy lại: vẫn đồng bộ thành công, không chặn, không đụng tồn kho', async () => {
     const bumpedItemId = itemIds[0];
+    // Cố tình đặt SL vượt xa STOCK_PER_ITEM — trước đây (mục (at)/(au)) sẽ bị chặn 400, nay phải cho
+    // qua bình thường vì endpoint không còn kiểm tra tồn kho (docs/api/xuatthietbi_tubaogia_api.md mục 8).
+    const bumpedQuantity = STOCK_PER_ITEM + 10;
     await prisma.quotationItem.updateMany({
       where: { quotationId, itemId: bumpedItemId },
-      data: { quantity: QTY_PER_ITEM + 3, lineTotal: (QTY_PER_ITEM + 3) * 100000 },
+      data: { quantity: bumpedQuantity, lineTotal: bumpedQuantity * 100000 },
     });
 
     const res = await request(app)
@@ -166,55 +171,13 @@ describe('POST /api/v1/orders/:orderId/export-equipment — integration, đơn 5
 
     expect(res.status).toBe(200);
     expect(res.body.data.unchanged).toBe(false);
-    expect(res.body.data.movements).toEqual([
-      expect.objectContaining({ itemId: bumpedItemId, quantity: 3, movementType: 'OUTBOUND' }),
-    ]);
-
-    const inv = await prisma.inventory.findUniqueOrThrow({ where: { itemId: bumpedItemId } });
-    expect(inv.quantityTotal).toBe(STOCK_PER_ITEM - QTY_PER_ITEM - 3);
+    expect(res.body.data.movements).toEqual([]);
 
     const line = await prisma.orderItem.findFirstOrThrow({ where: { orderId, itemId: bumpedItemId } });
-    expect(line.quantity).toBe(QTY_PER_ITEM + 3);
-  });
+    expect(line.quantity).toBe(bumpedQuantity);
 
-  it('lần 3: tăng vượt tồn kho, không có force -> báo 400 InsufficientStockError', async () => {
-    const bumpedItemId = itemIds[0];
-    await prisma.quotationItem.updateMany({
-      where: { quotationId, itemId: bumpedItemId },
-      data: { quantity: STOCK_PER_ITEM + 10, lineTotal: (STOCK_PER_ITEM + 10) * 100000 },
-    });
-
-    const res = await request(app)
-      .post(`/api/v1/orders/${orderId}/export-equipment`)
-      .set('Authorization', authHeader(managerId))
-      .send({});
-
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('BAD_REQUEST');
-    expect(res.body.error.details.items).toEqual([
-      expect.objectContaining({ itemId: bumpedItemId, required: STOCK_PER_ITEM + 10 - (QTY_PER_ITEM + 3) }),
-    ]);
-  });
-
-  it('lần 4: tăng vượt tồn kho, có force: true -> cho phép xuất, tồn kho xuống số âm', async () => {
-    const bumpedItemId = itemIds[0];
-    // Hiện tại net exported là QTY_PER_ITEM + 3, quantityTotal là STOCK_PER_ITEM - (QTY_PER_ITEM + 3).
-    // Báo giá đòi STOCK_PER_ITEM + 10, tức là delta = STOCK_PER_ITEM + 10 - (QTY_PER_ITEM + 3).
-    // Do force = true, sẽ được giảm xuống âm.
-
-    const res = await request(app)
-      .post(`/api/v1/orders/${orderId}/export-equipment`)
-      .set('Authorization', authHeader(managerId))
-      .send({ force: true });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.unchanged).toBe(false);
-    expect(res.body.data.movements).toEqual([
-      expect.objectContaining({ itemId: bumpedItemId, movementType: 'OUTBOUND' }),
-    ]);
-
+    // Tồn kho vẫn nguyên vẹn dù order_items đã đồng bộ vượt xa số thực có.
     const inv = await prisma.inventory.findUniqueOrThrow({ where: { itemId: bumpedItemId } });
-    // Tồn kho cuối cùng = STOCK_PER_ITEM - (STOCK_PER_ITEM + 10) = -10
-    expect(inv.quantityTotal).toBe(-10);
+    expect(inv.quantityTotal).toBe(STOCK_PER_ITEM);
   });
 });

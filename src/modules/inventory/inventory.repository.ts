@@ -95,10 +95,15 @@ export const inventoryRepository = {
   },
 
   async getLockedQuantityByDate(itemId: string, date: Date): Promise<number> {
+    // Bỏ điều kiện `pickedUpAt: null` (2026-08-03, theo yêu cầu người dùng): trước đây coi đơn đã "xuất
+    // thiết bị" là hết cần khóa, đúng NẾU xuất kho có trừ thật `inventory` — nhưng POST
+    // /orders/:id/export-equipment đã đổi qua chỉ đồng bộ order_items, KHÔNG còn trừ tồn kho thật (xem
+    // docs/xuatthietbi_tubaogia_api.md mục 8). Giữ nguyên `pickedUpAt: null` sẽ khiến thiết bị của đơn đã
+    // xuất "biến mất" khỏi cả 2 phía (không tính là khóa, cũng không bị trừ khỏi tổng) trong suốt thời
+    // gian đơn còn IN_PROGRESS — vẫn phải tính là khóa cho tới khi đơn rời khỏi CONFIRMED/IN_PROGRESS.
     const orders = await prisma.order.findMany({
       where: {
         orderStatus: { in: ['CONFIRMED', 'IN_PROGRESS'] },
-        pickedUpAt: null,
         orderItems: { some: { itemId, source: 'INTERNAL' } },
       },
       select: {
@@ -108,7 +113,15 @@ export const inventoryRepository = {
         createdAt: true,
         confirmedAt: true,
         orderItems: { where: { itemId, source: 'INTERNAL' }, select: { quantity: true } },
-        schedulePlans: { select: { startTime: true, endTime: true } },
+        // Chỉ lấy lịch trình THẬT SỰ giữ thiết bị (SETUP = lắp đặt, COLLECT = thu hồi) để tính khung giờ
+        // khóa/nhả kho — loại SURVEY (khảo sát hiện trường) ra vì buổi khảo sát không mang thiết bị đi,
+        // nếu tính cả SURVEY thì khung khóa sẽ kéo lùi về tận ngày khảo sát (có thể trước ngày tổ chức
+        // hàng tuần), khóa oan thiết bị suốt khoảng thời gian không hề dùng tới. Cũng loại lịch trình đã
+        // CANCELLED — kế hoạch bị hủy không còn giữ chỗ thiết bị.
+        schedulePlans: {
+          where: { status: { not: 'CANCELLED' }, task: { taskCode: { in: ['SETUP', 'COLLECT'] } } },
+          select: { startTime: true, endTime: true },
+        },
       }
     });
 

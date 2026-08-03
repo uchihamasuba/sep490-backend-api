@@ -173,8 +173,9 @@ router.put(
   asyncHandler(orderController.markPicklistPickedUp),
 );
 
-// Xuất thiết bị (luồng nhanh từ màn chi tiết báo giá — docs/api/xuatthietbi_tubaogia_api.md):
-// khác picklist/picked-up ở chỗ có hiệu ứng tồn kho thật + điều kiện nới (mục 4.2 tài liệu đó).
+// Xuất thiết bị (luồng nhanh từ màn chi tiết báo giá — docs/api/xuatthietbi_tubaogia_api.md mục 8):
+// CHỈ đồng bộ order_items theo quotation_items, không đụng tồn kho thật — khác picklist/picked-up ở
+// chỗ này cho phép chạy lặp lại vô hạn, không yêu cầu preparedQty đủ, không yêu cầu order_status.
 router.post(
   '/:orderId/export-equipment',
   requireRole('MANAGER'),
