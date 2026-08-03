@@ -13,6 +13,7 @@ jest.mock('../schedule.repository', () => ({
     taskExists: jest.fn(),
     findUserById: jest.fn(),
     createBatch: jest.fn(),
+    syncOrderDates: jest.fn(),
   },
 }));
 

@@ -23,6 +23,7 @@ jest.mock('../schedule.repository', () => ({
     checkIn: jest.fn(),
     checkOut: jest.fn(),
     attachEvidence: jest.fn(),
+    syncOrderDates: jest.fn(),
     listWorkTasks: jest.fn(),
   },
 }));
