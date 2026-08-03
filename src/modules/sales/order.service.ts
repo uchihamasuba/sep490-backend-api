@@ -49,6 +49,7 @@ export interface OrderListItemDTO {
   eventType: string;
   eventName: string | null;
   eventDate: string;
+  endDate: string | null;
   location: string;
   guestCount: number | null;
   totalAmount: number;
@@ -167,6 +168,7 @@ function mapListItem(row: {
   eventType: string;
   eventName: string | null;
   eventDate: Date;
+  endDate: Date | null;
   location: string;
   guestCount: number | null;
   totalAmount: unknown;
@@ -184,6 +186,7 @@ function mapListItem(row: {
     eventType: row.eventType,
     eventName: row.eventName,
     eventDate: row.eventDate.toISOString(),
+    endDate: row.endDate ? row.endDate.toISOString() : null,
     location: row.location,
     guestCount: row.guestCount,
     totalAmount: toNumber(row.totalAmount),
