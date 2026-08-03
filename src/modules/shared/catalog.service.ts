@@ -157,6 +157,28 @@ async function updateItemStatus(itemId: string, status: 'ACTIVE' | 'INACTIVE' | 
   return mapItem(updated);
 }
 
+export interface ItemComponentDTO {
+  componentId: string;
+  childItemId: string;
+  childItemName: string;
+  unit: string;
+  quantity: number;
+}
+
+async function getItemComponents(itemId: string): Promise<ItemComponentDTO[]> {
+  const existing = await catalogRepository.findById(itemId);
+  if (!existing) throw AppError.notFound('Không tìm thấy thiết bị');
+
+  const components = await catalogRepository.findComponentsByItemId(itemId);
+  return components.map((c) => ({
+    componentId: c.id,
+    childItemId: c.childId,
+    childItemName: c.child.itemName,
+    unit: c.child.unit,
+    quantity: c.quantity,
+  }));
+}
+
 export interface ItemSupplierDetailsDTO {
   itemId: string;
   supplierId: string;
@@ -310,6 +332,7 @@ export const catalogService = {
   listItems,
   createItem,
   getItemById,
+  getItemComponents,
   updateItem,
   updateItemStatus,
   getItemSuppliers,

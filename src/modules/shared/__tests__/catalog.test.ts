@@ -14,6 +14,7 @@ jest.mock('../catalog.repository', () => ({
     findById: jest.fn(),
     update: jest.fn(),
     updateStatus: jest.fn(),
+    findComponentsByItemId: jest.fn(),
   },
 }));
 
@@ -260,5 +261,54 @@ describe('PATCH /api/v1/catalog/items/:itemId/status', () => {
       .set('Authorization', authHeader())
       .send({ status: 'DELETED' });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('GET /api/v1/catalog/items/:itemId/components', () => {
+  it('returns the components mapped properly', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.findComponentsByItemId.mockResolvedValue([
+      {
+        id: 'comp-1',
+        parentId: 'item-1',
+        childId: 'child-1',
+        quantity: 2,
+        child: { itemName: 'Micro Shure SM58', unit: 'Cái' },
+      },
+    ] as never);
+
+    const res = await request(app)
+      .get('/api/v1/catalog/items/item-1/components')
+      .set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0]).toMatchObject({
+      componentId: 'comp-1',
+      childItemId: 'child-1',
+      childItemName: 'Micro Shure SM58',
+      unit: 'Cái',
+      quantity: 2,
+    });
+  });
+
+  it('returns empty array when item has no components', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.findComponentsByItemId.mockResolvedValue([] as never);
+
+    const res = await request(app)
+      .get('/api/v1/catalog/items/item-1/components')
+      .set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  it('returns 404 when parent item does not exist', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app)
+      .get('/api/v1/catalog/items/missing/components')
+      .set('Authorization', authHeader());
+    expect(res.status).toBe(404);
   });
 });

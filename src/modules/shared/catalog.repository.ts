@@ -93,6 +93,13 @@ export const catalogRepository = {
   updateStatus(itemId: string, status: 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE'): Promise<CatalogItemWithType> {
     return prisma.item.update({ where: { itemId }, data: { status }, include: detailInclude });
   },
+
+  findComponentsByItemId(itemId: string) {
+    return prisma.itemComponent.findMany({
+      where: { parentId: itemId },
+      include: { child: true },
+    });
+  },
 };
 
 export interface CategoryListFilter {

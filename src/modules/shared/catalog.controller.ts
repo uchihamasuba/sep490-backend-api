@@ -32,6 +32,12 @@ async function getById(req: Request, res: Response) {
   ok(res, item);
 }
 
+async function getItemComponents(req: Request, res: Response) {
+  const { itemId } = req.params as unknown as ItemIdParam;
+  const components = await catalogService.getItemComponents(itemId);
+  ok(res, components);
+}
+
 async function update(req: Request, res: Response) {
   const { itemId } = req.params as unknown as ItemIdParam;
   const body = req.body as UpdateCatalogItemBody;
@@ -81,6 +87,7 @@ export const catalogController = {
   list,
   create,
   getById,
+  getItemComponents,
   update,
   updateStatus,
   getSuppliers,
