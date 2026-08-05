@@ -21,7 +21,7 @@ const prisma = new PrismaClient();
 const BCRYPT_ROUNDS = 10;
 
 // "Hôm nay" của kịch bản seed — mọi ngày tháng tương đối (sự kiện đã xong / sắp diễn ra) tính từ mốc này.
-const TODAY = new Date('2026-07-24T08:00:00Z');
+const TODAY = new Date();
 
 // ============================================================================
 // HELPERS
@@ -78,15 +78,19 @@ const ALL_TABLES = [
   'collected_equipment_reports',
   'inventory_movements',
   'inventory',
+  'settlement_evidences',
   'settlements',
+  'deposit_evidences',
   'deposits',
   'supplier_transaction_items',
   'supplier_transactions',
   'change_request_items',
   'change_requests',
+  'survey_report_evidences',
   'survey_reports',
   'attendances',
   'schedule_plan_assignees',
+  'schedule_plan_evidences',
   'schedule_plans',
   'work_tasks',
   'order_items',
@@ -956,7 +960,11 @@ async function main(): Promise<void> {
           latitude: 10.762622 + (Math.random() - 0.5) * 0.1,
           longitude: 106.660172 + (Math.random() - 0.5) * 0.1,
           status: cfg.planStatus,
-          evidenceId: cfg.planStatus === 'COMPLETED' ? randomEvidence(0.5) ?? null : null,
+          evidences: (() => {
+            if (cfg.planStatus !== 'COMPLETED') return undefined;
+            const ev = randomEvidence(0.5);
+            return ev ? { create: [{ evidenceId: ev }] } : undefined;
+          })(),
           createdBy: randomChoice(managers).userId,
           assignees: {
             create: assigneeRows.map((a) => ({
@@ -995,7 +1003,10 @@ async function main(): Promise<void> {
           reportCode: `SUR-${order.orderCode.replace('ORD-', '')}`,
           orderId: order.orderId,
           planId: surveyPlanId,
-          evidenceId: randomEvidence(0.7) ?? null,
+          evidences: (() => {
+            const ev = randomEvidence(0.7);
+            return ev ? { create: [{ evidenceId: ev }] } : undefined;
+          })(),
           surveyDate: addDays(order.eventDate, -14),
           location: randomChoice(VENUES).name,
           area: randomInt(150, 600),
@@ -1094,7 +1105,11 @@ async function main(): Promise<void> {
           paymentMethod: paymentDate ? randomChoice(['Chuyển khoản ngân hàng', 'Ví MoMo', 'Tiền mặt']) : null,
           qrCodeUrl: paymentDate ? `https://payments.bnwevents.vn/qr/${genId()}.png` : null,
           status: depositStatus,
-          evidenceId: depositStatus === 'PAID' ? randomEvidence(0.7) ?? null : null,
+          evidences: (() => {
+            if (depositStatus !== 'PAID') return undefined;
+            const ev = randomEvidence(0.7);
+            return ev ? { create: [{ evidenceId: ev }] } : undefined;
+          })(),
           requestedBy: requester.userId,
           approvedBy: depositStatus === 'PAID' ? randomChoice(managers).userId : null,
           approvedAt: paymentDate,
@@ -1195,7 +1210,10 @@ async function main(): Promise<void> {
           paymentMethod: 'Chuyển khoản ngân hàng',
           qrCodeUrl: `https://payments.bnwevents.vn/qr/${genId()}.png`,
           paidAt: addDays(order.eventDate, 3),
-          evidenceId: randomEvidence(0.7) ?? null,
+          evidences: (() => {
+            const ev = randomEvidence(0.7);
+            return ev ? { create: [{ evidenceId: ev }] } : undefined;
+          })(),
           status: 'PAID',
           requestedBy: requester.userId,
           requestedAt: addDays(order.eventDate, 1),

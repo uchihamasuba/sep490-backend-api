@@ -361,12 +361,12 @@ model Evidence {
   uploadedBy  String   @map("uploaded_by") @db.VarChar(36)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp(0)
 
-  uploader      User           @relation("EvidenceUploadedBy", fields: [uploadedBy], references: [userId], onDelete: Restrict)
-  schedulePlans SchedulePlan[]
+  uploader      User                   @relation("EvidenceUploadedBy", fields: [uploadedBy], references: [userId], onDelete: Restrict)
+  schedulePlans SchedulePlanEvidence[]
   attendances   Attendance[]
-  surveyReports SurveyReport[]
-  deposits      Deposit[]
-  settlements   Settlement[]
+  surveyReports SurveyReportEvidence[]
+  deposits      DepositEvidence[]
+  settlements   SettlementEvidence[]
 
   @@map("evidences")
 }
@@ -526,28 +526,27 @@ model WorkTask {
 }
 
 model SchedulePlan {
-  planId     String         @id @default(dbgenerated("(uuid())")) @map("plan_id") @db.VarChar(36)
-  planCode   String         @unique @map("plan_code") @db.VarChar(50)
-  orderId    String         @map("order_id") @db.VarChar(36)
-  taskId     String         @map("task_id") @db.VarChar(36)
-  startTime  DateTime       @map("start_time") @db.Timestamp(0)
-  endTime    DateTime?      @map("end_time") @db.Timestamp(0)
-  location   String?        @db.Text
-  latitude   Float?         @db.Float
-  longitude  Float?         @db.Float
-  status     ScheduleStatus @default(PENDING)
-  evidenceId String?        @map("evidence_id") @db.VarChar(36)
-  notes      String?        @db.Text
-  createdBy  String         @map("created_by") @db.VarChar(36)
-  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
-  updatedAt  DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  planId    String         @id @default(dbgenerated("(uuid())")) @map("plan_id") @db.VarChar(36)
+  planCode  String         @unique @map("plan_code") @db.VarChar(50)
+  orderId   String         @map("order_id") @db.VarChar(36)
+  taskId    String         @map("task_id") @db.VarChar(36)
+  startTime DateTime       @map("start_time") @db.Timestamp(0)
+  endTime   DateTime?      @map("end_time") @db.Timestamp(0)
+  location  String?        @db.Text
+  latitude  Float?         @db.Float
+  longitude Float?         @db.Float
+  status    ScheduleStatus @default(PENDING)
+  notes     String?        @db.Text
+  createdBy String         @map("created_by") @db.VarChar(36)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   order         Order                  @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
   task          WorkTask               @relation(fields: [taskId], references: [taskId], onDelete: Restrict)
-  evidence      Evidence?              @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
   creator       User                   @relation("SchedulePlanCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
   assignees     SchedulePlanAssignee[]
   surveyReports SurveyReport[]
+  evidences     SchedulePlanEvidence[]
 
   @@index([orderId], map: "idx_schedule_plans_order")
   @@index([taskId], map: "idx_schedule_plans_task")
@@ -597,7 +596,6 @@ model SurveyReport {
   reportCode         String       @unique @map("report_code") @db.VarChar(50)
   orderId            String       @map("order_id") @db.VarChar(36)
   planId             String?      @map("plan_id") @db.VarChar(36)
-  evidenceId         String?      @map("evidence_id") @db.VarChar(36)
   surveyDate         DateTime     @map("survey_date") @db.Timestamp(0)
   location           String       @db.Text
   area               Decimal?     @db.Decimal(10, 2)
@@ -615,11 +613,11 @@ model SurveyReport {
   createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt          DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  order     Order         @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
-  plan      SchedulePlan? @relation(fields: [planId], references: [planId], onDelete: SetNull)
-  evidence  Evidence?     @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
-  reporter  User          @relation("SurveyReportedBy", fields: [reportedBy], references: [userId], onDelete: Restrict)
-  confirmer User?         @relation("SurveyConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
+  order     Order                  @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  plan      SchedulePlan?          @relation(fields: [planId], references: [planId], onDelete: SetNull)
+  reporter  User                   @relation("SurveyReportedBy", fields: [reportedBy], references: [userId], onDelete: Restrict)
+  confirmer User?                  @relation("SurveyConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
+  evidences SurveyReportEvidence[]
 
   @@index([orderId], map: "idx_survey_reports_order")
   @@index([status], map: "idx_survey_reports_status")
@@ -742,7 +740,6 @@ model Deposit {
   paymentMethod String?       @map("payment_method") @db.VarChar(100)
   qrCodeUrl     String?       @map("qr_code_url") @db.Text
   status        DepositStatus @default(UNPAID)
-  evidenceId    String?       @map("evidence_id") @db.VarChar(36)
   requestedBy   String        @map("requested_by") @db.VarChar(36)
   approvedBy    String?       @map("approved_by") @db.VarChar(36)
   approvedAt    DateTime?     @map("approved_at") @db.Timestamp(0)
@@ -750,10 +747,10 @@ model Deposit {
   createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  order     Order     @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
-  evidence  Evidence? @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
-  requester User      @relation("DepositRequestedBy", fields: [requestedBy], references: [userId], onDelete: Restrict)
-  approver  User?     @relation("DepositApprovedBy", fields: [approvedBy], references: [userId], onDelete: SetNull)
+  order     Order             @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  requester User              @relation("DepositRequestedBy", fields: [requestedBy], references: [userId], onDelete: Restrict)
+  approver  User?             @relation("DepositApprovedBy", fields: [approvedBy], references: [userId], onDelete: SetNull)
+  evidences DepositEvidence[]
 
   @@index([orderId], map: "idx_deposits_order")
   @@index([status], map: "idx_deposits_status")
@@ -770,7 +767,6 @@ model Settlement {
   paymentMethod String?          @map("payment_method") @db.VarChar(100)
   qrCodeUrl     String?          @map("qr_code_url") @db.Text
   paidAt        DateTime?        @map("paid_at") @db.Timestamp(0)
-  evidenceId    String?          @map("evidence_id") @db.VarChar(36)
   status        SettlementStatus @default(UNPAID)
   requestedBy   String?          @map("requested_by") @db.VarChar(36)
   requestedAt   DateTime?        @map("requested_at") @db.Timestamp(0)
@@ -780,10 +776,10 @@ model Settlement {
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  order     Order     @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
-  evidence  Evidence? @relation(fields: [evidenceId], references: [evidenceId], onDelete: SetNull)
-  requester User?     @relation("SettlementRequestedBy", fields: [requestedBy], references: [userId], onDelete: SetNull)
-  confirmer User?     @relation("SettlementConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
+  order     Order                @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  requester User?                @relation("SettlementRequestedBy", fields: [requestedBy], references: [userId], onDelete: SetNull)
+  confirmer User?                @relation("SettlementConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
+  evidences SettlementEvidence[]
 
   @@index([orderId], map: "idx_settlements_order")
   @@index([status], map: "idx_settlements_status")
@@ -823,11 +819,11 @@ model Notification {
 // ============================================================================
 
 model Inventory {
-  inventoryId       String   @id @default(dbgenerated("(uuid())")) @map("inventory_id") @db.VarChar(36)
-  itemId            String   @unique @map("item_id") @db.VarChar(36)
-  quantityTotal     Int      @default(0) @map("quantity_total")
-  quantityDamaged   Int      @default(0) @map("quantity_damaged")
-  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+  inventoryId     String   @id @default(dbgenerated("(uuid())")) @map("inventory_id") @db.VarChar(36)
+  itemId          String   @unique @map("item_id") @db.VarChar(36)
+  quantityTotal   Int      @default(0) @map("quantity_total")
+  quantityDamaged Int      @default(0) @map("quantity_damaged")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
   item Item @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
 
@@ -895,6 +891,50 @@ model CollectedEquipmentReportItem {
   @@index([reportId], map: "idx_cer_items_report")
   @@index([itemId], map: "idx_cer_items_item")
   @@map("collected_equipment_report_items")
+}
+
+model SchedulePlanEvidence {
+  planId     String @map("plan_id") @db.VarChar(36)
+  evidenceId String @map("evidence_id") @db.VarChar(36)
+
+  plan     SchedulePlan @relation(fields: [planId], references: [planId], onDelete: Cascade)
+  evidence Evidence     @relation(fields: [evidenceId], references: [evidenceId], onDelete: Cascade)
+
+  @@id([planId, evidenceId])
+  @@map("schedule_plan_evidences")
+}
+
+model SurveyReportEvidence {
+  surveyId   String @map("survey_id") @db.VarChar(36)
+  evidenceId String @map("evidence_id") @db.VarChar(36)
+
+  survey   SurveyReport @relation(fields: [surveyId], references: [surveyId], onDelete: Cascade)
+  evidence Evidence     @relation(fields: [evidenceId], references: [evidenceId], onDelete: Cascade)
+
+  @@id([surveyId, evidenceId])
+  @@map("survey_report_evidences")
+}
+
+model DepositEvidence {
+  depositId  String @map("deposit_id") @db.VarChar(36)
+  evidenceId String @map("evidence_id") @db.VarChar(36)
+
+  deposit  Deposit  @relation(fields: [depositId], references: [depositId], onDelete: Cascade)
+  evidence Evidence @relation(fields: [evidenceId], references: [evidenceId], onDelete: Cascade)
+
+  @@id([depositId, evidenceId])
+  @@map("deposit_evidences")
+}
+
+model SettlementEvidence {
+  settlementId String @map("settlement_id") @db.VarChar(36)
+  evidenceId   String @map("evidence_id") @db.VarChar(36)
+
+  settlement Settlement @relation(fields: [settlementId], references: [settlementId], onDelete: Cascade)
+  evidence   Evidence   @relation(fields: [evidenceId], references: [evidenceId], onDelete: Cascade)
+
+  @@id([settlementId, evidenceId])
+  @@map("settlement_evidences")
 }
 
 model ItemComponent {

@@ -78,7 +78,7 @@ describe('paymentService.updateDepositStatus', () => {
 
     const result = await paymentService.updateDepositStatus('dep-1', { status: 'PAID' }, 'user-1');
 
-    expect(mockedPaymentRepo.updateStatus).toHaveBeenCalledWith('dep-1', 'ord-1', 'PAID', 'user-1');
+    expect(mockedPaymentRepo.updateStatus).toHaveBeenCalledWith('dep-1', 'ord-1', 'PAID', 'user-1', undefined);
     expect(result.status).toBe('PAID');
   });
 
@@ -109,7 +109,7 @@ describe('paymentService.confirmSettlement', () => {
 
     const result = await paymentService.confirmSettlement('set-1', 'user-1');
 
-    expect(mockedPaymentRepo.confirmSettlement).toHaveBeenCalledWith('set-1', 'user-1');
+    expect(mockedPaymentRepo.confirmSettlement).toHaveBeenCalledWith('set-1', 'ord-1', 'user-1', undefined);
     expect(result.status).toBe('PAID');
   });
 

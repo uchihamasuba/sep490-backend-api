@@ -126,7 +126,7 @@ export interface DepositDTO {
   paymentMethod: string | null;
   qrCodeUrl: string | null;
   status: string;
-  evidenceId: string | null;
+  evidenceIds: string[];
   requestedBy: string;
   approvedBy: string | null;
   approvedAt: string | null;
@@ -145,7 +145,7 @@ export interface SettlementDTO {
   paymentMethod: string | null;
   qrCodeUrl: string | null;
   paidAt: string | null;
-  evidenceId: string | null;
+  evidenceIds: string[];
   status: string;
   requestedBy: string | null;
   requestedAt: string | null;
@@ -384,7 +384,7 @@ function mapDeposit(row: Deposit): DepositDTO {
     paymentMethod: row.paymentMethod,
     qrCodeUrl: row.qrCodeUrl,
     status: row.status,
-    evidenceId: row.evidenceId,
+    evidenceIds: (row as any).evidences ? (row as any).evidences.map((e: any) => e.evidenceId) : [],
     requestedBy: row.requestedBy,
     approvedBy: row.approvedBy,
     approvedAt: row.approvedAt ? row.approvedAt.toISOString() : null,
@@ -423,7 +423,7 @@ function mapSettlement(row: Settlement): SettlementDTO {
     paymentMethod: row.paymentMethod,
     qrCodeUrl: row.qrCodeUrl,
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
-    evidenceId: row.evidenceId,
+    evidenceIds: (row as any).evidences ? (row as any).evidences.map((e: any) => e.evidenceId) : [],
     status: row.status,
     requestedBy: row.requestedBy,
     requestedAt: row.requestedAt ? row.requestedAt.toISOString() : null,

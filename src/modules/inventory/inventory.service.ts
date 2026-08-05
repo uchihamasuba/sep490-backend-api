@@ -53,6 +53,7 @@ export interface PicklistItemDTO {
   itemId: string;
   itemName: string;
   unit: string;
+  rentalPrice: number;
   source: string;
   quantityOrdered: number;
   quantityAvailable: number | null;
@@ -214,6 +215,7 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
       itemId: row.itemId,
       itemName: row.item.itemName,
       unit: row.item.unit,
+      rentalPrice: Number(row.item.rentalPrice),
       source: row.source,
       quantityOrdered: row.quantity,
       quantityAvailable,

@@ -221,15 +221,21 @@ CREATE TABLE schedule_plans (
     end_time    TIMESTAMP NULL,
     location    TEXT,
     status      ENUM('PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
-    evidence_id VARCHAR(36),
     notes       TEXT,
     created_by  VARCHAR(36) NOT NULL,
     created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
     FOREIGN KEY (task_id) REFERENCES work_tasks(task_id) ON DELETE RESTRICT,
-    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(user_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE schedule_plan_evidences (
+    plan_id     VARCHAR(36) NOT NULL,
+    evidence_id VARCHAR(36) NOT NULL,
+    PRIMARY KEY (plan_id, evidence_id),
+    FOREIGN KEY (plan_id) REFERENCES schedule_plans(plan_id) ON DELETE CASCADE,
+    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE CASCADE
 );
 
 CREATE TABLE schedule_plan_assignees (
@@ -262,7 +268,6 @@ CREATE TABLE survey_reports (
     report_code         VARCHAR(50) NOT NULL UNIQUE,
     order_id            VARCHAR(36) NOT NULL,
     plan_id             VARCHAR(36),
-    evidence_id         VARCHAR(36),
     survey_date         TIMESTAMP NOT NULL,
     location            TEXT NOT NULL,
     area                DECIMAL(10,2),
@@ -281,9 +286,16 @@ CREATE TABLE survey_reports (
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
     FOREIGN KEY (plan_id) REFERENCES schedule_plans(plan_id) ON DELETE SET NULL,
-    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE SET NULL,
     FOREIGN KEY (reported_by) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (confirmed_by) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE TABLE survey_report_evidences (
+    survey_id   VARCHAR(36) NOT NULL,
+    evidence_id VARCHAR(36) NOT NULL,
+    PRIMARY KEY (survey_id, evidence_id),
+    FOREIGN KEY (survey_id) REFERENCES survey_reports(survey_id) ON DELETE CASCADE,
+    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE CASCADE
 );
 
 CREATE TABLE change_requests (
@@ -352,7 +364,6 @@ CREATE TABLE deposits (
     payment_method VARCHAR(100),
     qr_code_url    TEXT,
     status         ENUM('PENDING', 'SUCCESS', 'OVERDUE', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
-    evidence_id    VARCHAR(36),
     requested_by   VARCHAR(36) NOT NULL,
     approved_by    VARCHAR(36),
     approved_at    TIMESTAMP NULL,
@@ -360,9 +371,16 @@ CREATE TABLE deposits (
     created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE SET NULL,
     FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE RESTRICT,
     FOREIGN KEY (approved_by) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE TABLE deposit_evidences (
+    deposit_id  VARCHAR(36) NOT NULL,
+    evidence_id VARCHAR(36) NOT NULL,
+    PRIMARY KEY (deposit_id, evidence_id),
+    FOREIGN KEY (deposit_id) REFERENCES deposits(deposit_id) ON DELETE CASCADE,
+    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE CASCADE
 );
 
 CREATE TABLE settlements (
@@ -375,7 +393,6 @@ CREATE TABLE settlements (
     payment_method VARCHAR(100),
     qr_code_url    TEXT,
     paid_at        TIMESTAMP NULL,
-    evidence_id    VARCHAR(36),
     status         ENUM('DRAFT', 'AGREED', 'REQUESTED', 'PAID', 'CONFIRMED') NOT NULL DEFAULT 'DRAFT',
     requested_by   VARCHAR(36),
     requested_at   TIMESTAMP NULL,
@@ -385,9 +402,16 @@ CREATE TABLE settlements (
     created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
-    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE SET NULL,
     FOREIGN KEY (requested_by) REFERENCES users(user_id) ON DELETE SET NULL,
     FOREIGN KEY (confirmed_by) REFERENCES users(user_id) ON DELETE SET NULL
+);
+
+CREATE TABLE settlement_evidences (
+    settlement_id VARCHAR(36) NOT NULL,
+    evidence_id   VARCHAR(36) NOT NULL,
+    PRIMARY KEY (settlement_id, evidence_id),
+    FOREIGN KEY (settlement_id) REFERENCES settlements(settlement_id) ON DELETE CASCADE,
+    FOREIGN KEY (evidence_id) REFERENCES evidences(evidence_id) ON DELETE CASCADE
 );
 
 -- ============================================================================

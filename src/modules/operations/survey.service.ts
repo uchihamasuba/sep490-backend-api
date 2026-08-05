@@ -30,7 +30,7 @@ export interface SurveyReportDetailDTO extends SurveyReportListItemDTO {
   additionalRequests: string | null;
   proposedItems: string | null;
   notes: string | null;
-  evidenceId: string | null;
+  evidenceIds: string[];
   confirmedByName: string | null;
   confirmedAt: string | null;
   createdAt: string;
@@ -76,7 +76,7 @@ function mapDetail(row: SurveyReportWithDetails): SurveyReportDetailDTO {
     additionalRequests: row.additionalRequests,
     proposedItems: row.proposedItems,
     notes: row.notes,
-    evidenceId: row.evidenceId,
+    evidenceIds: row.evidences ? row.evidences.map((e) => e.evidenceId) : [],
     confirmedByName: row.confirmer?.fullName ?? null,
     confirmedAt: row.confirmedAt ? row.confirmedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
@@ -149,7 +149,7 @@ async function createSurveyReport(body: CreateSurveyReportBody, actor: Actor): P
     additionalRequests: body.additionalRequests ?? null,
     proposedItems: body.proposedItems ?? null,
     notes: body.notes || null,
-    evidenceId: body.evidenceId ?? null,
+    evidenceIds: body.evidenceIds ?? [],
     reportedBy: actor.id,
   });
 

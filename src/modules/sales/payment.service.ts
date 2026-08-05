@@ -20,7 +20,7 @@ export interface DepositDTO {
   paymentMethod: string | null;
   qrCodeUrl: string | null;
   status: string;
-  evidenceId: string | null;
+  evidenceIds: string[];
   requestedBy: string;
   approvedBy: string | null;
   approvedAt: string | null;
@@ -58,7 +58,7 @@ export interface SettlementDTO {
   paymentMethod: string | null;
   qrCodeUrl: string | null;
   paidAt: string | null;
-  evidenceId: string | null;
+  evidenceIds: string[];
   status: string;
   requestedBy: string | null;
   requestedAt: string | null;
@@ -84,7 +84,7 @@ function mapDeposit(row: Deposit): DepositDTO {
     paymentMethod: row.paymentMethod,
     qrCodeUrl: row.qrCodeUrl,
     status: row.status,
-    evidenceId: row.evidenceId,
+    evidenceIds: (row as any).evidences ? (row as any).evidences.map((e: any) => e.evidenceId) : [],
     requestedBy: row.requestedBy,
     approvedBy: row.approvedBy,
     approvedAt: row.approvedAt ? row.approvedAt.toISOString() : null,
@@ -117,7 +117,7 @@ function mapSettlement(row: Settlement): SettlementDTO {
     paymentMethod: row.paymentMethod,
     qrCodeUrl: row.qrCodeUrl,
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
-    evidenceId: row.evidenceId,
+    evidenceIds: (row as any).evidences ? (row as any).evidences.map((e: any) => e.evidenceId) : [],
     status: row.status,
     requestedBy: row.requestedBy,
     requestedAt: row.requestedAt ? row.requestedAt.toISOString() : null,
@@ -140,14 +140,14 @@ async function updateDepositStatus(depositId: string, body: UpdateDepositStatusB
     throw AppError.badRequest(`Khoản cọc đang ở trạng thái ${deposit.status} (đã kết thúc), không thể cập nhật thêm`);
   }
 
-  const updated = await paymentRepository.updateStatus(depositId, deposit.orderId, body.status, actorId);
+  const updated = await paymentRepository.updateStatus(depositId, deposit.orderId, body.status, actorId, body.evidenceIds);
   return mapDeposit(updated);
 }
 
 // PUT /settlements/:settlementId/confirm — docs/api/tiendosukien_api.md mục 6, bước 3: "Xác nhận thu
 // nốt & Quyết toán". FE tự gọi tiếp PUT /orders/:id/status { COMPLETED } sau bước này (đã chốt mục 6
 // bước 4) — không tự cascade cập nhật Order ở đây.
-async function confirmSettlement(settlementId: string, confirmedBy: string): Promise<SettlementDTO> {
+async function confirmSettlement(settlementId: string, confirmedBy: string, evidenceIds?: string[]): Promise<SettlementDTO> {
   const settlement = await paymentRepository.findSettlementById(settlementId);
   if (!settlement) throw AppError.notFound('Không tìm thấy bản quyết toán');
 
@@ -155,7 +155,7 @@ async function confirmSettlement(settlementId: string, confirmedBy: string): Pro
     throw AppError.badRequest('Bản quyết toán này đã được xác nhận trước đó');
   }
 
-  const updated = await paymentRepository.confirmSettlement(settlementId, confirmedBy);
+  const updated = await paymentRepository.confirmSettlement(settlementId, settlement.orderId, confirmedBy, evidenceIds);
   return mapSettlement(updated);
 }
 
@@ -177,7 +177,7 @@ async function markSettlementPaid(settlementId: string, body: MarkSettlementPaid
     }
   }
 
-  const updated = await paymentRepository.markSettlementPaid(settlementId, body.evidenceId);
+  const updated = await paymentRepository.markSettlementPaid(settlementId, body.evidenceIds!, settlement.orderId);
   return mapSettlement(updated);
 }
 

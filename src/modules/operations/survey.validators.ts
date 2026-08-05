@@ -28,6 +28,7 @@ export const createSurveyReportBodySchema = z
     proposedItems: z.string().trim().min(1).optional(),
     notes: z.string().trim().optional(),
     evidenceId: z.string().trim().min(1).optional(),
+    evidenceIds: z.array(z.string().trim().min(1)).optional(),
   })
   // Kích thước mặt bằng (diện tích/dài/rộng) phải khai đủ bộ 3 hoặc bỏ hẳn — không chấp nhận khai nửa
   // vời (vd chỉ nhập area mà thiếu length/width) vì 3 số này mô tả cùng 1 phép đo mặt bằng.
@@ -37,7 +38,13 @@ export const createSurveyReportBodySchema = z
       return provided === 0 || provided === 3;
     },
     { message: 'area, length và width phải được khai đủ cả 3 hoặc để trống cả 3', path: ['area'] },
-  );
+  )
+  .transform((data) => {
+    if (!data.evidenceIds && data.evidenceId) {
+      data.evidenceIds = [data.evidenceId];
+    }
+    return data;
+  });
 
 export const confirmSurveyReportBodySchema = z.object({
   status: z.literal('CONFIRMED', { message: 'status phải là CONFIRMED' }),

@@ -62,7 +62,7 @@ export interface SchedulePlanDTO {
   latitude: number | null;
   longitude: number | null;
   status: ScheduleStatus;
-  evidenceId: string | null;
+  evidenceIds: string[];
   notes: string | null;
   assignees: AssigneeDTO[];
 }
@@ -118,7 +118,7 @@ function mapPlan(row: SchedulePlanWithDetails): SchedulePlanDTO {
     latitude: row.latitude,
     longitude: row.longitude,
     status: row.status,
-    evidenceId: row.evidenceId,
+    evidenceIds: row.evidences ? row.evidences.map((e) => e.evidenceId) : [],
     notes: row.notes,
     assignees: row.assignees.map(mapAssignee),
   };
@@ -266,7 +266,7 @@ async function updateSchedulePlanStatus(
     throw AppError.badRequest(`Không thể hủy kế hoạch đang ở trạng thái ${existing.status}`);
   }
 
-  const updated = await scheduleRepository.updateStatus(planId, body.status, body.notes, body.evidenceId);
+  const updated = await scheduleRepository.updateStatus(planId, body.status, body.notes, body.evidenceIds);
   return mapPlan(updated);
 }
 
@@ -376,14 +376,14 @@ async function checkOut(planId: string, userId: string, actor: Actor, latitude?:
 // thay cho đường cũ PATCH .../status { COMPLETED, evidenceId } không còn dùng được. Không bắt buộc,
 // không gắn điều kiện status nào ("tách biệt hoàn toàn") — bất kỳ assignee nào (LEAD/TECHNICAL) của plan
 // đều gắn được, không riêng người check-in/out.
-async function attachEvidence(planId: string, evidenceId: string, actor: Actor): Promise<SchedulePlanDTO> {
+async function attachEvidence(planId: string, evidenceIds: string[], actor: Actor): Promise<SchedulePlanDTO> {
   const plan = await findPlanOrThrow(planId);
   const isAssigned = plan.assignees.some((a) => a.userId === actor.id);
   if (!isAssigned) {
     throw AppError.forbidden('Chỉ nhân sự được phân công vào kế hoạch này mới được gắn ảnh minh chứng');
   }
 
-  await scheduleRepository.attachEvidence(planId, evidenceId);
+  await scheduleRepository.attachEvidence(planId, evidenceIds);
   return getSchedulePlanById(planId);
 }
 async function listWorkTasks(query: ListWorkTasksQuery) {

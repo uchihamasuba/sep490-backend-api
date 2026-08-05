@@ -15,6 +15,7 @@ const detailInclude = {
   order: { select: { orderCode: true, eventName: true, customer: { select: { customerName: true } } } },
   reporter: { select: { userId: true, fullName: true } },
   confirmer: { select: { userId: true, fullName: true } },
+  evidences: { select: { evidenceId: true } },
 } satisfies Prisma.SurveyReportInclude;
 
 export type SurveyReportWithDetails = Prisma.SurveyReportGetPayload<{ include: typeof detailInclude }>;
@@ -99,11 +100,18 @@ export const surveyRepository = {
     additionalRequests: string | null;
     proposedItems: string | null;
     notes: string | null;
-    evidenceId: string | null;
+    evidenceIds: string[];
     reportedBy: string;
   }): Promise<SurveyReportWithDetails> {
+    const { evidenceIds, ...rest } = data;
     return prisma.surveyReport.create({
-      data: { ...data, status: 'NEEDS_REVIEW' },
+      data: { 
+        ...rest, 
+        status: 'NEEDS_REVIEW',
+        evidences: evidenceIds.length > 0 ? {
+          create: evidenceIds.map((id) => ({ evidenceId: id })),
+        } : undefined,
+      },
       include: detailInclude,
     });
   },

@@ -80,6 +80,12 @@ export const updateSchedulePlanStatusBodySchema = z.object({
   status: z.enum(['CONFIRMED', 'CANCELLED'], { message: 'status không hợp lệ, chỉ chấp nhận CONFIRMED hoặc CANCELLED' }),
   notes: z.string().trim().optional(),
   evidenceId: z.string().trim().min(1).optional(),
+  evidenceIds: z.array(z.string().trim().min(1)).optional(),
+}).transform((data) => {
+  if (!data.evidenceIds && data.evidenceId) {
+    data.evidenceIds = [data.evidenceId];
+  }
+  return data;
 });
 
 export const addAssigneeBodySchema = assigneeInputSchema;
@@ -102,7 +108,16 @@ export const checkOutBodySchema = z.object({
 // (đã chốt ở docs/api/more-require.md mục (ag), thay cho đường cũ PATCH .../status { COMPLETED,
 // evidenceId } không còn dùng được). Không bắt buộc, nhân viên tự gắn khi có ảnh.
 export const attachEvidenceBodySchema = z.object({
-  evidenceId: z.string().trim().min(1, 'Thiếu mã ảnh minh chứng'),
+  evidenceId: z.string().trim().min(1).optional(),
+  evidenceIds: z.array(z.string().trim().min(1)).optional(),
+}).transform((data) => {
+  if (!data.evidenceIds && data.evidenceId) {
+    data.evidenceIds = [data.evidenceId];
+  }
+  return data;
+}).refine((data) => data.evidenceIds && data.evidenceIds.length > 0, {
+  message: 'Thiếu mã ảnh minh chứng',
+  path: ['evidenceIds'],
 });
 
 // POST /schedule-plans/batch — tạo nhiều dòng cùng orderId trong 1 transaction (docs/api/

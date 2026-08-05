@@ -14,16 +14,39 @@ const depositTargetStatusEnum = z.enum(['PAID', 'CANCELLED']);
 
 export const updateDepositStatusBodySchema = z.object({
   status: depositTargetStatusEnum,
+  evidenceId: z.string().trim().min(1).optional(),
+  evidenceIds: z.array(z.string().trim().min(1)).optional(),
+}).transform((data) => {
+  if (!data.evidenceIds && data.evidenceId) {
+    data.evidenceIds = [data.evidenceId];
+  }
+  return data;
 });
 
 export const confirmSettlementBodySchema = z.object({
   status: z.literal('PAID'),
+  evidenceId: z.string().trim().min(1).optional(),
+  evidenceIds: z.array(z.string().trim().min(1)).optional(),
+}).transform((data) => {
+  if (!data.evidenceIds && data.evidenceId) {
+    data.evidenceIds = [data.evidenceId];
+  }
+  return data;
 });
 
 // PUT /settlements/:settlementId/mark-paid — transition UNPAID -> PAID (docs/api/api.md gap (n)),
 // Leader bấm "Xác nhận đã thu tiền" tại hiện trường kèm 1 ảnh bằng chứng.
 export const markSettlementPaidBodySchema = z.object({
-  evidenceId: z.string().trim().min(1, 'Thiếu mã bằng chứng'),
+  evidenceId: z.string().trim().min(1).optional(),
+  evidenceIds: z.array(z.string().trim().min(1)).optional(),
+}).transform((data) => {
+  if (!data.evidenceIds && data.evidenceId) {
+    data.evidenceIds = [data.evidenceId];
+  }
+  return data;
+}).refine((data) => data.evidenceIds && data.evidenceIds.length > 0, {
+  message: 'Thiếu mã bằng chứng',
+  path: ['evidenceIds'],
 });
 
 // GET /deposits (gộp toàn hệ thống) — gap chính đã ghi ở docs/api/datcoc_api.md mục 1.2/8.

@@ -1,4 +1,4 @@
-import type { Deposit, DepositStatus, Prisma, Settlement } from '@prisma/client';
+import type { Deposit, DepositStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 
 export interface DepositListFilter {
@@ -20,6 +20,7 @@ const depositListInclude = {
       customer: { select: { customerName: true, phone: true } },
     },
   },
+  evidences: { select: { evidenceId: true } },
 } satisfies Prisma.DepositInclude;
 
 export type DepositWithOrder = Prisma.DepositGetPayload<{ include: typeof depositListInclude }>;
@@ -40,8 +41,8 @@ function buildDepositWhere(filter: DepositListFilter): Prisma.DepositWhereInput 
 }
 
 export const paymentRepository = {
-  findDepositById(depositId: string): Promise<Deposit | null> {
-    return prisma.deposit.findUnique({ where: { depositId } });
+  findDepositById(depositId: string) {
+    return prisma.deposit.findUnique({ where: { depositId }, include: { evidences: { select: { evidenceId: true } } } });
   },
 
   async findManyDeposits(params: DepositListParams) {
@@ -71,35 +72,71 @@ export const paymentRepository = {
     orderId: string,
     status: DepositStatus,
     approvedBy: string,
-  ): Promise<Deposit> {
+    evidenceIds?: string[]
+  ) {
+    const evidencesUpdate = evidenceIds !== undefined ? {
+      evidences: {
+        deleteMany: {},
+        create: evidenceIds.map((id) => ({ evidenceId: id })),
+      }
+    } : {};
+
     if (status !== 'PAID') {
-      return prisma.deposit.update({ where: { depositId }, data: { status } });
+      return prisma.deposit.update({ where: { depositId }, data: { status, ...evidencesUpdate } });
     }
 
     const now = new Date();
     const [deposit] = await prisma.$transaction([
-      prisma.deposit.update({ where: { depositId }, data: { status, approvedBy, approvedAt: now, paymentDate: now } }),
+      prisma.deposit.update({ where: { depositId }, data: { status, approvedBy, approvedAt: now, paymentDate: now, ...evidencesUpdate } }),
       prisma.order.update({ where: { orderId }, data: { paymentStatus: 'DEPOSITED' } }),
     ]);
 
     return deposit;
   },
 
-  findSettlementById(settlementId: string): Promise<Settlement | null> {
-    return prisma.settlement.findUnique({ where: { settlementId } });
+  findSettlementById(settlementId: string) {
+    return prisma.settlement.findUnique({ where: { settlementId }, include: { evidences: { select: { evidenceId: true } } } });
   },
 
-  confirmSettlement(settlementId: string, confirmedBy: string): Promise<Settlement> {
-    return prisma.settlement.update({
-      where: { settlementId },
-      data: { status: 'PAID', confirmedBy, confirmedAt: new Date() },
-    });
+  async confirmSettlement(settlementId: string, orderId: string, confirmedBy: string, evidenceIds?: string[]) {
+    const evidencesUpdate = evidenceIds !== undefined ? {
+      evidences: {
+        deleteMany: {},
+        create: evidenceIds.map((id) => ({ evidenceId: id })),
+      }
+    } : {};
+
+    const [settlement] = await prisma.$transaction([
+      prisma.settlement.update({
+        where: { settlementId },
+        data: { status: 'PAID', confirmedBy, confirmedAt: new Date(), ...evidencesUpdate },
+      }),
+      prisma.order.update({
+        where: { orderId },
+        data: { paymentStatus: 'PAID' }
+      })
+    ]);
+    return settlement;
   },
 
-  markSettlementPaid(settlementId: string, evidenceId: string): Promise<Settlement> {
-    return prisma.settlement.update({
-      where: { settlementId },
-      data: { status: 'PAID', paidAt: new Date(), evidenceId },
-    });
+  async markSettlementPaid(settlementId: string, evidenceIds: string[], orderId: string) {
+    const [settlement] = await prisma.$transaction([
+      prisma.settlement.update({
+        where: { settlementId },
+        data: { 
+          status: 'PAID', 
+          paidAt: new Date(), 
+          evidences: {
+            deleteMany: {},
+            create: evidenceIds.map((id) => ({ evidenceId: id })),
+          }
+        },
+      }),
+      prisma.order.update({
+        where: { orderId },
+        data: { paymentStatus: 'PAID' }
+      })
+    ]);
+    return settlement;
   },
 };

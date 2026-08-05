@@ -274,7 +274,7 @@ implement màn tạo báo cáo phía Leader Staff:
 | 4 ô đo đạc (`measurement1..4`) | `area`/`length`/`width`/`entrance` | Chỉ 3/4 khớp được, xem mục 3.1 — đổi form thành đúng field số (`area`, `length`, `width` dạng number input) + `entrance` (text), bỏ 2 field không có cột (chiều cao trần, công suất điện) khỏi payload cho tới khi Backend bổ sung cột theo mục 3.6. |
 | Bảng thiết bị đề xuất thuê (`rentalItems[]`) | `proposedItems` (string) | Theo hướng đã chốt ở mục 3.3: đổi từ bảng nhiều dòng thành 1 textarea tự do, gửi thẳng thành 1 chuỗi `proposedItems`. |
 | Bảng thiết bị báo giá nháp (`quoteItems[]`) | **Không có trong payload** | Theo mục 3.4 — bỏ hẳn khối này khỏi payload/form tạo cho tới khi Backend xác nhận có bảng lưu tương ứng hay không. |
-| Ảnh minh chứng | `evidenceId` (1 ảnh, upload trước qua `POST /evidence/upload` rồi gắn `evidenceId` vào payload tạo) | Form hiện tại (`SurveyCreateDrawer`) **chưa có** ô upload ảnh nào — cần bổ sung ở bản mobile, chỉ hỗ trợ 1 ảnh do giới hạn cột đơn (mục 3.5). |
+| Ảnh minh chứng | `evidenceIds` (mảng nhiều ID, upload trước qua `POST /evidence/upload` rồi truyền mảng `evidenceIds` vào payload tạo) | Form hiện tại (`SurveyCreateDrawer`) **chưa có** ô upload ảnh nào — cần bổ sung ở bản mobile (hỗ trợ chọn/chụp nhiều ảnh). |
 | `planId` (không có ở form) | `planId` (optional) | Payload thật hỗ trợ gắn báo cáo vào 1 `schedule_plans` cụ thể (buổi khảo sát đã lên lịch) — form hiện tại bỏ qua field này hoàn toàn. Nên gắn khi tạo từ 1 buổi khảo sát đã có lịch (mục 6) để giữ liên kết kế hoạch ↔ kết quả. |
 
 `report_code` (mã báo cáo, mock tự sinh phía client qua `nextAdminSurveyReportId()`) — payload thật

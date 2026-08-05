@@ -354,7 +354,7 @@ describe('scheduleService.attachEvidence — gắn evidenceId độc lập với
       fakePlan({ status: 'IN_PROGRESS' }, [fakeAssignee({ userId: 'leader-1' })]) as never,
     );
 
-    await expect(scheduleService.attachEvidence('plan-1', 'evidence-1', outsider)).rejects.toMatchObject({
+    await expect(scheduleService.attachEvidence('plan-1', ['evidence-1'], outsider)).rejects.toMatchObject({
       status: 403,
     });
     expect(mockedRepo.attachEvidence).not.toHaveBeenCalled();
@@ -369,8 +369,8 @@ describe('scheduleService.attachEvidence — gắn evidenceId độc lập với
     );
     mockedRepo.attachEvidence.mockResolvedValue({} as never);
 
-    await scheduleService.attachEvidence('plan-1', 'evidence-1', technical);
-    expect(mockedRepo.attachEvidence).toHaveBeenCalledWith('plan-1', 'evidence-1');
+    await scheduleService.attachEvidence('plan-1', ['evidence-1'], technical);
+    expect(mockedRepo.attachEvidence).toHaveBeenCalledWith('plan-1', ['evidence-1']);
   });
 });
 
@@ -403,7 +403,7 @@ describe('HTTP routes — role permission matrix', () => {
     const res = await request(app)
       .patch('/api/v1/schedule-plans/plan-1/evidence')
       .set('Authorization', authHeader('MANAGER'))
-      .send({ evidenceId: 'evidence-1' });
+      .send({ evidenceIds: ['evidence-1'] });
 
     expect(res.status).toBe(403);
   });

@@ -41,6 +41,7 @@ const detailInclude = {
       attendance: true,
     },
   },
+  evidences: { select: { evidenceId: true } },
 } satisfies Prisma.SchedulePlanInclude;
 
 export type SchedulePlanWithDetails = Prisma.SchedulePlanGetPayload<{ include: typeof detailInclude }>;
@@ -197,14 +198,21 @@ export const scheduleRepository = {
     planId: string,
     status: ScheduleStatus,
     notes: string | null | undefined,
-    evidenceId: string | null | undefined,
+    evidenceIds: string[] | undefined,
   ): Promise<SchedulePlanWithDetails> {
     return prisma.schedulePlan.update({
       where: { planId },
       data: {
         status,
         ...(notes !== undefined ? { notes } : {}),
-        ...(evidenceId !== undefined ? { evidenceId } : {}),
+        ...(evidenceIds !== undefined
+          ? {
+              evidences: {
+                deleteMany: {},
+                create: evidenceIds.map((id) => ({ evidenceId: id })),
+              },
+            }
+          : {}),
       },
       include: detailInclude,
     });
@@ -246,8 +254,16 @@ export const scheduleRepository = {
     return prisma.attendance.update({ where: { assigneeId }, data: { checkOutAt: new Date(), latitude, longitude } });
   },
 
-  attachEvidence(planId: string, evidenceId: string) {
-    return prisma.schedulePlan.update({ where: { planId }, data: { evidenceId } });
+  attachEvidence(planId: string, evidenceIds: string[]) {
+    return prisma.schedulePlan.update({ 
+      where: { planId }, 
+      data: { 
+        evidences: {
+          deleteMany: {},
+          create: evidenceIds.map((id) => ({ evidenceId: id })),
+        } 
+      } 
+    });
   },
 
   async listWorkTasks(skip?: number, take?: number, search?: string) {

@@ -21,7 +21,8 @@ async function updateDepositStatus(req: Request, res: Response) {
 async function confirmSettlement(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { settlementId } = req.params as unknown as SettlementIdParam;
-  const settlement = await paymentService.confirmSettlement(settlementId, req.user.id);
+  const body = req.body as { evidenceIds?: string[] };
+  const settlement = await paymentService.confirmSettlement(settlementId, req.user.id, body.evidenceIds);
   ok(res, settlement);
 }
 

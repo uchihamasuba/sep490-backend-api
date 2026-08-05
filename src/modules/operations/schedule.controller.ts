@@ -95,7 +95,7 @@ async function attachEvidence(req: Request, res: Response) {
   const actor = requireActor(req);
   const { planId } = req.params as unknown as PlanIdParam;
   const body = req.body as AttachEvidenceBody;
-  const plan = await scheduleService.attachEvidence(planId, body.evidenceId, actor);
+  const plan = await scheduleService.attachEvidence(planId, body.evidenceIds!, actor);
   ok(res, plan);
 }
 
