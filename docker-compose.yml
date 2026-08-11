@@ -30,25 +30,36 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # Nạp toàn bộ config bí mật/tùy chọn từ file .env cạnh compose (BE/.env) — CÙNG cách app đọc khi chạy
+    # local (dotenv). Nhờ đó Firebase (upload evidence + FCM push) và SMTP (mời/nhắc nhân viên qua email)
+    # hoạt động trong container. FIREBASE_PRIVATE_KEY có \n được compose tự bung thành xuống dòng thật (PEM hợp lệ).
+    # required:false → vẫn `docker compose up` được khi CHƯA có .env (rơi về default ở 'environment' bên dưới).
+    # THỨ TỰ ƯU TIÊN: biến khai báo trong 'environment' GHI ĐÈ biến cùng tên nạp từ .env.
+    env_file:
+      - path: .env
+        required: false
     environment:
-      # DATABASE_URL trỏ tới service 'db' trong mạng compose (KHÔNG phải localhost).
+      # DB chạy riêng trên VPS (docker service) → DATABASE_URL do BẠN quản Ở ĐÂY, KHÔNG lấy từ .env (dòng này
+      # ghi đè mọi DATABASE_URL trong .env). Mặc định trỏ service 'db' nội bộ để test local; khi deploy lên VPS,
+      # đổi dòng này thành connection string DB trên VPS (và có thể gỡ service 'db' + 'depends_on' nếu không dùng
+      # DB nội bộ). Muốn nhận từ shell: đổi thành  DATABASE_URL: "${DATABASE_URL}".
       DATABASE_URL: "mysql://${MYSQL_USER:-bnwems}:${MYSQL_PASSWORD:-bnwems}@db:3306/${MYSQL_DATABASE:-bnwems}"
-      NODE_ENV: development
-      PORT: "3001"
+      # --- App config: đọc từ ENV, có default an toàn để container vẫn boot ngay cả khi thiếu .env ---
+      NODE_ENV: "${NODE_ENV:-development}"
+      PORT: "${PORT:-3001}"
       CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:3000}"
-      # Secret dev — ĐỔI khi deploy thật. Tối thiểu 16 ký tự (env.ts yêu cầu).
+      # Secret dev (tối thiểu 16 ký tự — env.ts yêu cầu); .env sẽ ghi đè bằng secret thật khi có.
       JWT_SECRET: "${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}"
-      JWT_EXPIRES_IN: "7d"
+      JWT_EXPIRES_IN: "${JWT_EXPIRES_IN:-7d}"
+      # Firebase / SMTP / COMPANY_BANK_* là TÙY CHỌN: CỐ Ý không liệt kê ở đây mà nạp qua 'env_file' phía trên,
+      # để biến vắng mặt là 'undefined' (đúng .optional() trong env.ts) thay vì chuỗi rỗng — tránh trường hợp
+      # vd SMTP_PORT rỗng bị z.coerce.number() ép thành 0 và làm hỏng boot. Thêm các biến này vào .env khi cần bật.
       # Đặt true để seed dữ liệu mẫu lúc khởi động (LƯU Ý: seed xóa sạch dữ liệu cũ).
       RUN_SEED: "${RUN_SEED:-false}"
       # Giúp nodemon bắt thay đổi file qua bind-mount trên macOS/Windows.
       CHOKIDAR_USEPOLLING: "true"
-    # Firebase (upload evidence + push) & SMTP (mời/nhắc email) là TÙY CHỌN — app vẫn boot khi thiếu.
-    # Muốn bật: bỏ comment env_file dưới và tạo file .env (theo .env.example).
-    # env_file:
-    #   - .env
     ports:
-      - "3001:3001"
+      - "${PORT:-3001}:${PORT:-3001}"
     volumes:
       # Bind-mount source để sửa code là app tự reload. node_modules giữ của image (anonymous volume).
       - .:/app
