@@ -6,6 +6,7 @@ import type {
 } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { AppError } from '../../utils/AppError';
+import { reservationRepository } from './reservation.repository';
 
 const inventoryItemInclude = {
   item: {
@@ -73,6 +74,15 @@ export const inventoryRepository = {
 
   findByItemId(itemId: string): Promise<InventoryWithItem | null> {
     return prisma.inventory.findUnique({ where: { itemId }, include: inventoryItemInclude });
+  },
+
+  /** Tổng/hỏng của nhiều item cùng lúc (cho timeline thiết bị — tính capacity/over-committed). */
+  findManyByItemIds(itemIds: string[]): Promise<{ itemId: string; quantityTotal: number; quantityDamaged: number }[]> {
+    if (itemIds.length === 0) return Promise.resolve([]);
+    return prisma.inventory.findMany({
+      where: { itemId: { in: itemIds } },
+      select: { itemId: true, quantityTotal: true, quantityDamaged: true },
+    });
   },
 
   itemExists(itemId: string) {
@@ -190,6 +200,30 @@ export const inventoryRepository = {
     });
   },
 
+  // Sửa chữa hàng hỏng: chỉ giảm quantity_damaged (total KHÔNG đổi — hàng sửa xong quay lại dùng được).
+  repairDamaged(itemId: string, quantity: number): Promise<InventoryWithItem> {
+    return prisma.inventory.update({
+      where: { itemId },
+      data: { quantityDamaged: { decrement: quantity } },
+      include: inventoryItemInclude,
+    });
+  },
+
+  // Thanh lý hàng hỏng: giảm cả damaged lẫn total (mất khỏi sở hữu) + ghi ADJUSTMENT(−qty) trong 1 transaction.
+  async scrapDamaged(itemId: string, quantity: number, performedBy: string, notes: string | null): Promise<InventoryWithItem> {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.inventory.update({
+        where: { itemId },
+        data: { quantityDamaged: { decrement: quantity }, quantityTotal: { decrement: quantity } },
+        include: inventoryItemInclude,
+      });
+      await tx.inventoryMovement.create({
+        data: { itemId, orderId: null, reportId: null, movementType: 'ADJUSTMENT', quantity: -quantity, performedBy, notes: notes ?? null },
+      });
+      return updated;
+    });
+  },
+
   createMovement(data: {
     itemId: string;
     orderId: string | null;
@@ -269,9 +303,10 @@ export const inventoryRepository = {
     });
   },
 
-  // Xác nhận báo cáo + áp dụng hiệu ứng tồn kho (available += good, damaged += damaged, total -= lost,
-  // reserved -= toàn bộ số về) + ghi 1 dòng inventory_movements(INBOUND)/item trong CÙNG 1 transaction —
-  // đảm bảo không có trạng thái "đã confirm report nhưng chưa cập nhật tồn kho" nếu 1 bước giữa chừng lỗi.
+  // Xác nhận báo cáo thu hồi + áp dụng hiệu ứng tồn kho theo mô hình rental (Phase 2):
+  //   damaged += damaged (hỏng: vẫn sở hữu, không dùng được) · total −= lost (mất hẳn) ·
+  //   good về kho KHÔNG đổi total (total = số sở hữu, không trừ lúc xuất) · ghi INBOUND (good+damaged).
+  // Tất cả trong CÙNG 1 transaction — không có trạng thái "đã confirm nhưng chưa cập nhật tồn".
   async confirmReportAndApplyInventory(
     reportId: string,
     orderId: string,
@@ -289,14 +324,17 @@ export const inventoryRepository = {
           where: { itemId: line.itemId },
           data: {
             quantityDamaged: { increment: line.damagedQuantity },
-            quantityTotal: { increment: line.goodQuantity + line.damagedQuantity }, // Khôi phục lại total trừ phần lost
+            quantityTotal: { decrement: line.lostQuantity }, // total = sở hữu: chỉ trừ phần MẤT (good/damaged vẫn thuộc sở hữu)
           },
         });
       }
 
       // Set order_id (trước đây NULL) để công thức net_exported của export-equipment v2 phản ánh
       // "đồ đã về kho thì được phép xuất lại" — docs/api/xuatthietbi_tubaogia_api.md mục 4.1 bước 2.1.
-      const movementLines = items.filter((line) => line.goodQuantity + line.damagedQuantity > 0);
+      // INBOUND reconcile TOÀN BỘ số đã xuất của dòng này (good+damaged về kho + lost đã xác nhận mất)
+      // để Σ(OUTBOUND)−Σ(INBOUND) phản ánh đúng "đang còn ngoài kho", KHÔNG để phần lost tồn dư vĩnh viễn
+      // trong on-hand (review P0 finding #3). `total` đã −= lost ở trên; good/damaged vẫn thuộc sở hữu.
+      const movementLines = items.filter((line) => line.goodQuantity + line.damagedQuantity + line.lostQuantity > 0);
       if (movementLines.length > 0) {
         await tx.inventoryMovement.createMany({
           data: movementLines.map((line) => ({
@@ -304,9 +342,9 @@ export const inventoryRepository = {
             reportId,
             orderId,
             movementType: 'INBOUND' as const,
-            quantity: line.goodQuantity + line.damagedQuantity,
+            quantity: line.goodQuantity + line.damagedQuantity + line.lostQuantity,
             performedBy: confirmedBy,
-            notes: 'Nhập kho từ biên bản thu hồi thiết bị',
+            notes: `Thu hồi: ${line.goodQuantity} tốt, ${line.damagedQuantity} hỏng, ${line.lostQuantity} mất`,
           })),
         });
       }
@@ -317,13 +355,11 @@ export const inventoryRepository = {
     return report;
   },
 
-  // POST /schedule-plans/:planId/warehouse-movement (docs/api/api.md gap (g)) — Leader ghi nhận xuất
-  // kho doanh nghiệp thực tế tại hiện trường. Cùng hiệu ứng tồn kho với export-equipment
-  // (order.repository.ts#exportEquipment): quantityAvailable -= quantity, quantityReserved += quantity,
-  // ghi 1 dòng inventory_movements OUTBOUND/item. Guard đủ hàng bằng `updateMany` có điều kiện
-  // (count=0 nghĩa là không đủ available) NGAY TRONG transaction để tránh race condition giữa nhiều
-  // request ghi đồng thời — ném `InsufficientFieldStockError` (không phải AppError, giữ đúng lớp
-  // repository thuần Prisma) để service tầng trên dịch lại thành lỗi 400.
+  // POST /schedule-plans/:planId/warehouse-movement — Leader ghi nhận hàng RỜI kho tại hiện trường.
+  // Mô hình rental (Phase 2): xuất kho KHÔNG trừ quantity_total (= số sở hữu) — chỉ ghi 1 dòng
+  // inventory_movements(OUTBOUND). Guard theo TỒN VẬT LÝ (on-hand = total − damaged − đang-ngoài-kho),
+  // khóa dòng inventory (FOR UPDATE) NGAY TRONG transaction để serialize các lần xuất đồng thời trên
+  // cùng item — ném `InsufficientFieldStockError` (repository thuần) để service dịch thành lỗi 400.
   async recordFieldOutbound(params: {
     orderId: string;
     performedBy: string;
@@ -333,13 +369,11 @@ export const inventoryRepository = {
     const movementIds = await prisma.$transaction(async (tx) => {
       const created: string[] = [];
       for (const line of params.items) {
-        const updated = await tx.inventory.updateMany({
-          where: { itemId: line.itemId, quantityTotal: { gte: line.quantity } },
-          data: { quantityTotal: { decrement: line.quantity } },
-        });
-        if (updated.count === 0) {
-          const inv = await tx.inventory.findUnique({ where: { itemId: line.itemId }, select: { quantityTotal: true } });
-          throw new InsufficientFieldStockError(line.itemId, inv?.quantityTotal ?? 0, line.quantity);
+        // Khóa dòng inventory của item rồi kiểm tồn vật lý trước khi ghi OUTBOUND.
+        await tx.$queryRaw`SELECT inventory_id FROM inventory WHERE item_id = ${line.itemId} FOR UPDATE`;
+        const onHand = await reservationRepository.getOnHandNow(line.itemId, tx);
+        if (onHand < line.quantity) {
+          throw new InsufficientFieldStockError(line.itemId, onHand, line.quantity);
         }
 
         const movement = await tx.inventoryMovement.create({
@@ -357,7 +391,7 @@ export const inventoryRepository = {
         created.push(movement.movementId);
       }
       return created;
-    });
+    }, { isolationLevel: 'ReadCommitted' });
 
     return prisma.inventoryMovement.findMany({ where: { movementId: { in: movementIds } }, include: movementInclude });
   },

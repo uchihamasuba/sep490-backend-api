@@ -20,6 +20,14 @@ jest.mock('../../inventory/inventory.repository', () => ({
   },
 }));
 
+// Cảnh báo mềm (computeStockWarnings) gọi reservationRepository — mock để tất định (đủ hàng → không cảnh báo).
+jest.mock('../../inventory/reservation.repository', () => ({
+  reservationRepository: {
+    getAvailableForRange: jest.fn().mockResolvedValue(9999),
+    orderWindow: jest.fn(() => ({ startAt: new Date('2026-01-01T00:00:00Z'), endAt: new Date('2026-01-02T00:00:00Z') })),
+  },
+}));
+
 jest.mock('../quotation.repository', () => {
   const actual = jest.requireActual('../quotation.repository');
   return { ...actual, quotationRepository: { ...actual.quotationRepository, findById: jest.fn() } };
@@ -226,7 +234,7 @@ describe('orderService.createOrder', () => {
       'user-1',
     );
 
-    expect(result).toEqual({ orderId: 'ord-1', orderCode: 'ORD-002' });
+    expect(result).toEqual({ orderId: 'ord-1', orderCode: 'ORD-002', warnings: [] });
   });
 
   it('allows creating an order with an empty items array (items decided later at the quotation step)', async () => {
@@ -246,7 +254,7 @@ describe('orderService.createOrder', () => {
       'user-1',
     );
 
-    expect(result).toEqual({ orderId: 'ord-1', orderCode: 'ORD-003' });
+    expect(result).toEqual({ orderId: 'ord-1', orderCode: 'ORD-003', warnings: [] });
   });
 });
 
@@ -286,7 +294,7 @@ describe('orderService.updateOrderStatus / updateOrderItems — terminal-state g
       cancelReason: 'Khách hủy sự kiện',
     } as never);
 
-    expect(mockedOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'CANCELLED', 'Khách hủy sự kiện', null);
+    expect(mockedOrderRepo.updateStatus).toHaveBeenCalledWith('ord-1', 'CANCELLED', 'Khách hủy sự kiện', null, expect.objectContaining({ fromStatus: 'NEW' }));
     expect(result.orderStatus).toBe('CANCELLED');
   });
 
@@ -305,6 +313,7 @@ describe('orderService.updateOrderStatus / updateOrderItems — terminal-state g
       'CONFIRMED',
       null,
       expect.any(Date),
+      expect.objectContaining({ fromStatus: 'NEW' }),
     );
     expect(result.orderStatus).toBe('CONFIRMED');
   });
@@ -374,7 +383,7 @@ describe('HTTP routes', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.data).toEqual({ orderId: 'ord-1', orderCode: 'ORD-004' });
+    expect(res.body.data).toEqual({ orderId: 'ord-1', orderCode: 'ORD-004', warnings: [] });
   });
 
   it('POST /api/v1/orders allows creating an order without an items field at all', async () => {
@@ -394,7 +403,7 @@ describe('HTTP routes', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.data).toEqual({ orderId: 'ord-1', orderCode: 'ORD-005' });
+    expect(res.body.data).toEqual({ orderId: 'ord-1', orderCode: 'ORD-005', warnings: [] });
   });
 
   it('POST /api/v1/orders is forbidden for non-Manager roles', async () => {

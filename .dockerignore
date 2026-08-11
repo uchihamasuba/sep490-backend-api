@@ -1,0 +1,20 @@
+# Không đưa vào image (npm ci sẽ tự cài lại trong container — tránh lệch nền tảng).
+node_modules
+dist
+
+# Secrets & logs
+.env
+.env.local
+*.log
+npm-debug.log*
+
+# Git & OS
+.git
+.gitignore
+.DS_Store
+Thumbs.db
+
+# Tài liệu & test không cần trong image runtime
+docs
+**/__tests__
+coverage

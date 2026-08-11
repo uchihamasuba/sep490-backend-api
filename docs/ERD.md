@@ -219,6 +219,16 @@ erDiagram
     int quantity
     varchar(36) performed_by FK
   }
+  inventory_reservations {
+    varchar(36) reservation_id PK
+    varchar(36) item_id FK
+    varchar(36) order_id FK
+    varchar(36) quotation_id FK
+    int quantity
+    timestamp start_at
+    timestamp end_at
+    enum status
+  }
   deposits {
     varchar(36) deposit_id PK
     varchar deposit_code UK
@@ -258,6 +268,9 @@ erDiagram
   item_types ||--o{ items : "gồm"
   items ||--|| inventory : "tồn kho 1-1"
   items ||--o{ inventory_movements : "biến động"
+  items ||--o{ inventory_reservations : "giữ chỗ theo khoảng"
+  orders ||--o{ inventory_reservations : "giữ chỗ"
+  quotations |o--o{ inventory_reservations : "giữ mềm"
   items ||--o{ quotation_items : "trong báo giá"
   items ||--o{ order_items : "được đặt"
   items ||--o{ change_request_items : "thay đổi"
@@ -350,6 +363,7 @@ erDiagram
 - **Polymorphic không FK**: `notifications.(ref_type, ref_id)`.
 - **Mô hình "hiện trường ghi → Manager xác nhận"**: các cặp `reported_by/confirmed_by` (survey, collected report), `requested_by/approved_by/confirmed_by` (deposit, settlement).
 - **Phân công nhiều–nhiều**: một đầu mục công việc (`schedule_plans`) có nhiều người qua bảng nối `schedule_plan_assignees(plan_id, user_id, role)`. `role` = `LEAD` (giám sát) / `TECHNICAL`, **gán theo từng plan** (khớp app mobile: một người có thể là LEAD ở plan này, TECHNICAL ở plan khác). Ràng buộc `unique(plan_id, user_id)` + partial-unique **tối đa 1 LEAD/plan**. `attendances` chấm công **1-1 theo từng dòng phân công** (`assignee_id`).
+- **Giữ chỗ theo thời gian (`inventory_reservations`) — mô hình RENTAL (thêm 2026-08):** chống double-book thiết bị cho 2 sự kiện trùng lịch. `quantity_total` = số **sở hữu** (chỉ đổi khi mua/thanh lý/mất khi thu hồi — xuất kho KHÔNG trừ total). Khả dụng **tính động, không lưu counter**: `available(item,[s,e]) = total − damaged − Σ reserved(CONFIRMED giao [s,e])`; `on_hand(now) = total − damaged − (ΣOUTBOUND − ΣINBOUND)`. Chỉ `order_items.source=INTERNAL` sinh reservation. Chốt chặn overbooking (409) tại **cọc PAID** trong transaction (`SELECT … FOR UPDATE` + ReadCommitted). Vòng đời status: `HELD`(báo giá) → `CONFIRMED`(đơn cọc) → `RELEASED`(hủy) / `CONSUMED`(đóng đơn). Chi tiết: `docs/inventory-rental-refactor-plan.md`.
 
 ### Đã tinh gọn từ bản đầy đủ (34 → 27 bảng)
 Bỏ 7 bảng để phù hợp phạm vi đồ án (đều có thể thêm lại nếu cần):

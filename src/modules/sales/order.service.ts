@@ -1,5 +1,6 @@
 import type { Deposit, OrderStatus, Settlement } from '@prisma/client';
 import { AppError } from '../../utils/AppError';
+import { reservationRepository } from '../inventory/reservation.repository';
 import { scheduleRepository } from '../operations/schedule.repository';
 import type { Actor } from '../operations/schedule.service';
 import { changeRequestRepository } from './changeRequest.repository';
@@ -25,6 +26,7 @@ import type {
   CreateOrderBody,
   CreateSettlementBody,
   ListOrdersQuery,
+  UpdateOrderDatesBody,
   ListOrderDepositsQuery,
   ListPicklistsQuery,
   UpdateLiveChecklistBody,
@@ -55,6 +57,7 @@ export interface OrderListItemDTO {
   paymentStatus: string;
   orderStatus: string;
   createdAt: string;
+  pickedUpAt: string | null;
 }
 
 export interface OrderItemDTO {
@@ -80,6 +83,9 @@ export interface OrderDetailDTO extends OrderListItemDTO {
   updatedAt: string;
   closedAt: string | null;
   closedBy: string | null;
+  closedByName: string | null;
+  pickedUpAt: string | null;
+  pickedUpBy: string | null;
   items: OrderItemDTO[];
 }
 
@@ -91,9 +97,20 @@ export interface OrderListMeta {
   counts: { all: number; new: number; confirmed: number; inProgress: number; completed: number; cancelled: number };
 }
 
+export interface StockWarning {
+  itemId: string;
+  itemName: string;
+  requested: number;
+  available: number;
+  windowStart: string;
+  windowEnd: string;
+}
+
 export interface CreateOrderResult {
   orderId: string;
   orderCode: string;
+  /** Cảnh báo mềm (KHÔNG chặn) khi nhu cầu INTERNAL vượt khả dụng cho cửa sổ đơn — sales biết trước khi thu cọc. */
+  warnings: StockWarning[];
 }
 
 export interface OrderStatsDTO {
@@ -174,6 +191,7 @@ function mapListItem(row: {
   paymentStatus: string;
   orderStatus: string;
   createdAt: Date;
+  pickedUpAt: Date | null;
   customer: { customerName: string; phone: string };
 }): OrderListItemDTO {
   return {
@@ -192,6 +210,7 @@ function mapListItem(row: {
     paymentStatus: row.paymentStatus,
     orderStatus: row.orderStatus,
     createdAt: row.createdAt.toISOString(),
+    pickedUpAt: row.pickedUpAt ? row.pickedUpAt.toISOString() : null,
   };
 }
 
@@ -207,6 +226,9 @@ function mapDetail(row: OrderWithDetails): OrderDetailDTO {
     updatedAt: row.updatedAt.toISOString(),
     closedAt: row.closedAt ? row.closedAt.toISOString() : null,
     closedBy: row.closedBy,
+    closedByName: row.closer?.fullName ?? null,
+    pickedUpAt: row.pickedUpAt ? row.pickedUpAt.toISOString() : null,
+    pickedUpBy: row.pickedUpBy,
     items: row.orderItems.map((item) => ({
       orderItemId: item.orderItemId,
       itemId: item.itemId,
@@ -220,6 +242,43 @@ function mapDetail(row: OrderWithDetails): OrderDetailDTO {
       notes: item.notes,
     })),
   };
+}
+
+// Cảnh báo mềm (Phase 3/5a): gộp nhu cầu INTERNAL theo item, so với available cho cửa sổ đơn — KHÔNG chặn,
+// chỉ trả về để FE hiện cho sales. Chốt chặn cứng (409) vẫn ở bước cọc PAID (reserveOrderStock).
+async function computeStockWarnings(
+  items: OrderLineInput[],
+  eventDate: Date,
+  endDate: Date | null,
+  excludeOrderId?: string,
+): Promise<StockWarning[]> {
+  const needByItem = new Map<string, number>();
+  for (const line of items) {
+    if (line.source && line.source !== 'INTERNAL') continue; // phần thuê NCC không giữ kho nội bộ
+    needByItem.set(line.itemId, (needByItem.get(line.itemId) ?? 0) + line.quantity);
+  }
+  if (needByItem.size === 0) return [];
+
+  const { startAt, endAt } = reservationRepository.orderWindow(eventDate, endDate);
+  const itemIds = [...needByItem.keys()];
+  const itemRows = await orderRepository.findItemsByIds(itemIds);
+  const nameById = new Map(itemRows.map((i) => [i.itemId, i.itemName]));
+
+  const warnings: StockWarning[] = [];
+  for (const [itemId, need] of needByItem) {
+    const available = await reservationRepository.getAvailableForRange(itemId, startAt, endAt, excludeOrderId);
+    if (need > available) {
+      warnings.push({
+        itemId,
+        itemName: nameById.get(itemId) ?? itemId,
+        requested: need,
+        available,
+        windowStart: startAt.toISOString(),
+        windowEnd: endAt.toISOString(),
+      });
+    }
+  }
+  return warnings;
 }
 
 async function validateItemsExist(items: OrderLineInput[]): Promise<void> {
@@ -292,6 +351,7 @@ async function createOrder(body: CreateOrderBody, createdByUserId: string): Prom
     eventType: body.eventType,
     eventName: body.eventName ?? null,
     eventDate: body.eventDate,
+    endDate: body.endDate ?? null,
     location: body.location,
     latitude: body.latitude,
     longitude: body.longitude,
@@ -301,7 +361,10 @@ async function createOrder(body: CreateOrderBody, createdByUserId: string): Prom
     itemInputs: body.items,
   });
 
-  return { orderId: created.orderId, orderCode: created.orderCode };
+  // Cảnh báo mềm sau khi đã lưu (không chặn tạo đơn) — chốt chặn cứng ở bước cọc.
+  const warnings = await computeStockWarnings(body.items, body.eventDate, body.endDate ?? null);
+
+  return { orderId: created.orderId, orderCode: created.orderCode, warnings };
 }
 
 async function updateOrderStatus(orderId: string, body: UpdateOrderStatusBody): Promise<OrderDetailDTO> {
@@ -315,7 +378,10 @@ async function updateOrderStatus(orderId: string, body: UpdateOrderStatusBody): 
     confirmedAt = new Date();
   }
 
-  const updated = await orderRepository.updateStatus(orderId, body.orderStatus, cancelReason, confirmedAt);
+  const updated = await orderRepository.updateStatus(orderId, body.orderStatus, cancelReason, confirmedAt, {
+    fromStatus: existing.orderStatus,
+    actorId: existing.createdBy,
+  });
 
   return mapDetail(updated);
 }
@@ -326,6 +392,16 @@ async function updateOrderItems(orderId: string, items: OrderLineInput[]): Promi
 
   await validateItemsExist(items);
   const updated = await orderRepository.replaceItems(orderId, items);
+  return mapDetail(updated);
+}
+
+// Đổi ngày sự kiện (reschedule) — đơn CONFIRMED/IN_PROGRESS tự dời cửa sổ giữ chỗ + guard 409 nếu ngày
+// mới trùng khoảng thiếu hàng. Phí đổi ngày (miễn phí nếu >3 ngày trước lắp đặt) do Manager xử lý ở
+// settlement (additionalFee) — endpoint này chỉ đổi ngày + đồng bộ giữ chỗ.
+async function updateOrderDates(orderId: string, body: UpdateOrderDatesBody): Promise<OrderDetailDTO> {
+  const existing = await findOrderOrThrow(orderId);
+  assertNotTerminal(existing);
+  const updated = await orderRepository.updateDates(orderId, body.eventDate, body.endDate ?? null);
   return mapDetail(updated);
 }
 
@@ -796,6 +872,7 @@ export const orderService = {
   createOrder,
   updateOrderStatus,
   updateOrderItems,
+  updateOrderDates,
   deleteOrder,
   getOrderStats,
   getOrderSurvey,

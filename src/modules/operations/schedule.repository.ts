@@ -1,6 +1,7 @@
 import type { PlanMemberRole, ScheduleStatus } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+import { reservationRepository } from '../inventory/reservation.repository';
 
 export interface SchedulePlanListFilter {
   orderId?: string;
@@ -379,16 +380,24 @@ export const scheduleRepository = {
     );
   },
   async syncOrderDates(orderId: string): Promise<void> {
-    const plans = await prisma.schedulePlan.findMany({
-      where: { orderId },
-      select: { startTime: true, endTime: true }
-    });
-    if (plans.length > 0) {
-      const maxDate = new Date(Math.max(...plans.map(p => p.endTime ? p.endTime.getTime() : p.startTime.getTime())));
-      await prisma.order.update({
-        where: { orderId },
-        data: { endDate: maxDate }
-      });
-    }
+    const [order, plans] = await Promise.all([
+      prisma.order.findUnique({ where: { orderId }, select: { eventDate: true, endDate: true } }),
+      prisma.schedulePlan.findMany({ where: { orderId }, select: { startTime: true, endTime: true } }),
+    ]);
+    if (!order || plans.length === 0) return;
+
+    const maxPlanEnd = Math.max(...plans.map((p) => (p.endTime ?? p.startTime).getTime()));
+    // endDate CHỈ được MỞ RỘNG để phủ lịch kết thúc sau sự kiện (vd thu hồi ngày hôm sau) — KHÔNG được
+    // co xuống dưới ngày diễn ra sự kiện hay endDate hiện có. Trước đây dùng thẳng max(plan ends) nên 1
+    // lịch khảo sát/lắp đặt TRƯỚC sự kiện sẽ kéo endDate về trước eventDate (đơn "kết thúc" trước khi
+    // "diễn ra") + làm lệch cửa sổ giữ chỗ thiết bị (phát hiện khi test full-cycle 2026-08-11).
+    const floor = Math.max(order.eventDate.getTime(), order.endDate ? order.endDate.getTime() : 0);
+    const maxDate = new Date(Math.max(floor, maxPlanEnd));
+    // Không cần ghi lại nếu endDate không đổi (tránh update thừa + resync thừa).
+    if (order.endDate && order.endDate.getTime() === maxDate.getTime()) return;
+
+    await prisma.order.update({ where: { orderId }, data: { endDate: maxDate } });
+    // Đồng bộ lại cửa sổ reservation theo endDate mới, tránh cửa sổ khóa bị lệch (review P0 finding #4).
+    await reservationRepository.resyncWindowsForOrder(orderId);
   },
 };

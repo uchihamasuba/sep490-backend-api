@@ -4,6 +4,7 @@ import { app } from '../../../app';
 import { env } from '../../../config/env';
 import { scheduleRepository } from '../../operations/schedule.repository';
 import { inventoryRepository } from '../inventory.repository';
+import { reservationRepository } from '../reservation.repository';
 
 // Mock repository — KHÔNG chạm DB thật (trước đây file này là integration test query trực tiếp trên
 // prisma/seed.ts, nên mỗi lần seed data đổi là test vỡ dù logic nghiệp vụ không đổi gì). Theo đúng
@@ -30,6 +31,25 @@ jest.mock('../inventory.repository', () => ({
   },
 }));
 
+jest.mock('../reservation.repository', () => ({
+  reservationRepository: {
+    getReservedForRange: jest.fn(),
+    getReservedForRangeBatch: jest.fn(),
+    getOutstandingOutBatch: jest.fn(),
+    getMovementSumsBatch: jest.fn(),
+    getOnHandNow: jest.fn(),
+    getAvailableForRange: jest.fn(),
+    getOutstandingOut: jest.fn(),
+    listReservationsForItem: jest.fn(),
+    listReservationsInRange: jest.fn(),
+    reserveOrderStock: jest.fn(),
+    releaseByOrder: jest.fn(),
+    consumeByOrder: jest.fn(),
+    countActiveByOrder: jest.fn(),
+    orderWindow: jest.fn(),
+  },
+}));
+
 jest.mock('../../operations/schedule.repository', () => ({
   scheduleRepository: {
     isUserLeadOnOrder: jest.fn(),
@@ -37,6 +57,24 @@ jest.mock('../../operations/schedule.repository', () => ({
 }));
 
 const mockedRepo = inventoryRepository as jest.Mocked<typeof inventoryRepository>;
+const mockedResv = reservationRepository as jest.Mocked<typeof reservationRepository>;
+
+beforeEach(() => {
+  // Mặc định "không có hàng đang ngoài kho" → quantityOnHand = total − damaged trong các test hiển thị.
+  mockedResv.getOutstandingOut.mockResolvedValue(0);
+  // listInventory dùng bản BATCH (chống N+1) — uỷ quyền về scalar mock để các test cũ set getReservedForRange/
+  // getOutstandingOut vẫn có hiệu lực mà không phải sửa từng test.
+  mockedResv.getReservedForRangeBatch.mockImplementation(async (itemIds: string[]) => {
+    const map = new Map<string, number>();
+    for (const id of itemIds) map.set(id, (await mockedResv.getReservedForRange(id, new Date(), new Date())) ?? 0);
+    return map;
+  });
+  mockedResv.getOutstandingOutBatch.mockImplementation(async (itemIds: string[]) => {
+    const map = new Map<string, number>();
+    for (const id of itemIds) map.set(id, (await mockedResv.getOutstandingOut(id)) ?? 0);
+    return map;
+  });
+});
 const mockedScheduleRepo = scheduleRepository as jest.Mocked<typeof scheduleRepository>;
 
 function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF', userId = 'user-1') {
@@ -111,7 +149,7 @@ function fakeReport(overrides: Record<string, unknown> = {}) {
 describe('GET /api/v1/inventory', () => {
   it('lists inventory rows with correct joined fields', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [fakeInventory()], totalItems: 1 } as never);
-    mockedRepo.getLockedQuantityByDate.mockResolvedValue(2);
+    mockedResv.getReservedForRange.mockResolvedValue(2);
 
     const res = await request(app).get('/api/v1/inventory?limit=50').set('Authorization', authHeader('MANAGER'));
 
@@ -133,7 +171,7 @@ describe('GET /api/v1/inventory/:itemId', () => {
     mockedRepo.findByItemId.mockResolvedValue(
       fakeInventory({ itemId: 'item-den', quantityTotal: 15, quantityDamaged: 1, item: { ...fakeInventory().item, itemName: 'Đèn Beam 230' } }) as never,
     );
-    mockedRepo.getLockedQuantityByDate.mockResolvedValue(2);
+    mockedResv.getReservedForRange.mockResolvedValue(2);
 
     const res = await request(app).get('/api/v1/inventory/item-den').set('Authorization', authHeader('MANAGER'));
 
@@ -181,7 +219,7 @@ describe('GET /api/v1/inventory/picklist/:orderId', () => {
         item: { itemName: 'Loa JBL 1000W', unit: 'Cái', inventory: { quantityTotal: 10, quantityDamaged: 0 } },
       },
     ] as never);
-    mockedRepo.getLockedQuantityByDate.mockResolvedValue(2);
+    mockedResv.getOnHandNow.mockResolvedValue(8);
     mockedRepo.getExportedQuantity.mockResolvedValue(0);
 
     const res = await request(app).get('/api/v1/inventory/picklist/order-1').set('Authorization', authHeader('MANAGER'));
@@ -252,7 +290,8 @@ describe('Write endpoints — successful quantity updates (Manager)', () => {
   it('POST /api/v1/inventory/adjust increases quantityTotal and quantityAvailable together (200)', async () => {
     mockedRepo.findByItemId.mockResolvedValue(fakeInventory({ quantityTotal: 50 }) as never);
     mockedRepo.adjustTotal.mockResolvedValue(fakeInventory({ quantityTotal: 60 }) as never);
-    mockedRepo.getLockedQuantityByDate.mockResolvedValue(5);
+    mockedResv.getOnHandNow.mockResolvedValue(50);
+    mockedResv.getReservedForRange.mockResolvedValue(5);
     mockedRepo.createMovement.mockResolvedValue({} as never);
 
     const res = await request(app)

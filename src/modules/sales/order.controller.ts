@@ -17,6 +17,7 @@ import type {
   OrderItemIdParam,
   UpdateLiveChecklistBody,
   UpdateOrderItemBody,
+  UpdateOrderDatesBody,
   UpdateOrderItemsBody,
   UpdateOrderQuotationBody,
   UpdateOrderStatusBody,
@@ -52,6 +53,13 @@ async function updateItems(req: Request, res: Response) {
   const { orderId } = req.params as unknown as OrderIdParam;
   const body = req.body as UpdateOrderItemsBody;
   const order = await orderService.updateOrderItems(orderId, body.items);
+  ok(res, order);
+}
+
+async function updateDates(req: Request, res: Response) {
+  const { orderId } = req.params as unknown as OrderIdParam;
+  const body = req.body as UpdateOrderDatesBody;
+  const order = await orderService.updateOrderDates(orderId, body);
   ok(res, order);
 }
 
@@ -172,6 +180,7 @@ export const orderController = {
   create,
   updateStatus,
   updateItems,
+  updateDates,
   remove,
   stats,
   survey,

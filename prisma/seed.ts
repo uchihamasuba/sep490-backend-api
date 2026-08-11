@@ -13,6 +13,8 @@ import type {
   SupplierTransactionStatus,
   DepositStatus,
   CollectedEquipmentReportStatus,
+  OrderItemSource,
+  ReservationStatus,
 } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
@@ -77,6 +79,7 @@ const ALL_TABLES = [
   'collected_equipment_report_items',
   'collected_equipment_reports',
   'inventory_movements',
+  'inventory_reservations',
   'inventory',
   'settlement_evidences',
   'settlements',
@@ -1285,6 +1288,197 @@ async function main(): Promise<void> {
     })),
   });
   console.log(`  - Inventory cho ${items.length} items, ${inventoryMovements.length} inventory movements`);
+
+  // ==========================================================================
+  // 12. RESERVATIONS + KỊCH BẢN NGOÀI LUỒNG (mô hình rental — Phase 1-3)
+  //     Chạy sau §9/§10 nên inventory & movements đã có; đọc/ép quantityTotal thật để kiểm chứng.
+  // ==========================================================================
+  const SETUP_BUFFER_H = 24; // khớp reservation.repository.ts
+  const TURNAROUND_D = 1;
+  const managerId = managers[0].userId;
+  const dayOf = (n: number): Date => addDays(TODAY, n);
+  const winStart = (start: Date): Date => addHours(start, -SETUP_BUFFER_H);
+  const winEnd = (end: Date): Date => addDays(end, TURNAROUND_D);
+
+  // (a) Reservation cho CÁC ĐƠN HIỆN CÓ — re-query để lấy endDate + orderItems thật.
+  //     CONFIRMED/IN_PROGRESS → CONFIRMED · COMPLETED → CONSUMED · CANCELLED → RELEASED · NEW → bỏ qua.
+  const existingOrders = await prisma.order.findMany({
+    select: {
+      orderId: true,
+      orderStatus: true,
+      eventDate: true,
+      endDate: true,
+      orderItems: { where: { source: 'INTERNAL' }, select: { itemId: true, quantity: true } },
+    },
+  });
+  const resvData: {
+    reservationId: string;
+    itemId: string;
+    orderId: string;
+    quantity: number;
+    startAt: Date;
+    endAt: Date;
+    status: ReservationStatus;
+    createdBy: string;
+  }[] = [];
+  for (const o of existingOrders) {
+    const rs: ReservationStatus | null =
+      o.orderStatus === 'CONFIRMED' || o.orderStatus === 'IN_PROGRESS'
+        ? 'CONFIRMED'
+        : o.orderStatus === 'COMPLETED'
+          ? 'CONSUMED'
+          : o.orderStatus === 'CANCELLED'
+            ? 'RELEASED'
+            : null;
+    if (!rs) continue;
+    const startAt = winStart(o.eventDate);
+    const endAt = winEnd(o.endDate ?? o.eventDate);
+    const need = new Map<string, number>();
+    for (const oi of o.orderItems) need.set(oi.itemId, (need.get(oi.itemId) ?? 0) + oi.quantity);
+    for (const [itemId, quantity] of need) {
+      resvData.push({ reservationId: genId(), itemId, orderId: o.orderId, quantity, startAt, endAt, status: rs, createdBy: managerId });
+    }
+  }
+  if (resvData.length) await prisma.inventoryReservation.createMany({ data: resvData });
+
+  // (b) KỊCH BẢN NGOÀI LUỒNG — cửa sổ đặt xa (D+200..) để không bị pollution bởi reservation ở (a).
+  const edgeItemId = itemIdByCode.get('SPK-JBL715') ?? items[0].itemId;
+  const edgeItem = items.find((i) => i.itemId === edgeItemId) ?? items[0];
+  const item2 = items.find((i) => i.itemId !== edgeItemId) ?? items[0];
+  const item3 = items.find((i) => i.itemId !== edgeItemId && i.itemId !== item2.itemId) ?? items[0];
+  const custA = customers[0];
+  const custB = customers[1] ?? customers[0];
+
+  // Ép tồn về số nhỏ, dễ kiểm chứng bằng mắt.
+  await prisma.inventory.update({ where: { itemId: edgeItemId }, data: { quantityTotal: 5, quantityDamaged: 0 } });
+  await prisma.inventory.update({ where: { itemId: item2.itemId }, data: { quantityTotal: 5, quantityDamaged: 0 } });
+  await prisma.inventory.update({ where: { itemId: item3.itemId }, data: { quantityTotal: 10, quantityDamaged: 0 } });
+
+  const makeEdgeOrder = async (
+    code: string,
+    customerId: string,
+    status: OrderStatus,
+    eventDate: Date,
+    endDate: Date,
+    lines: { itemId: string; qty: number; price: number; source?: OrderItemSource }[],
+  ): Promise<string> => {
+    const orderId = genId();
+    await prisma.order.create({
+      data: {
+        orderId,
+        orderCode: code,
+        customerId,
+        policyId: depositPolicy.policyId,
+        eventType: 'Hội nghị doanh nghiệp',
+        eventName: `Kịch bản ${code}`,
+        eventDate,
+        endDate,
+        location: 'Trung tâm Hội nghị Quốc gia, Hà Nội',
+        latitude: 21.0037,
+        longitude: 105.7873,
+        guestCount: 150,
+        totalAmount: round2(lines.reduce((s, l) => s + l.qty * l.price, 0)),
+        paymentStatus: status === 'NEW' ? 'UNPAID' : 'DEPOSITED',
+        orderStatus: status,
+        confirmedAt: status === 'NEW' ? null : TODAY,
+        createdBy: managerId,
+        orderItems: {
+          create: lines.map((l) => ({
+            itemId: l.itemId,
+            quantity: l.qty,
+            unitPrice: l.price,
+            subtotal: round2(l.qty * l.price),
+            source: l.source ?? 'INTERNAL',
+            preparedQty: 0,
+          })),
+        },
+      },
+    });
+    return orderId;
+  };
+
+  const pushResv = (itemId: string, orderId: string, quantity: number, start: Date, end: Date, status: ReservationStatus = 'CONFIRMED') =>
+    prisma.inventoryReservation.create({
+      data: { reservationId: genId(), itemId, orderId, quantity, startAt: winStart(start), endAt: winEnd(end), status, createdBy: managerId },
+    });
+
+  // E1 — OVERBOOKING: A giữ hết 5 cho [D+200,D+202]; B (NEW, cần 1 cho D+201) có cọc UNPAID.
+  //      Tester bấm "xác nhận cọc" cho B ⇒ kỳ vọng 409 (available=0).
+  const aStart = dayOf(200);
+  const aEnd = dayOf(202);
+  const ordA = await makeEdgeOrder('ORD-101', custA.id, 'CONFIRMED', aStart, aEnd, [{ itemId: edgeItemId, qty: 5, price: edgeItem.rentalPrice }]);
+  await pushResv(edgeItemId, ordA, 5, aStart, aEnd);
+
+  const bDate = dayOf(201);
+  const ordB = await makeEdgeOrder('ORD-102', custB.id, 'NEW', bDate, bDate, [{ itemId: edgeItemId, qty: 1, price: edgeItem.rentalPrice }]);
+  await prisma.deposit.create({
+    data: {
+      depositId: genId(),
+      depositCode: 'DEP-102',
+      orderId: ordB,
+      amount: round2(edgeItem.rentalPrice * 0.3),
+      dueDate: bDate,
+      status: 'UNPAID',
+      requestedBy: managerId,
+      notes: 'Cọc chờ xác nhận — dùng để test CHẶN overbooking (ORD-101 đã giữ hết tồn item này).',
+    },
+  });
+
+  // E4 — TURNAROUND: C giữ cùng item cho [D+205,D+206] (KHÔNG chồng A) → cả hai hợp lệ.
+  const cStart = dayOf(205);
+  const cEnd = dayOf(206);
+  const ordC = await makeEdgeOrder('ORD-103', custA.id, 'CONFIRMED', cStart, cEnd, [{ itemId: edgeItemId, qty: 5, price: edgeItem.rentalPrice }]);
+  await pushResv(edgeItemId, ordC, 5, cStart, cEnd);
+
+  // E2 — NCC GÁNH THIẾU: cần 8 (item2 tồn 5) → 5 INTERNAL + 3 SUPPLIER; reservation chỉ 5 (không âm).
+  const dStart = dayOf(210);
+  const dEnd = dayOf(211);
+  const ordD = await makeEdgeOrder('ORD-104', custB.id, 'CONFIRMED', dStart, dEnd, [
+    { itemId: item2.itemId, qty: 5, price: item2.rentalPrice, source: 'INTERNAL' },
+    { itemId: item2.itemId, qty: 3, price: item2.rentalPrice, source: 'SUPPLIER' },
+  ]);
+  await pushResv(item2.itemId, ordD, 5, dStart, dEnd);
+  await prisma.supplierTransaction.create({
+    data: {
+      transactionId: genId(),
+      transactionCode: 'STX-104',
+      supplierId: suppliers[0].id,
+      orderId: ordD,
+      transactionType: 'RENTAL',
+      serviceTitle: 'Thuê ngoài phần thiếu (kho nội bộ chỉ đủ 5/8)',
+      estimatedCost: round2(3 * item2.rentalPrice * 1.2),
+      depositAmount: 0,
+      paymentStatus: 'DEPOSITED',
+      status: 'APPROVED',
+      updatedBy: managerId,
+      items: {
+        create: [{ itemId: item2.itemId, itemName: item2.name, quantity: 3, unitCost: round2(item2.rentalPrice * 1.2), subtotal: round2(3 * item2.rentalPrice * 1.2), receivedQuantity: 0 }],
+      },
+    },
+  });
+
+  // E3 — HỎNG/MẤT KHI THU HỒI: đơn IN_PROGRESS đã xuất 4; biên bản SUBMITTED (2 tốt,1 hỏng,1 mất).
+  //      Tester xác nhận biên bản ⇒ item3 total −=1 (=9), damaged +=1.
+  const eStart = dayOf(215);
+  const eEnd = dayOf(216);
+  const ordE = await makeEdgeOrder('ORD-105', custA.id, 'IN_PROGRESS', eStart, eEnd, [{ itemId: item3.itemId, qty: 4, price: item3.rentalPrice }]);
+  await pushResv(item3.itemId, ordE, 4, eStart, eEnd);
+  await prisma.inventoryMovement.create({
+    data: { movementId: genId(), itemId: item3.itemId, orderId: ordE, reportId: null, movementType: 'OUTBOUND', quantity: 4, performedBy: managerId, notes: 'Xuất kho hiện trường cho ORD-105' },
+  });
+  await prisma.collectedEquipmentReport.create({
+    data: {
+      reportId: genId(),
+      orderId: ordE,
+      reportType: 'INTERNAL',
+      status: 'SUBMITTED',
+      reportedBy: managerId,
+      notes: 'Thu hồi ORD-105: 2 tốt, 1 hỏng, 1 mất — chờ Manager xác nhận để áp dụng tồn kho.',
+      items: { create: [{ cerItemId: genId(), itemId: item3.itemId, goodQuantity: 2, damagedQuantity: 1, lostQuantity: 1 }] },
+    },
+  });
+
+  console.log(`  - ${resvData.length} reservations (đơn hiện có) + 5 kịch bản ngoài luồng (ORD-101..105 (E1..E5))`);
 
   // ==========================================================================
   // 11. NOTIFICATIONS

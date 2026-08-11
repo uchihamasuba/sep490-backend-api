@@ -11,7 +11,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
-    "test": "jest"
+    "test": "jest",
+    "seed": "prisma db seed"
   },
   "keywords": [],
   "author": "",

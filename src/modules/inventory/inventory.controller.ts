@@ -11,8 +11,12 @@ import type {
   ListInventoryQuery,
   ListMovementsQuery,
   ListReportsQuery,
+  ListReservationsQuery,
   OrderIdParam,
+  RepairInventoryBody,
   ReportIdParam,
+  ReservationsTimelineQuery,
+  ScrapInventoryBody,
 } from './inventory.validators';
 
 function requireActor(req: Request) {
@@ -57,6 +61,39 @@ async function adjust(req: Request, res: Response) {
   ok(res, inventory);
 }
 
+async function repair(req: Request, res: Response) {
+  const body = req.body as RepairInventoryBody;
+  const inventory = await inventoryService.repairInventory(body);
+  ok(res, inventory);
+}
+
+async function scrap(req: Request, res: Response) {
+  const actor = requireActor(req);
+  const body = req.body as ScrapInventoryBody;
+  const inventory = await inventoryService.scrapInventory(body, actor.id);
+  ok(res, inventory);
+}
+
+async function listItemReservations(req: Request, res: Response) {
+  const { itemId } = req.params as unknown as ItemIdParam;
+  const { from, to } = req.query as unknown as ListReservationsQuery;
+  const data = await inventoryService.listItemReservations(itemId, from, to);
+  ok(res, data);
+}
+
+async function reconcile(_req: Request, res: Response) {
+  const result = await inventoryService.reconcileInventory();
+  ok(res, result);
+}
+
+async function reservationsTimeline(req: Request, res: Response) {
+  const { from, to, categoryId } = req.query as unknown as ReservationsTimelineQuery;
+  const start = from ?? new Date();
+  const end = to ?? new Date(start.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const result = await inventoryService.listReservationsTimeline(start, end, categoryId);
+  ok(res, result);
+}
+
 async function listReports(req: Request, res: Response) {
   const query = req.query as unknown as ListReportsQuery;
   const result = await inventoryService.listReports(query);
@@ -91,6 +128,11 @@ export const inventoryController = {
   listMovements,
   getPicklist,
   adjust,
+  repair,
+  scrap,
+  reconcile,
+  reservationsTimeline,
+  listItemReservations,
   listReports,
   getReportById,
   createReport,

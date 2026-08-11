@@ -183,6 +183,14 @@ enum CollectedEquipmentReportStatus {
   CONFIRMED
 }
 
+/// Trạng thái giữ chỗ thiết bị theo khoảng thời gian (mô hình rental).
+enum ReservationStatus {
+  HELD // giữ chỗ mềm (báo giá / đơn nháp) — cảnh báo, CHƯA chặn overbooking
+  CONFIRMED // giữ chỗ chắc (đơn đã cọc/CONFIRMED) — TÍNH vào chặn overbooking
+  RELEASED // đã nhả (đơn hủy / hết hạn giữ) — ngừng tính
+  CONSUMED // đã hoàn tất vòng thuê (đơn đóng/COMPLETED) — ngừng tính
+}
+
 // ============================================================================
 // NHÓM 1 — IDENTITY & MASTER DATA
 // ============================================================================
@@ -344,6 +352,7 @@ model Item {
   components                    ItemComponent[]                @relation("ParentItem")
   usedIn                        ItemComponent[]                @relation("ChildItem")
   suppliers                     SupplierItem[]
+  reservations                  InventoryReservation[]
 
   @@index([typeId], map: "idx_items_type")
   @@index([status], map: "idx_items_status")
@@ -389,10 +398,11 @@ model Quotation {
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
 
-  customer Customer        @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
-  creator  User            @relation("QuotationCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
-  items    QuotationItem[]
-  orders   Order[]
+  customer     Customer               @relation(fields: [customerId], references: [customerId], onDelete: Restrict)
+  creator      User                   @relation("QuotationCreatedBy", fields: [createdBy], references: [userId], onDelete: Restrict)
+  items        QuotationItem[]
+  orders       Order[]
+  reservations InventoryReservation[]
 
   @@index([customerId], map: "idx_quotations_customer")
   @@index([status], map: "idx_quotations_status")
@@ -476,6 +486,7 @@ model Order {
   settlements               Settlement[]
   collectedEquipmentReports CollectedEquipmentReport[]
   inventoryMovements        InventoryMovement[]
+  reservations              InventoryReservation[]
 
   @@index([customerId], map: "idx_orders_customer")
   @@index([quotationId], map: "idx_orders_quotation")
@@ -850,6 +861,34 @@ model InventoryMovement {
   @@index([orderId], map: "idx_inv_mov_order")
   @@index([reportId], map: "idx_inv_mov_report")
   @@map("inventory_movements")
+}
+
+/// Giữ chỗ thiết bị theo khoảng thời gian [startAt, endAt] — nguồn tính khả dụng cho luồng cho thuê.
+/// quantity = nhu cầu nội bộ RÒNG (chỉ order_items source=INTERNAL sinh reservation; phần thuê NCC không tính).
+/// Chỉ status=CONFIRMED được tính vào chặn overbooking; HELD=giữ mềm, RELEASED/CONSUMED=ngừng tính.
+/// Cửa sổ giữ = [eventDate − setupBuffer, endDate + turnaround] (xem reservation.repository.ts).
+model InventoryReservation {
+  reservationId String            @id @default(dbgenerated("(uuid())")) @map("reservation_id") @db.VarChar(36)
+  itemId        String            @map("item_id") @db.VarChar(36)
+  orderId       String?           @map("order_id") @db.VarChar(36)
+  quotationId   String?           @map("quotation_id") @db.VarChar(36)
+  quantity      Int
+  startAt       DateTime          @map("start_at") @db.Timestamp(0)
+  endAt         DateTime          @map("end_at") @db.Timestamp(0)
+  status        ReservationStatus @default(CONFIRMED)
+  createdBy     String            @map("created_by") @db.VarChar(36)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  item      Item       @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
+  // Cascade (không SetNull): đơn bị xóa thì reservation phải mất theo — nếu để mồ côi (orderId=NULL) nó
+  // vẫn tính vào overbooking mà release/consume (lọc theo orderId) không nhả được (review P0 finding #7).
+  order     Order?     @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+  quotation Quotation? @relation(fields: [quotationId], references: [quotationId], onDelete: SetNull)
+
+  @@index([itemId, status, startAt, endAt], map: "idx_resv_item_window")
+  @@index([orderId], map: "idx_resv_order")
+  @@map("inventory_reservations")
 }
 
 model CollectedEquipmentReport {

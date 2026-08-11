@@ -1,5 +1,6 @@
 import type { Deposit, DepositStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
+import { reservationRepository } from '../inventory/reservation.repository';
 
 export interface DepositListFilter {
   status?: DepositStatus;
@@ -85,13 +86,27 @@ export const paymentRepository = {
       return prisma.deposit.update({ where: { depositId }, data: { status, ...evidencesUpdate } });
     }
 
+    // Cọc PAID = "chốt kho": trong CÙNG transaction (a) giữ chỗ + CHẶN overbooking (reserveOrderStock
+    // ném 409 → rollback cả cọc), (b) đưa đơn NEW → CONFIRMED + confirmedAt, (c) payment_status=DEPOSITED.
     const now = new Date();
-    const [deposit] = await prisma.$transaction([
-      prisma.deposit.update({ where: { depositId }, data: { status, approvedBy, approvedAt: now, paymentDate: now, ...evidencesUpdate } }),
-      prisma.order.update({ where: { orderId }, data: { paymentStatus: 'DEPOSITED' } }),
-    ]);
+    return prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { orderId }, select: { orderStatus: true } });
+      const active = !!order && ['NEW', 'CONFIRMED', 'IN_PROGRESS'].includes(order.orderStatus);
+      if (active) {
+        await reservationRepository.reserveOrderStock(tx, orderId, approvedBy);
+      }
+      const promote = order?.orderStatus === 'NEW';
 
-    return deposit;
+      const deposit = await tx.deposit.update({
+        where: { depositId },
+        data: { status, approvedBy, approvedAt: now, paymentDate: now, ...evidencesUpdate },
+      });
+      await tx.order.update({
+        where: { orderId },
+        data: { paymentStatus: 'DEPOSITED', ...(promote ? { orderStatus: 'CONFIRMED', confirmedAt: now } : {}) },
+      });
+      return deposit;
+    }, { isolationLevel: 'ReadCommitted' });
   },
 
   findSettlementById(settlementId: string) {

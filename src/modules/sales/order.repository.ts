@@ -1,6 +1,7 @@
 import type { DepositStatus, Item, OrderItemSource, OrderStatus, PaymentStatus, Prisma } from '@prisma/client';
 import { prisma } from '../../db/prisma';
 import { AppError } from '../../utils/AppError';
+import { reservationRepository } from '../inventory/reservation.repository';
 
 export interface LiveShowChecklist {
   backdrop: boolean;
@@ -48,6 +49,7 @@ export interface OrderListParams extends OrderListFilter {
 const detailInclude = {
   customer: { select: { customerName: true, phone: true, email: true, address: true } },
   creator: { select: { userId: true, fullName: true, role: true } },
+  closer: { select: { userId: true, fullName: true } },
   orderItems: { include: { item: { select: { itemName: true, unit: true } } } },
 } satisfies Prisma.OrderInclude;
 
@@ -158,6 +160,7 @@ export const orderRepository = {
     eventType: string;
     eventName: string | null;
     eventDate: Date;
+    endDate: Date | null;
     location: string;
     latitude?: number;
     longitude?: number;
@@ -177,6 +180,7 @@ export const orderRepository = {
         eventType: params.eventType,
         eventName: params.eventName,
         eventDate: params.eventDate,
+        endDate: params.endDate,
         location: params.location,
         latitude: params.latitude,
         longitude: params.longitude,
@@ -199,41 +203,75 @@ export const orderRepository = {
     });
   },
 
-  updateStatus(
+  // Đổi trạng thái đơn + đồng bộ reservation theo vòng đời (Phase 3-4), tất cả trong 1 transaction:
+  //   → CONFIRMED (từ trạng thái khác): reserveOrderStock = CHẶN overbooking (409) + tạo reservation.
+  //   → CANCELLED: releaseByOrder (nhả chỗ).   → COMPLETED: consumeByOrder (ngừng tính).
+  async updateStatus(
     orderId: string,
     orderStatus: OrderStatus,
     cancelReason: string | null,
-    confirmedAt?: Date | null,
+    confirmedAt: Date | null,
+    opts: { fromStatus: OrderStatus; actorId: string },
   ): Promise<OrderWithDetails> {
-    return prisma.order.update({
-      where: { orderId },
-      data: { orderStatus, cancelReason, confirmedAt },
-      include: detailInclude,
-    });
+    await prisma.$transaction(async (tx) => {
+      if (orderStatus === 'CONFIRMED' && opts.fromStatus !== 'CONFIRMED') {
+        await reservationRepository.reserveOrderStock(tx, orderId, opts.actorId);
+      } else if (orderStatus === 'CANCELLED') {
+        await reservationRepository.releaseByOrder(orderId, tx);
+      } else if (orderStatus === 'COMPLETED') {
+        await reservationRepository.consumeByOrder(orderId, tx);
+      }
+      await tx.order.update({ where: { orderId }, data: { orderStatus, cancelReason, confirmedAt } });
+    }, { isolationLevel: 'ReadCommitted' });
+    const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
+    if (!order) throw AppError.internal('Không tìm thấy đơn hàng sau khi đổi trạng thái');
+    return order;
+  },
+
+  // Đổi ngày sự kiện (reschedule): cập nhật eventDate/endDate rồi dời cửa sổ giữ chỗ theo ngày mới
+  // (resyncReservationsForOrder = xóa + tạo lại reservation với cửa sổ mới, guard 409 nếu ngày mới thiếu hàng).
+  async updateDates(orderId: string, eventDate: Date, endDate: Date | null): Promise<OrderWithDetails> {
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.order.update({ where: { orderId }, data: { eventDate, endDate } });
+        await reservationRepository.resyncReservationsForOrder(tx, orderId);
+      },
+      { isolationLevel: 'ReadCommitted' },
+    );
+    const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
+    if (!order) throw AppError.internal('Không tìm thấy đơn hàng sau khi đổi ngày');
+    return order;
   },
 
   async replaceItems(orderId: string, itemInputs: OrderLineInput[]): Promise<OrderWithDetails> {
     const lines = computeOrderLines(itemInputs);
     const totalAmount = computeOrderTotal(lines);
 
-    return prisma.order.update({
-      where: { orderId },
-      data: {
-        totalAmount,
-        orderItems: {
-          deleteMany: {},
-          create: lines.map((line) => ({
-            itemId: line.itemId,
-            quantity: line.quantity,
-            unitPrice: line.unitPrice,
-            subtotal: line.subtotal,
-            source: line.source,
-            notes: line.notes,
-          })),
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { orderId },
+        data: {
+          totalAmount,
+          orderItems: {
+            deleteMany: {},
+            create: lines.map((line) => ({
+              itemId: line.itemId,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              subtotal: line.subtotal,
+              source: line.source,
+              notes: line.notes,
+            })),
+          },
         },
-      },
-      include: detailInclude,
-    });
+      });
+      // Sửa order_items trên đơn đã CONFIRMED → đồng bộ reservation (409 nếu tăng vượt khả dụng) — finding #10.
+      await reservationRepository.resyncReservationsForOrder(tx, orderId);
+    }, { isolationLevel: 'ReadCommitted' });
+
+    const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
+    if (!order) throw AppError.internal('Không tìm thấy đơn hàng sau khi cập nhật danh sách thiết bị');
+    return order;
   },
 
   delete(orderId: string) {
@@ -270,8 +308,10 @@ export const orderRepository = {
   },
 
   async generateNextDepositCode(): Promise<string> {
+    // Lấy mã LỚN NHẤT (không phải mới-tạo-nhất) — các deposit seed cùng created_at nên orderBy createdAt
+    // trả về mã tuỳ ý (vd DEP-004) → +1 = DEP-005 đã tồn tại → 409. Dùng orderBy depositCode desc như order.
     const latest = await prisma.deposit.findFirst({
-      orderBy: { createdAt: 'desc' },
+      orderBy: { depositCode: 'desc' },
       select: { depositCode: true },
     });
     if (!latest || !latest.depositCode.startsWith('DEP-')) {
@@ -353,8 +393,8 @@ export const orderRepository = {
     });
     const totalAmount = otherItems.reduce((sum, item) => sum + Number(item.subtotal), newSubtotal);
 
-    const [, order] = await prisma.$transaction([
-      prisma.orderItem.update({
+    const order = await prisma.$transaction(async (tx) => {
+      await tx.orderItem.update({
         where: { orderItemId },
         data: {
           quantity,
@@ -364,9 +404,12 @@ export const orderRepository = {
           ...(data.preparedQty !== undefined ? { preparedQty: data.preparedQty } : {}),
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
         },
-      }),
-      prisma.order.update({ where: { orderId }, data: { totalAmount }, include: detailInclude }),
-    ]);
+      });
+      const ord = await tx.order.update({ where: { orderId }, data: { totalAmount }, include: detailInclude });
+      // Đồng bộ reservation sau khi sửa 1 dòng order_items (finding #10).
+      await reservationRepository.resyncReservationsForOrder(tx, orderId);
+      return ord;
+    }, { isolationLevel: 'ReadCommitted' });
 
     return order;
   },
@@ -405,12 +448,48 @@ export const orderRepository = {
     });
   },
 
+  // Đánh dấu "đã xuất kho" (web) = HÀNG RỜI KHO → ghi OUTBOUND cho item INTERNAL của đơn, đồng thời set
+  // pickedUpAt. Idempotent: chỉ ghi OUTBOUND nếu đơn CHƯA có (tránh trùng với warehouse-movement của
+  // Flutter SETUP). Hợp nhất "một đường xuất kho" (Phase 4) — sửa lệch on_hand mà reconcile bắt được.
   markPickedUp(orderId: string, pickedUpBy: string): Promise<OrderForPicklist> {
-    return prisma.order.update({
-      where: { orderId },
-      data: { pickedUpAt: new Date(), pickedUpBy },
-      include: picklistInclude,
-    });
+    return prisma.$transaction(
+      async (tx) => {
+        const existingOut = await tx.inventoryMovement.count({ where: { orderId, movementType: 'OUTBOUND' } });
+        if (existingOut === 0) {
+          const items = await tx.orderItem.findMany({
+            where: { orderId, source: 'INTERNAL' },
+            select: { itemId: true, quantity: true },
+          });
+          const needByItem = new Map<string, number>();
+          for (const it of items) needByItem.set(it.itemId, (needByItem.get(it.itemId) ?? 0) + it.quantity);
+          for (const [itemId, qty] of needByItem) {
+            // Khóa dòng inventory rồi kiểm tồn vật lý (on-hand) trước khi ghi OUTBOUND.
+            await tx.$queryRaw`SELECT inventory_id FROM inventory WHERE item_id = ${itemId} FOR UPDATE`;
+            const onHand = await reservationRepository.getOnHandNow(itemId, tx);
+            if (onHand < qty) {
+              throw AppError.conflict('Không đủ tồn vật lý (on-hand) để xuất kho', { itemId, onHand, requested: qty });
+            }
+            await tx.inventoryMovement.create({
+              data: {
+                itemId,
+                orderId,
+                reportId: null,
+                movementType: 'OUTBOUND',
+                quantity: qty,
+                performedBy: pickedUpBy,
+                notes: 'Xuất kho khi đánh dấu "Đã xuất kho" (web)',
+              },
+            });
+          }
+        }
+        return tx.order.update({
+          where: { orderId },
+          data: { pickedUpAt: new Date(), pickedUpBy },
+          include: picklistInclude,
+        });
+      },
+      { isolationLevel: 'ReadCommitted' },
+    );
   },
 
   // Xuất thiết bị (docs/api/xuatthietbi_tubaogia_api.md mục 8, "CẬP NHẬT LẦN 3" 2026-08-03): CHỈ đồng
@@ -494,8 +573,12 @@ export const orderRepository = {
         });
       }
 
+      if (itemsChanged) {
+        // Xuất kho v2 đồng bộ order_items từ báo giá → đồng bộ reservation theo (finding #10).
+        await reservationRepository.resyncReservationsForOrder(tx, orderId);
+      }
       return { itemsChanged };
-    });
+    }, { isolationLevel: 'ReadCommitted' });
 
     // Đọc response NGOÀI transaction — detailInclude nặng, chỉ phục vụ build response (BUG mục 7.2 cũ).
     const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });

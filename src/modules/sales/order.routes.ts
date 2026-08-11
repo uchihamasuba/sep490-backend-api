@@ -17,6 +17,7 @@ import {
   orderItemIdParamSchema,
   updateLiveChecklistBodySchema,
   updateOrderItemBodySchema,
+  updateOrderDatesBodySchema,
   updateOrderItemsBodySchema,
   updateOrderQuotationBodySchema,
   updateOrderStatusBodySchema,
@@ -80,6 +81,15 @@ router.put(
   validate(orderIdParamSchema, 'params'),
   validate(updateOrderItemsBodySchema, 'body'),
   asyncHandler(orderController.updateItems),
+);
+
+// Đổi ngày sự kiện (reschedule) — Manager. Đơn đã chốt sẽ tự dời cửa sổ giữ chỗ + 409 nếu ngày mới thiếu hàng.
+router.put(
+  '/:orderId/dates',
+  requireRole('MANAGER'),
+  validate(orderIdParamSchema, 'params'),
+  validate(updateOrderDatesBodySchema, 'body'),
+  asyncHandler(orderController.updateDates),
 );
 
 router.put(

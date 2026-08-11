@@ -37,19 +37,38 @@ const orderItemInputSchema = z.object({
   notes: z.string().trim().optional(),
 });
 
-export const createOrderBodySchema = z.object({
-  customerId: z.string().trim().min(1, 'Thiếu mã khách hàng'),
-  quotationId: z.string().trim().min(1).nullable().optional(),
-  eventType: z.string().trim().min(1, 'Vui lòng nhập loại sự kiện'),
-  eventName: z.string().trim().min(1).optional(),
-  eventDate: z.coerce.date(),
-  location: z.string().trim().min(1, 'Vui lòng nhập địa điểm'),
-  latitude: z.coerce.number().optional(),
-  longitude: z.coerce.number().optional(),
-  guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'Số lượng khách quá lớn').optional(),
-  items: z.array(orderItemInputSchema).default([]),
-  notes: z.string().trim().optional(),
-});
+export const createOrderBodySchema = z
+  .object({
+    customerId: z.string().trim().min(1, 'Thiếu mã khách hàng'),
+    quotationId: z.string().trim().min(1).nullable().optional(),
+    eventType: z.string().trim().min(1, 'Vui lòng nhập loại sự kiện'),
+    eventName: z.string().trim().min(1).optional(),
+    eventDate: z.coerce.date(),
+    // Ngày kết thúc thuê — dựng cửa sổ giữ chỗ [eventDate − đệm, endDate + turnaround]. Bỏ trống → dùng eventDate.
+    endDate: z.coerce.date().optional(),
+    location: z.string().trim().min(1, 'Vui lòng nhập địa điểm'),
+    latitude: z.coerce.number().optional(),
+    longitude: z.coerce.number().optional(),
+    guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'Số lượng khách quá lớn').optional(),
+    items: z.array(orderItemInputSchema).default([]),
+    notes: z.string().trim().optional(),
+  })
+  .refine((data) => !data.endDate || data.endDate >= data.eventDate, {
+    message: 'Ngày kết thúc phải >= ngày sự kiện',
+    path: ['endDate'],
+  });
+
+// PUT /orders/:id/dates — đổi ngày sự kiện (reschedule). Đơn CONFIRMED/IN_PROGRESS sẽ tự dời cửa sổ
+// giữ chỗ thiết bị + re-check 409 nếu ngày mới trùng khoảng thiếu hàng.
+export const updateOrderDatesBodySchema = z
+  .object({
+    eventDate: z.coerce.date(),
+    endDate: z.coerce.date().optional(),
+  })
+  .refine((data) => !data.endDate || data.endDate >= data.eventDate, {
+    message: 'Ngày kết thúc phải >= ngày sự kiện',
+    path: ['endDate'],
+  });
 
 export const updateOrderStatusBodySchema = z
   .object({
@@ -174,6 +193,7 @@ export type ListOrdersQuery = z.infer<typeof listOrdersQuerySchema>;
 export type ListOrderDepositsQuery = z.infer<typeof listOrderDepositsQuerySchema>;
 export type OrderItemInput = z.infer<typeof orderItemInputSchema>;
 export type CreateOrderBody = z.infer<typeof createOrderBodySchema>;
+export type UpdateOrderDatesBody = z.infer<typeof updateOrderDatesBodySchema>;
 export type UpdateOrderStatusBody = z.infer<typeof updateOrderStatusBodySchema>;
 export type UpdateOrderItemsBody = z.infer<typeof updateOrderItemsBodySchema>;
 export type UpdateOrderItemBody = z.infer<typeof updateOrderItemBodySchema>;

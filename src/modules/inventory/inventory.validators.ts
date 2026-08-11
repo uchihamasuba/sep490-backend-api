@@ -50,6 +50,27 @@ export const adjustInventoryBodySchema = z.object({
   notes: z.string().trim().optional(),
 });
 
+// Bảo trì hàng hỏng: sửa chữa (damaged −= qty) / thanh lý (damaged −= qty, total −= qty).
+export const repairInventoryBodySchema = z.object({
+  itemId: z.string().trim().min(1, 'Thiếu mã thiết bị'),
+  quantity: z.coerce.number().int().positive('Số lượng phải lớn hơn 0'),
+  notes: z.string().trim().optional(),
+});
+export const scrapInventoryBodySchema = repairInventoryBodySchema;
+
+// Lịch bận thiết bị: liệt kê reservation của 1 item trong khoảng [from, to].
+export const listReservationsQuerySchema = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+});
+
+// GET /inventory/reservations-timeline — reservation của mọi item trong [from,to], có thể lọc theo danh mục.
+export const reservationsTimelineQuerySchema = z.object({
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  categoryId: z.string().uuid().optional(),
+});
+
 export const listReportsQuerySchema = z.object({
   status: reportStatusEnum.optional(),
   orderId: z.string().trim().min(1).optional(),
@@ -84,6 +105,10 @@ export type CreateInventoryBody = z.infer<typeof createInventoryBodySchema>;
 export type ListInventoryQuery = z.infer<typeof listInventoryQuerySchema>;
 export type ListMovementsQuery = z.infer<typeof listMovementsQuerySchema>;
 export type AdjustInventoryBody = z.infer<typeof adjustInventoryBodySchema>;
+export type RepairInventoryBody = z.infer<typeof repairInventoryBodySchema>;
+export type ScrapInventoryBody = z.infer<typeof scrapInventoryBodySchema>;
+export type ListReservationsQuery = z.infer<typeof listReservationsQuerySchema>;
+export type ReservationsTimelineQuery = z.infer<typeof reservationsTimelineQuerySchema>;
 export type ListReportsQuery = z.infer<typeof listReportsQuerySchema>;
 export type CreateReportBody = z.infer<typeof createReportBodySchema>;
 export type ConfirmReportBody = z.infer<typeof confirmReportBodySchema>;

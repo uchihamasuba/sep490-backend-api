@@ -12,8 +12,12 @@ import {
   listInventoryQuerySchema,
   listMovementsQuerySchema,
   listReportsQuerySchema,
+  listReservationsQuerySchema,
   orderIdParamSchema,
+  repairInventoryBodySchema,
   reportIdParamSchema,
+  reservationsTimelineQuerySchema,
+  scrapInventoryBodySchema,
 } from './inventory.validators';
 
 const router = Router();
@@ -43,7 +47,31 @@ router.post(
   asyncHandler(inventoryController.adjust),
 );
 
+// Bảo trì hàng hỏng — Sửa chữa (damaged−) / Thanh lý (damaged−, total−). Chỉ Manager/Admin.
+router.post(
+  '/repair',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(repairInventoryBodySchema, 'body'),
+  asyncHandler(inventoryController.repair),
+);
+router.post(
+  '/scrap',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(scrapInventoryBodySchema, 'body'),
+  asyncHandler(inventoryController.scrap),
+);
+
 router.get('/movements', validate(listMovementsQuerySchema, 'query'), asyncHandler(inventoryController.listMovements));
+
+// Đối soát tồn (Phase 6): dựng lại on_hand từ inventory_movements, phát hiện bất biến bị vi phạm. Manager/Admin.
+router.get('/reconcile', requireRole('MANAGER', 'ADMIN'), asyncHandler(inventoryController.reconcile));
+
+// Timeline thiết bị (Phase 7 #3): reservation của mọi item trong [from,to], gom theo item + cờ over-committed.
+router.get(
+  '/reservations-timeline',
+  validate(reservationsTimelineQuerySchema, 'query'),
+  asyncHandler(inventoryController.reservationsTimeline),
+);
 
 router.get(
   '/picklist/:orderId',
@@ -116,6 +144,14 @@ router.put(
   validate(reportIdParamSchema, 'params'),
   validate(confirmReportBodySchema, 'body'),
   asyncHandler(inventoryController.confirmReport),
+);
+
+// Lịch bận thiết bị: liệt kê reservation của 1 item trong khoảng [from,to]. Đăng ký TRƯỚC catch-all /:itemId.
+router.get(
+  '/:itemId/reservations',
+  validate(itemIdParamSchema, 'params'),
+  validate(listReservationsQuerySchema, 'query'),
+  asyncHandler(inventoryController.listItemReservations),
 );
 
 // Route tham số 1 đoạn (`/:itemId`) đăng ký SAU CÙNG trong nhóm GET để không "nuốt" các path tĩnh ở trên

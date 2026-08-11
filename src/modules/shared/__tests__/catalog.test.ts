@@ -122,13 +122,20 @@ describe('POST /api/v1/catalog/items', () => {
     expect(mockedRepo.typeExists).not.toHaveBeenCalled();
   });
 
-  it('is forbidden for non-Manager roles', async () => {
+  // Chốt 2026-08-11: catalog là master data thuộc quyền Admin (CLAUDE.md) + toàn bộ UI tạo/sửa thiết bị
+  // nằm ở admin/ → mở quyền ADMIN cho POST/PUT/PATCH catalog (trước đây chỉ MANAGER, admin bị 403).
+  it('allows Admin to create catalog item', async () => {
+    mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
+    mockedRepo.generateNextItemCode.mockResolvedValue('ITM-003');
+    mockedRepo.create.mockResolvedValue(fakeItem({ itemId: 'item-3', itemCode: 'ITM-003' }) as never);
+
     const res = await request(app)
       .post('/api/v1/catalog/items')
       .set('Authorization', authHeader('ADMIN'))
-      .send({ itemName: 'Đèn Beam 230', typeId: 'type-1', unit: 'Cái' });
+      .send({ itemName: 'Đèn Beam 230', typeId: 'type-1', unit: 'Cái', rentalPrice: 300000 });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ itemId: 'item-3' });
   });
 
   it('rejects priceValidFrom after priceValidTo with 400', async () => {
@@ -238,12 +245,17 @@ describe('PUT /api/v1/catalog/items/:itemId', () => {
     expect(res.status).toBe(404);
   });
 
-  it('is forbidden for non-Manager roles', async () => {
+  // Chốt 2026-08-11: mở quyền ADMIN cho catalog write (xem ghi chú ở POST test phía trên).
+  it('allows Admin to update catalog item', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
+    mockedRepo.update.mockResolvedValue(fakeItem({ itemName: 'X' }) as never);
+
     const res = await request(app)
       .put('/api/v1/catalog/items/item-1')
       .set('Authorization', authHeader('ADMIN'))
       .send({ itemName: 'X', typeId: 'type-1', unit: 'Cái', rentalPrice: 1 });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 });
 

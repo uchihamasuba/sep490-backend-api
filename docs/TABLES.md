@@ -182,6 +182,28 @@
 
 **Nghiệp vụ:** xuất kho khi thi công (`OUTBOUND`), nhập lại khi thu hồi (`INBOUND`), điều chỉnh thủ công (`ADJUSTMENT`).
 
+### 29. `inventory_reservations`
+> 🟦 **Mô hình RENTAL — thêm 2026-08 (Prisma `db push`; xem `docs/inventory-rental-refactor-plan.md`)**
+
+**Mục đích:** **Giữ chỗ thiết bị theo khoảng thời gian** để chống double-book 2 sự kiện trùng lịch. Là nguồn tính khả dụng động (không lưu counter): `available(item,[s,e]) = quantity_total − quantity_damaged − Σ reserved(CONFIRMED, giao [s,e])`. Chỉ `order_items` nội bộ (`source=INTERNAL`) sinh reservation; phần thuê NCC không giữ kho.
+
+| Cột | Kiểu | Khóa | Mô tả |
+|---|---|---|---|
+| reservation_id | varchar(36) | PK | Định danh giữ chỗ |
+| item_id | varchar(36) | FK → items (Cascade) | Thiết bị được giữ |
+| order_id | varchar(36) | FK → orders (Cascade, null) | Đơn giữ chỗ |
+| quotation_id | varchar(36) | FK → quotations (SetNull, null) | Báo giá (giữ mềm HELD) |
+| quantity | integer | | Số lượng giữ |
+| start_at | timestamp | | Đầu cửa sổ = `event_date − setupBuffer(24h)` |
+| end_at | timestamp | | Cuối cửa sổ = `(end_date ?? event_date) + turnaround(1 ngày)` |
+| status | reservation_status | | `HELD`/`CONFIRMED`/`RELEASED`/`CONSUMED` |
+| created_by | varchar(36) | | Người tạo |
+| created_at / updated_at | timestamp | | |
+
+**Index:** `idx_resv_item_window (item_id, status, start_at, end_at)` cho truy vấn overlap; `idx_resv_order (order_id)`.
+
+**Vòng đời:** cọc PAID → đơn `CONFIRMED` + tạo reservation `CONFIRMED` (chốt chặn overbooking 409 trong transaction, `SELECT … FOR UPDATE` + ReadCommitted); đơn `CANCELLED` → `RELEASED`; đơn đóng/`COMPLETED` → `CONSUMED`. Sửa/hủy `order_items` trên đơn đã chốt → xóa & tạo lại reservation (guard 409 nếu tăng vượt khả dụng).
+
 ---
 
 ## Nhóm 3 — Sales & Orders

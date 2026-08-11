@@ -1,0 +1,58 @@
+# BNWEMS Backend — stack test nhanh: MySQL 8 + API (hot-reload).
+# Chạy từ thư mục BE/:  docker compose up --build
+# Biến có thể override bằng file .env cạnh compose (hoặc export trước khi chạy).
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: bnwems-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bnwems}
+      MYSQL_USER: ${MYSQL_USER:-bnwems}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-bnwems}
+    ports:
+      # Host 3307 để KHÔNG đụng MySQL local (3306). Nối DB GUI vào localhost:3307.
+      - "${DB_HOST_PORT:-3307}:3306"
+    volumes:
+      - bnwems-db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    container_name: bnwems-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # DATABASE_URL trỏ tới service 'db' trong mạng compose (KHÔNG phải localhost).
+      DATABASE_URL: "mysql://${MYSQL_USER:-bnwems}:${MYSQL_PASSWORD:-bnwems}@db:3306/${MYSQL_DATABASE:-bnwems}"
+      NODE_ENV: development
+      PORT: "3001"
+      CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:3000}"
+      # Secret dev — ĐỔI khi deploy thật. Tối thiểu 16 ký tự (env.ts yêu cầu).
+      JWT_SECRET: "${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}"
+      JWT_EXPIRES_IN: "7d"
+      # Đặt true để seed dữ liệu mẫu lúc khởi động (LƯU Ý: seed xóa sạch dữ liệu cũ).
+      RUN_SEED: "${RUN_SEED:-false}"
+      # Giúp nodemon bắt thay đổi file qua bind-mount trên macOS/Windows.
+      CHOKIDAR_USEPOLLING: "true"
+    # Firebase (upload evidence + push) & SMTP (mời/nhắc email) là TÙY CHỌN — app vẫn boot khi thiếu.
+    # Muốn bật: bỏ comment env_file dưới và tạo file .env (theo .env.example).
+    # env_file:
+    #   - .env
+    ports:
+      - "3001:3001"
+    volumes:
+      # Bind-mount source để sửa code là app tự reload. node_modules giữ của image (anonymous volume).
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  bnwems-db-data:

@@ -19,11 +19,13 @@ router.use(requireAuth);
 // Đọc catalog: mọi role đã đăng nhập (dùng chung bởi modal báo giá/đơn — docs/api/taobaogiamoi_api.md).
 router.get('/', validate(listCatalogItemsQuerySchema, 'query'), asyncHandler(catalogController.list));
 
-// Tạo item catalog: Manager (đúng luồng "catalog phải đi trước báo giá", docs/api/taobaogiamoi_api.md
-// mục 3.1 hướng A — chỉ Manager xây dựng catalog/báo giá theo CLAUDE.md).
+// Tạo item catalog: Manager + Admin. CLAUDE.md xếp "thiết bị (catalog)" vào master data thuộc quyền
+// Admin, và toàn bộ UI tạo/sửa thiết bị nằm ở admin/ (admin/catalog/create, admin/catalog/[id]/edit).
+// Trước đây chỉ cho MANAGER khiến admin bấm Lưu bị 403 mà manager lại không có UI → không role nào tạo
+// được thiết bị qua web (chốt mở quyền ADMIN 2026-08-11 sau test E2E).
 router.post(
   '/',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(createCatalogItemBodySchema, 'body'),
   asyncHandler(catalogController.create),
 );
@@ -50,7 +52,7 @@ router.get(
 
 router.put(
   '/:itemId',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(itemIdParamSchema, 'params'),
   validate(updateCatalogItemBodySchema, 'body'),
   asyncHandler(catalogController.update),
@@ -58,7 +60,7 @@ router.put(
 
 router.patch(
   '/:itemId/status',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN'),
   validate(itemIdParamSchema, 'params'),
   validate(updateCatalogItemStatusBodySchema, 'body'),
   asyncHandler(catalogController.updateStatus),

@@ -9,6 +9,7 @@ import {
   type MovementWithDetails,
   type ReportWithDetails,
 } from './inventory.repository';
+import { reservationRepository } from './reservation.repository';
 import type {
   AdjustInventoryBody,
   CreateInventoryBody,
@@ -16,6 +17,8 @@ import type {
   ListInventoryQuery,
   ListMovementsQuery,
   ListReportsQuery,
+  RepairInventoryBody,
+  ScrapInventoryBody,
 } from './inventory.validators';
 
 export interface InventoryDTO {
@@ -31,6 +34,7 @@ export interface InventoryDTO {
   quantityDamaged: number;
   quantityReserved: number;
   quantityAvailable: number;
+  quantityOnHand: number; // tồn vật lý đang trong kho = total − damaged − (đang cho mượn ngoài)
   updatedAt: string;
 }
 
@@ -93,7 +97,7 @@ export interface ListMeta {
   totalPages: number;
 }
 
-function mapInventory(row: InventoryWithItem, lockedQty: number): InventoryDTO {
+function mapInventory(row: InventoryWithItem, lockedQty: number, onHand: number): InventoryDTO {
   return {
     itemId: row.itemId,
     itemName: row.item.itemName,
@@ -107,6 +111,7 @@ function mapInventory(row: InventoryWithItem, lockedQty: number): InventoryDTO {
     quantityDamaged: row.quantityDamaged,
     quantityReserved: lockedQty,
     quantityAvailable: row.quantityTotal - row.quantityDamaged - lockedQty,
+    quantityOnHand: onHand,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -166,22 +171,30 @@ async function findInventoryOrThrow(itemId: string): Promise<InventoryWithItem> 
 async function listInventory(query: ListInventoryQuery): Promise<{ data: InventoryDTO[]; meta: ListMeta }> {
   const skip = (query.page - 1) * query.limit;
   const { rows, totalItems } = await inventoryRepository.findMany({ itemId: query.itemId, search: query.search }, skip, query.limit);
-  const queryDate = query.date ? new Date(query.date) : new Date();
-  
-  const data = await Promise.all(
-    rows.map(async (row) => {
-      const lockedQty = await inventoryRepository.getLockedQuantityByDate(row.itemId, queryDate);
-      return mapInventory(row, lockedQty);
-    })
-  );
+  const queryStart = query.date ? new Date(query.date) : new Date();
+  const queryEnd = new Date(queryStart.getTime() + 24 * 60 * 60 * 1000);
+
+  // Gộp N+1: thay vì 2 query/dòng (reserved + outstanding), dùng 2 query GROUP BY cho cả trang.
+  const itemIds = rows.map((row) => row.itemId);
+  const [reservedMap, outstandingMap] = await Promise.all([
+    reservationRepository.getReservedForRangeBatch(itemIds, queryStart, queryEnd),
+    reservationRepository.getOutstandingOutBatch(itemIds),
+  ]);
+  const data = rows.map((row) => {
+    const reservedQty = reservedMap.get(row.itemId) ?? 0;
+    const onHand = row.quantityTotal - row.quantityDamaged - (outstandingMap.get(row.itemId) ?? 0);
+    return mapInventory(row, reservedQty, onHand);
+  });
 
   return { data, meta: toMeta(query.page, query.limit, totalItems) };
 }
 
 async function getInventoryByItemId(itemId: string): Promise<InventoryDTO> {
   const row = await findInventoryOrThrow(itemId);
-  const lockedQty = await inventoryRepository.getLockedQuantityByDate(itemId, new Date());
-  return mapInventory(row, lockedQty);
+  const now = new Date();
+  const reservedQty = await reservationRepository.getReservedForRange(itemId, now, new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  const onHand = row.quantityTotal - row.quantityDamaged - (await reservationRepository.getOutstandingOut(itemId));
+  return mapInventory(row, reservedQty, onHand);
 }
 
 async function listMovements(query: ListMovementsQuery): Promise<{ data: MovementDTO[]; meta: ListMeta }> {
@@ -199,14 +212,13 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
   if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   const rows = await inventoryRepository.findOrderItemsForPicklist(orderId);
-  const now = new Date();
-  
+
   return Promise.all(rows.map(async (row) => {
     let quantityAvailable = null;
     let quantityExported = 0;
     if (row.item.inventory) {
-      const locked = await inventoryRepository.getLockedQuantityByDate(row.itemId, now);
-      quantityAvailable = row.item.inventory.quantityTotal - row.item.inventory.quantityDamaged - locked;
+      // Picklist quan tâm "hàng còn thật trong kho để lấy hôm nay" = on-hand (mô hình rental Phase 2/4).
+      quantityAvailable = await reservationRepository.getOnHandNow(row.itemId);
     }
     quantityExported = await inventoryRepository.getExportedQuantity(orderId, row.itemId);
 
@@ -245,17 +257,17 @@ async function createInventory(body: CreateInventoryBody): Promise<InventoryDTO>
     quantityDamaged: body.quantityDamaged,
   });
 
-  return mapInventory(created, 0);
+  return mapInventory(created, 0, created.quantityTotal - created.quantityDamaged);
 }
 
 async function adjustInventory(body: AdjustInventoryBody, actorId: string): Promise<InventoryDTO> {
-  const current = await findInventoryOrThrow(body.itemId);
-  const lockedQty = await inventoryRepository.getLockedQuantityByDate(body.itemId, new Date());
-  const quantityAvailable = current.quantityTotal - current.quantityDamaged - lockedQty;
+  await findInventoryOrThrow(body.itemId); // đảm bảo dòng tồn kho tồn tại (404 nếu không)
+  // Giảm tồn (thanh lý) chỉ được với hàng còn THẬT trong kho (on-hand), không đụng phần đang cho thuê.
+  const onHand = await reservationRepository.getOnHandNow(body.itemId);
 
-  if (body.deltaTotal < 0 && quantityAvailable < Math.abs(body.deltaTotal)) {
-    throw AppError.badRequest('Không đủ số lượng khả dụng để giảm tồn kho', {
-      quantityAvailable,
+  if (body.deltaTotal < 0 && onHand < Math.abs(body.deltaTotal)) {
+    throw AppError.badRequest('Không đủ tồn vật lý (on-hand) để giảm tồn kho', {
+      onHand,
       requested: Math.abs(body.deltaTotal),
     });
   }
@@ -271,7 +283,79 @@ async function adjustInventory(body: AdjustInventoryBody, actorId: string): Prom
     notes: body.notes || null,
   });
 
-  return mapInventory(updated, lockedQty);
+  const now = new Date();
+  const reservedQty = await reservationRepository.getReservedForRange(body.itemId, now, new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  const onHandAfter = updated.quantityTotal - updated.quantityDamaged - (await reservationRepository.getOutstandingOut(body.itemId));
+  return mapInventory(updated, reservedQty, onHandAfter);
+}
+
+// Dựng lại DTO có đủ reserved (theo ngày) + on-hand cho 1 dòng inventory vừa cập nhật.
+async function mapInventoryFresh(row: InventoryWithItem): Promise<InventoryDTO> {
+  const now = new Date();
+  const reservedQty = await reservationRepository.getReservedForRange(row.itemId, now, new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  const onHand = row.quantityTotal - row.quantityDamaged - (await reservationRepository.getOutstandingOut(row.itemId));
+  return mapInventory(row, reservedQty, onHand);
+}
+
+// Bảo trì — SỬA CHỮA: damaged −= qty (total KHÔNG đổi, hàng sửa xong quay lại dùng được).
+async function repairInventory(body: RepairInventoryBody): Promise<InventoryDTO> {
+  const row = await findInventoryOrThrow(body.itemId);
+  if (body.quantity > row.quantityDamaged) {
+    throw AppError.badRequest('Số lượng sửa chữa vượt quá số lượng hỏng hiện có', {
+      quantityDamaged: row.quantityDamaged,
+      requested: body.quantity,
+    });
+  }
+  const updated = await inventoryRepository.repairDamaged(body.itemId, body.quantity);
+  return mapInventoryFresh(updated);
+}
+
+// Bảo trì — THANH LÝ: damaged −= qty, total −= qty (mất khỏi sở hữu) + ghi ADJUSTMENT(−qty).
+async function scrapInventory(body: ScrapInventoryBody, actorId: string): Promise<InventoryDTO> {
+  const row = await findInventoryOrThrow(body.itemId);
+  if (body.quantity > row.quantityDamaged) {
+    throw AppError.badRequest('Số lượng thanh lý vượt quá số lượng hỏng hiện có', {
+      quantityDamaged: row.quantityDamaged,
+      requested: body.quantity,
+    });
+  }
+  const updated = await inventoryRepository.scrapDamaged(body.itemId, body.quantity, actorId, body.notes || null);
+  return mapInventoryFresh(updated);
+}
+
+export interface ReservationDTO {
+  reservationId: string;
+  itemId: string;
+  orderId: string | null;
+  orderCode: string | null;
+  customerName: string | null;
+  eventDate: string | null;
+  endDate: string | null;
+  startAt: string;
+  endAt: string;
+  quantity: number;
+  status: string;
+}
+
+// Lịch bận thiết bị: liệt kê từng reservation (CONFIRMED) của 1 item trong khoảng [from, to] (mặc định 90 ngày).
+async function listItemReservations(itemId: string, from?: Date, to?: Date): Promise<ReservationDTO[]> {
+  await findInventoryOrThrow(itemId);
+  const start = from ?? new Date();
+  const end = to ?? new Date(start.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const rows = await reservationRepository.listReservationsForItem(itemId, start, end);
+  return rows.map((r) => ({
+    reservationId: r.reservationId,
+    itemId: r.itemId,
+    orderId: r.orderId,
+    orderCode: r.order ? r.order.orderCode : null,
+    customerName: r.order ? r.order.customer.customerName : null,
+    eventDate: r.order ? r.order.eventDate.toISOString() : null,
+    endDate: r.order && r.order.endDate ? r.order.endDate.toISOString() : null,
+    startAt: r.startAt.toISOString(),
+    endAt: r.endAt.toISOString(),
+    quantity: r.quantity,
+    status: r.status,
+  }));
 }
 
 async function listReports(query: ListReportsQuery): Promise<{ data: ReportDTO[]; meta: ListMeta }> {
@@ -405,13 +489,181 @@ async function recordFieldOutbound(planId: string, body: WarehouseMovementBody, 
   }
 }
 
+// ============================================================================
+// ĐỐI SOÁT on_hand (Phase 6) — dựng lại từ inventory_movements, phát hiện bất biến bị vi phạm.
+// ============================================================================
+export interface ReconcileItemDTO {
+  itemId: string;
+  itemName: string;
+  quantityTotal: number;
+  quantityDamaged: number;
+  outbound: number; // Σ OUTBOUND
+  inbound: number; // Σ INBOUND
+  outstanding: number; // out − in (chưa kẹp; âm = thu hồi > xuất → lỗi)
+  onHand: number; // total − damaged − outstanding
+  flags: string[]; // các bất biến bị vi phạm (rỗng = OK)
+}
+export interface ReconcileResult {
+  checkedAt: string;
+  totalItems: number;
+  anomalyCount: number;
+  anomalies: ReconcileItemDTO[];
+  items: ReconcileItemDTO[];
+}
+
+async function reconcileInventory(): Promise<ReconcileResult> {
+  const { rows } = await inventoryRepository.findMany({}, 0, 100_000);
+  const itemIds = rows.map((r) => r.itemId);
+  const sums = await reservationRepository.getMovementSumsBatch(itemIds);
+
+  const items: ReconcileItemDTO[] = rows.map((row) => {
+    const s = sums.get(row.itemId) ?? { out: 0, in: 0 };
+    const outstanding = s.out - s.in;
+    const onHand = row.quantityTotal - row.quantityDamaged - outstanding;
+    const flags: string[] = [];
+    if (outstanding < 0) flags.push('INBOUND vượt OUTBOUND (thu hồi nhiều hơn đã xuất)');
+    if (onHand < 0) flags.push('Tồn vật lý âm (đã xuất vượt tồn sở hữu)');
+    if (row.quantityDamaged > row.quantityTotal) flags.push('Hỏng vượt tổng sở hữu');
+    return {
+      itemId: row.itemId,
+      itemName: row.item.itemName,
+      quantityTotal: row.quantityTotal,
+      quantityDamaged: row.quantityDamaged,
+      outbound: s.out,
+      inbound: s.in,
+      outstanding,
+      onHand,
+      flags,
+    };
+  });
+
+  const anomalies = items.filter((i) => i.flags.length > 0);
+  return {
+    checkedAt: new Date().toISOString(),
+    totalItems: items.length,
+    anomalyCount: anomalies.length,
+    anomalies,
+    items,
+  };
+}
+
+// ============================================================================
+// TIMELINE THIẾT BỊ (Phase 7 #3) — reservation của MỌI item trong [from,to], gom theo item, cờ over-committed.
+// ============================================================================
+export interface TimelineReservationDTO {
+  reservationId: string;
+  orderId: string | null;
+  orderCode: string | null;
+  customerName: string | null;
+  quantity: number;
+  startAt: string;
+  endAt: string;
+  status: string;
+}
+export interface TimelineItemDTO {
+  itemId: string;
+  itemName: string;
+  itemCode: string;
+  quantityTotal: number;
+  quantityDamaged: number;
+  capacity: number; // total − damaged
+  maxConcurrent: number; // đỉnh reservation chồng nhau trong khoảng
+  overCommitted: boolean; // maxConcurrent > capacity
+  reservations: TimelineReservationDTO[];
+}
+export interface EquipmentTimelineResult {
+  from: string;
+  to: string;
+  items: TimelineItemDTO[];
+}
+
+/** Đỉnh số lượng reservation chồng nhau (sweep-line trên [startAt,endAt] có quantity). */
+function maxConcurrentQuantity(reservations: { startAt: Date; endAt: Date; quantity: number }[]): number {
+  const events: { t: number; delta: number }[] = [];
+  for (const r of reservations) {
+    events.push({ t: r.startAt.getTime(), delta: r.quantity });
+    events.push({ t: r.endAt.getTime(), delta: -r.quantity });
+  }
+  // Sắp theo thời điểm; tại cùng mốc, xử lý kết thúc (-) TRƯỚC bắt đầu (+) để không tính chồng ở điểm tiếp giáp.
+  events.sort((a, b) => (a.t !== b.t ? a.t - b.t : a.delta - b.delta));
+  let running = 0;
+  let max = 0;
+  for (const e of events) {
+    running += e.delta;
+    if (running > max) max = running;
+  }
+  return max;
+}
+
+async function listReservationsTimeline(from: Date, to: Date, categoryId?: string): Promise<EquipmentTimelineResult> {
+  const rows = await reservationRepository.listReservationsInRange(from, to, { categoryId });
+
+  const byItem = new Map<string, TimelineItemDTO>();
+  for (const r of rows) {
+    let entry = byItem.get(r.itemId);
+    if (!entry) {
+      entry = {
+        itemId: r.itemId,
+        itemName: r.item.itemName,
+        itemCode: r.item.itemCode,
+        quantityTotal: 0,
+        quantityDamaged: 0,
+        capacity: 0,
+        maxConcurrent: 0,
+        overCommitted: false,
+        reservations: [],
+      };
+      byItem.set(r.itemId, entry);
+    }
+    entry.reservations.push({
+      reservationId: r.reservationId,
+      orderId: r.orderId,
+      orderCode: r.order ? r.order.orderCode : null,
+      customerName: r.order ? r.order.customer.customerName : null,
+      quantity: r.quantity,
+      startAt: r.startAt.toISOString(),
+      endAt: r.endAt.toISOString(),
+      status: r.status,
+    });
+  }
+
+  // Bơm capacity (total − damaged) cho các item xuất hiện + tính over-committed.
+  const itemIds = [...byItem.keys()];
+  if (itemIds.length > 0) {
+    const invRows = await inventoryRepository.findManyByItemIds(itemIds);
+    const invMap = new Map(invRows.map((i) => [i.itemId, i]));
+    for (const entry of byItem.values()) {
+      const inv = invMap.get(entry.itemId);
+      entry.quantityTotal = inv?.quantityTotal ?? 0;
+      entry.quantityDamaged = inv?.quantityDamaged ?? 0;
+      entry.capacity = entry.quantityTotal - entry.quantityDamaged;
+      entry.maxConcurrent = maxConcurrentQuantity(
+        entry.reservations.map((x) => ({ startAt: new Date(x.startAt), endAt: new Date(x.endAt), quantity: x.quantity })),
+      );
+      entry.overCommitted = entry.maxConcurrent > entry.capacity;
+    }
+  }
+
+  const items = [...byItem.values()].sort((a, b) => {
+    if (a.overCommitted !== b.overCommitted) return a.overCommitted ? -1 : 1; // over-committed lên đầu
+    return a.itemName.localeCompare(b.itemName, 'vi');
+  });
+
+  return { from: from.toISOString(), to: to.toISOString(), items };
+}
+
 export const inventoryService = {
   listInventory,
+  reconcileInventory,
+  listReservationsTimeline,
   getInventoryByItemId,
   createInventory,
   listMovements,
   getPicklist,
   adjustInventory,
+  repairInventory,
+  scrapInventory,
+  listItemReservations,
   listReports,
   getReportById,
   createReport,
