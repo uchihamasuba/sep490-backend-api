@@ -10,6 +10,8 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16, 'JWT_SECRET phải có ít nhất 16 ký tự'),
   JWT_EXPIRES_IN: z.string().default('7d'),
 
+  // Danh sách origin được phép gọi API, NGĂN CÁCH BẰNG DẤU PHẨY (vd: "http://localhost:3000,https://app.vercel.app").
+  // Chấp nhận wildcard subdomain "*.vercel.app"; dấu "/" cuối và khoảng trắng được bỏ qua (xử lý ở app.ts).
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 
   // Firebase Storage (upload evidences) — configured manually in Task 1.4.
