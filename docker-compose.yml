@@ -59,7 +59,7 @@ services:
       # Giúp nodemon bắt thay đổi file qua bind-mount trên macOS/Windows.
       CHOKIDAR_USEPOLLING: "true"
     ports:
-      - "${PORT:-3001}:${PORT:-3001}"
+      - "${PORT:-3009}:${PORT:-3001}"
     volumes:
       # Bind-mount source để sửa code là app tự reload. node_modules giữ của image (anonymous volume).
       - .:/app
