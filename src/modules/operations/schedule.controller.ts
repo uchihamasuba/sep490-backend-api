@@ -29,14 +29,16 @@ function requireActor(req: Request) {
 }
 
 async function list(req: Request, res: Response) {
+  const actor = requireActor(req);
   const query = req.query as unknown as ListSchedulePlansQuery;
-  const result = await scheduleService.listSchedulePlans(query);
+  const result = await scheduleService.listSchedulePlans(query, actor);
   ok(res, result.data, { ...result.meta });
 }
 
 async function getById(req: Request, res: Response) {
+  const actor = requireActor(req);
   const { planId } = req.params as unknown as PlanIdParam;
-  const plan = await scheduleService.getSchedulePlanById(planId);
+  const plan = await scheduleService.getSchedulePlanById(planId, actor);
   ok(res, plan);
 }
 

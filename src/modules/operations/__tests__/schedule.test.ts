@@ -382,6 +382,63 @@ describe('HTTP routes — role permission matrix', () => {
     expect(res.status).toBe(200);
   });
 
+  it('GET /api/v1/schedule-plans — STAFF bị ÉP assigneeUserId = id của mình, bỏ qua giá trị client truyền (chống IDOR)', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 } as never);
+
+    // STAFF cố tình truyền assigneeUserId của người khác — server phải ghi đè bằng id trong token.
+    await request(app)
+      .get('/api/v1/schedule-plans?assigneeUserId=someone-else')
+      .set('Authorization', authHeader('STAFF', 'staff-9'));
+
+    expect(mockedRepo.findMany.mock.calls[0]?.[0]?.assigneeUserId).toBe('staff-9');
+  });
+
+  it('GET /api/v1/schedule-plans — STAFF không truyền assigneeUserId vẫn bị scope theo token (không thấy hết)', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 } as never);
+
+    await request(app).get('/api/v1/schedule-plans').set('Authorization', authHeader('STAFF', 'staff-9'));
+
+    expect(mockedRepo.findMany.mock.calls[0]?.[0]?.assigneeUserId).toBe('staff-9');
+  });
+
+  it('GET /api/v1/schedule-plans — MANAGER KHÔNG bị scope (không truyền assigneeUserId → thấy hết)', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 } as never);
+
+    await request(app).get('/api/v1/schedule-plans').set('Authorization', authHeader('MANAGER', 'mgr-1'));
+
+    expect(mockedRepo.findMany.mock.calls[0]?.[0]?.assigneeUserId).toBeUndefined();
+  });
+
+  it('GET /api/v1/schedule-plans/:planId — STAFF KHÔNG tham gia kế hoạch nhận 404 (che giấu tồn tại)', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({}, [fakeAssignee({ userId: 'leader-1' })]) as never);
+
+    const res = await request(app)
+      .get('/api/v1/schedule-plans/plan-1')
+      .set('Authorization', authHeader('STAFF', 'other-staff'));
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /api/v1/schedule-plans/:planId — STAFF có tham gia thì đọc được (200)', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({}, [fakeAssignee({ userId: 'leader-1' })]) as never);
+
+    const res = await request(app)
+      .get('/api/v1/schedule-plans/plan-1')
+      .set('Authorization', authHeader('STAFF', 'leader-1'));
+
+    expect(res.status).toBe(200);
+  });
+
+  it('GET /api/v1/schedule-plans/:planId — MANAGER đọc được mọi kế hoạch (200)', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({}, [fakeAssignee({ userId: 'leader-1' })]) as never);
+
+    const res = await request(app)
+      .get('/api/v1/schedule-plans/plan-1')
+      .set('Authorization', authHeader('MANAGER', 'mgr-1'));
+
+    expect(res.status).toBe(200);
+  });
+
   it('POST /api/v1/schedule-plans is forbidden for STAFF (Manager-only action)', async () => {
     const res = await request(app)
       .post('/api/v1/schedule-plans')

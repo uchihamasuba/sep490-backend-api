@@ -155,12 +155,18 @@ function assertAtMostOneLead(assignees: { role: PlanMemberRole }[]): void {
 
 async function listSchedulePlans(
   query: ListSchedulePlansQuery,
+  actor: Actor,
 ): Promise<{ data: SchedulePlanDTO[]; meta: { page: number | null; limit: number | null; totalItems: number; totalPages: number | null } }> {
   const paginated = query.page !== undefined || query.limit !== undefined;
   const page = query.page ?? 1;
   const limit = query.limit ?? 500;
   const skip = paginated ? (page - 1) * limit : undefined;
   const take = paginated ? limit : undefined;
+
+  // Scope theo quyền: STAFF chỉ được xem lịch của đơn mình được phân công — ÉP assigneeUserId = id trong
+  // token, BỎ QUA giá trị client tự truyền (chống IDOR: đổi/bỏ assigneeUserId để xem lịch người khác).
+  // MANAGER/ADMIN xem theo filter tùy ý (không truyền assigneeUserId → thấy hết).
+  const assigneeUserId = actor.role === 'STAFF' ? actor.id : query.assigneeUserId;
 
   const { rows, totalItems } = await scheduleRepository.findMany({
     orderId: query.orderId,
@@ -169,7 +175,7 @@ async function listSchedulePlans(
     dateFrom: query.dateFrom,
     dateTo: query.dateTo,
     dateMode: query.dateMode ?? 'timeline',
-    assigneeUserId: query.assigneeUserId,
+    assigneeUserId,
     skip,
     take,
   });
@@ -182,8 +188,13 @@ async function listSchedulePlans(
   };
 }
 
-async function getSchedulePlanById(planId: string): Promise<SchedulePlanDTO> {
+async function getSchedulePlanById(planId: string, actor?: Actor): Promise<SchedulePlanDTO> {
   const plan = await findPlanOrThrow(planId);
+  // STAFF chỉ đọc được kế hoạch mình có tham gia. Trả 404 (giống khi không tồn tại) để không lộ sự tồn
+  // tại của kế hoạch không liên quan. Lời gọi NỘI BỘ (không truyền actor) đã tự kiểm quyền trước đó nên bỏ qua.
+  if (actor?.role === 'STAFF' && !plan.assignees.some((a) => a.userId === actor.id)) {
+    throw AppError.notFound('Không tìm thấy kế hoạch lịch trình');
+  }
   return mapPlan(plan);
 }
 
