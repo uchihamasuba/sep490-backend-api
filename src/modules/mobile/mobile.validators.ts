@@ -21,6 +21,8 @@ export const createMobileReportBodySchema = z.object({
   transactionId: z.string().trim().min(1).optional(),
   notes: z.string().trim().optional(),
   items: z.array(reportItemInputSchema).min(1, 'Danh sách thiết bị phải có ít nhất 1 dòng'),
+  // Ảnh minh chứng kiểm đếm thu hồi (hỏng/mất) — evidenceId từ POST /evidence/upload; nhiều ảnh.
+  evidenceIds: z.array(z.string().trim().min(1)).optional(),
 });
 
 export type MobileOrderIdParam = z.infer<typeof mobileOrderIdParamSchema>;

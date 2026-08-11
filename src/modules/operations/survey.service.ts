@@ -11,6 +11,7 @@ export interface SurveyReportListItemDTO {
   surveyId: string;
   reportCode: string;
   orderId: string;
+  planId: string | null;
   orderCode: string;
   customerName: string;
   eventName: string | null;
@@ -54,6 +55,7 @@ function mapListItem(row: SurveyReportWithDetails): SurveyReportListItemDTO {
     surveyId: row.surveyId,
     reportCode: row.reportCode,
     orderId: row.orderId,
+    planId: row.planId,
     orderCode: row.order.orderCode,
     customerName: row.order.customer.customerName,
     eventName: row.order.eventName,
@@ -97,7 +99,7 @@ async function listSurveyReports(
   const skip = (page - 1) * limit;
 
   const [{ rows, totalItems }, counts] = await Promise.all([
-    surveyRepository.findMany({ search: query.search, status: query.status, skip, take: limit }),
+    surveyRepository.findMany({ search: query.search, status: query.status, planId: query.planId, skip, take: limit }),
     surveyRepository.countByStatusGlobal(),
   ]);
 

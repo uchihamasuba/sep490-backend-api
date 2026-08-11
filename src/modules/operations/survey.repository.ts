@@ -4,6 +4,7 @@ import { prisma } from '../../db/prisma';
 export interface SurveyReportListFilter {
   search?: string;
   status?: SurveyStatus;
+  planId?: string;
 }
 
 export interface SurveyReportListParams extends SurveyReportListFilter {
@@ -23,6 +24,7 @@ export type SurveyReportWithDetails = Prisma.SurveyReportGetPayload<{ include: t
 function buildWhere(filter: SurveyReportListFilter): Prisma.SurveyReportWhereInput {
   const where: Prisma.SurveyReportWhereInput = {};
   if (filter.status) where.status = filter.status;
+  if (filter.planId) where.planId = filter.planId;
   if (filter.search) {
     const q = filter.search;
     where.OR = [

@@ -9,6 +9,8 @@ const surveyStatusEnum = z.enum(['DRAFT', 'NEEDS_REVIEW', 'SUBMITTED', 'CONFIRME
 export const listSurveyReportsQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),
   status: surveyStatusEnum.optional(),
+  // Lọc theo lịch trình (mobile: Manager mở 1 công việc khảo sát → lấy đúng báo cáo của lịch đó).
+  planId: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
 });

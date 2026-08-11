@@ -288,7 +288,13 @@ export const orderRepository = {
 
   async findDeposits(orderId: string, skip?: number, take?: number) {
     const [rows, totalItems] = await Promise.all([
-      prisma.deposit.findMany({ where: { orderId }, orderBy: { createdAt: 'desc' }, skip, take }),
+      prisma.deposit.findMany({
+        where: { orderId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        include: { evidences: { select: { evidenceId: true } } },
+      }),
       prisma.deposit.count({ where: { orderId } }),
     ]);
     return { rows, totalItems };
@@ -332,7 +338,11 @@ export const orderRepository = {
   },
 
   findLatestSettlement(orderId: string) {
-    return prisma.settlement.findFirst({ where: { orderId }, orderBy: { createdAt: 'desc' } });
+    return prisma.settlement.findFirst({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+      include: { evidences: { select: { evidenceId: true } } },
+    });
   },
 
   createSettlement(data: {

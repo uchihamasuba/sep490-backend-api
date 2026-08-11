@@ -19,6 +19,7 @@ async function submitCollectedReport(orderId: string, body: CreateMobileReportBo
       transactionId: body.transactionId,
       notes: body.notes,
       items: body.items,
+      evidenceIds: body.evidenceIds,
     },
     actor,
   );

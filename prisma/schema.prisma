@@ -376,6 +376,7 @@ model Evidence {
   surveyReports SurveyReportEvidence[]
   deposits      DepositEvidence[]
   settlements   SettlementEvidence[]
+  collectedEquipmentReports CollectedEquipmentReportEvidence[]
 
   @@map("evidences")
 }
@@ -909,6 +910,7 @@ model CollectedEquipmentReport {
   confirmer   User?                          @relation("CollectedEquipmentConfirmedBy", fields: [confirmedBy], references: [userId], onDelete: SetNull)
   items       CollectedEquipmentReportItem[]
   movements   InventoryMovement[]
+  evidences   CollectedEquipmentReportEvidence[]
 
   @@index([orderId], map: "idx_cer_order")
   @@index([transactionId], map: "idx_cer_transaction")
@@ -930,6 +932,17 @@ model CollectedEquipmentReportItem {
   @@index([reportId], map: "idx_cer_items_report")
   @@index([itemId], map: "idx_cer_items_item")
   @@map("collected_equipment_report_items")
+}
+
+model CollectedEquipmentReportEvidence {
+  reportId   String @map("report_id") @db.VarChar(36)
+  evidenceId String @map("evidence_id") @db.VarChar(36)
+
+  report   CollectedEquipmentReport @relation(fields: [reportId], references: [reportId], onDelete: Cascade)
+  evidence Evidence                 @relation(fields: [evidenceId], references: [evidenceId], onDelete: Cascade)
+
+  @@id([reportId, evidenceId])
+  @@map("collected_equipment_report_evidences")
 }
 
 model SchedulePlanEvidence {

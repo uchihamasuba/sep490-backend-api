@@ -88,6 +88,7 @@ export interface ReportDTO {
   notes: string | null;
   createdAt: string;
   items: ReportItemDTO[];
+  evidenceIds: string[];
 }
 
 export interface ListMeta {
@@ -155,6 +156,7 @@ function mapReport(row: ReportWithDetails): ReportDTO {
       lostQuantity: item.lostQuantity,
       notes: item.notes,
     })),
+    evidenceIds: row.evidences.map((e) => e.evidenceId),
   };
 }
 
@@ -404,6 +406,7 @@ async function createReport(body: CreateReportBody, actor: Actor): Promise<Repor
       lostQuantity: line.lostQuantity,
       notes: line.notes || null,
     })),
+    evidenceIds: body.evidenceIds ?? [],
   });
 
   return mapReport(created);

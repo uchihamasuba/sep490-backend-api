@@ -35,6 +35,7 @@ const reportInclude = {
   reporter: { select: { userId: true, fullName: true } },
   confirmer: { select: { userId: true, fullName: true } },
   items: { include: { item: { select: { itemName: true, unit: true } } } },
+  evidences: { select: { evidenceId: true } },
 } satisfies Prisma.CollectedEquipmentReportInclude;
 
 export type ReportWithDetails = Prisma.CollectedEquipmentReportGetPayload<{ include: typeof reportInclude }>;
@@ -289,6 +290,7 @@ export const inventoryRepository = {
     reportedBy: string;
     notes: string | null;
     items: { itemId: string; goodQuantity: number; damagedQuantity: number; lostQuantity: number; notes: string | null }[];
+    evidenceIds: string[];
   }): Promise<ReportWithDetails> {
     return prisma.collectedEquipmentReport.create({
       data: {
@@ -298,6 +300,7 @@ export const inventoryRepository = {
         reportedBy: data.reportedBy,
         notes: data.notes,
         items: { create: data.items },
+        evidences: data.evidenceIds.length > 0 ? { create: data.evidenceIds.map((id) => ({ evidenceId: id })) } : undefined,
       },
       include: reportInclude,
     });
