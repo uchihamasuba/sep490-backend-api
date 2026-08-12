@@ -235,8 +235,10 @@ function countActiveByOrder(orderId: string, tx?: Tx): Promise<number> {
  * 1) Gộp nhu cầu nội bộ (INTERNAL) theo item; dựng cửa sổ từ eventDate/endDate.
  * 2) Khóa dòng inventory (FOR UPDATE) — serialize các lần xác nhận đồng thời (cùng item hoặc cùng đơn).
  * 3) Idempotent: đã có reservation CONFIRMED thì bỏ qua (đọc SAU khóa nên thấy bản vừa commit).
- * 4) Với mỗi item: reserved(range, loại trừ chính đơn) + need ≤ total − damaged, nếu vượt → 409.
- * 5) Tạo reservation CONFIRMED (quantity = nhu cầu nội bộ ròng).
+ * 4) Với mỗi item: available = total − damaged − reserved(range, loại trừ chính đơn). KHÔNG chặn nếu
+ *    thiếu — chỉ giữ chỗ phần khả dụng (reserve = min(need, available), luôn ≤ available nên không
+ *    overbook). Phần thiếu để Manager thuê ngoài NCC (cảnh báo mềm computeStockWarnings / UI trang đơn).
+ * 5) Tạo reservation CONFIRMED cho phần khả dụng (chỉ khi reserveQty > 0).
  */
 async function reserveOrderStock(
   tx: Prisma.TransactionClient,
@@ -287,23 +289,20 @@ async function reserveOrderStock(
   for (const [itemId, need] of needByItem) {
     const inv = await tx.inventory.findUnique({
       where: { itemId },
-      select: { quantityTotal: true, quantityDamaged: true, item: { select: { itemName: true } } },
+      select: { quantityTotal: true, quantityDamaged: true },
     });
     const total = inv?.quantityTotal ?? 0;
     const damaged = inv?.quantityDamaged ?? 0;
     const reserved = await getReservedForRange(itemId, startAt, endAt, { excludeOrderId: orderId, tx });
     const available = total - damaged - reserved;
-    if (need > available) {
-      throw AppError.conflict('Không đủ thiết bị khả dụng cho khoảng thời gian của đơn hàng', {
-        itemId,
-        itemName: inv?.item.itemName ?? null,
-        requested: need,
-        available,
-        windowStart: startAt.toISOString(),
-        windowEnd: endAt.toISOString(),
-      });
+    // KHÔNG chặn cứng khi thiếu kho (bỏ 409 cũ): chỉ giữ chỗ phần THỰC SỰ khả dụng — reserve ≤ available
+    // nên KHÔNG BAO GIỜ overbook. Phần thiếu (need − reserveQty) do Manager thuê ngoài NCC; trang chi tiết
+    // đơn đã có cảnh báo mềm "Thiếu · Thuê từ NCC" + computeStockWarnings. Nhờ vậy xác nhận đơn / xuất báo
+    // giá / cọc PAID không còn bị khoá chỉ vì kho nội bộ không đủ.
+    const reserveQty = Math.max(0, Math.min(need, available));
+    if (reserveQty > 0) {
+      rows.push({ itemId, orderId, quantity: reserveQty, startAt, endAt, status: 'CONFIRMED', createdBy });
     }
-    rows.push({ itemId, orderId, quantity: need, startAt, endAt, status: 'CONFIRMED', createdBy });
   }
   await tx.inventoryReservation.createMany({ data: rows });
 }
@@ -322,7 +321,7 @@ async function resyncWindowsForOrder(orderId: string, tx?: Tx): Promise<void> {
 
 // Đồng bộ reservation của đơn khớp order_items INTERNAL hiện tại — gọi SAU khi sửa/hủy order_items trên
 // đơn đã CONFIRMED/IN_PROGRESS (review P0 finding #10). Xóa reservation đang giữ rồi tạo lại (reserveOrderStock
-// guard 409 nếu tăng nhu cầu vượt khả dụng). Đơn NEW/terminal: bỏ qua (chưa/không giữ chỗ active).
+// chỉ giữ phần khả dụng, KHÔNG chặn nếu thiếu). Đơn NEW/terminal: bỏ qua (chưa/không giữ chỗ active).
 // ⚠️ Caller PHẢI mở transaction ReadCommitted (giống reserveOrderStock).
 async function resyncReservationsForOrder(tx: Prisma.TransactionClient, orderId: string): Promise<void> {
   const order = await tx.order.findUnique({ where: { orderId }, select: { orderStatus: true, createdBy: true } });

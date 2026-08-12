@@ -204,7 +204,8 @@ export const orderRepository = {
   },
 
   // Đổi trạng thái đơn + đồng bộ reservation theo vòng đời (Phase 3-4), tất cả trong 1 transaction:
-  //   → CONFIRMED (từ trạng thái khác): reserveOrderStock = CHẶN overbooking (409) + tạo reservation.
+  //   → CONFIRMED (từ trạng thái khác): reserveOrderStock = giữ chỗ phần khả dụng (KHÔNG chặn nếu thiếu;
+  //      phần thiếu thuê NCC). Không còn 409 "Không đủ thiết bị" — xác nhận đơn không bị khoá vì thiếu kho.
   //   → CANCELLED: releaseByOrder (nhả chỗ).   → COMPLETED: consumeByOrder (ngừng tính).
   async updateStatus(
     orderId: string,
@@ -229,7 +230,7 @@ export const orderRepository = {
   },
 
   // Đổi ngày sự kiện (reschedule): cập nhật eventDate/endDate rồi dời cửa sổ giữ chỗ theo ngày mới
-  // (resyncReservationsForOrder = xóa + tạo lại reservation với cửa sổ mới, guard 409 nếu ngày mới thiếu hàng).
+  // (resyncReservationsForOrder = xóa + tạo lại reservation với cửa sổ mới; chỉ giữ phần khả dụng, KHÔNG chặn nếu thiếu).
   async updateDates(orderId: string, eventDate: Date, endDate: Date | null): Promise<OrderWithDetails> {
     await prisma.$transaction(
       async (tx) => {

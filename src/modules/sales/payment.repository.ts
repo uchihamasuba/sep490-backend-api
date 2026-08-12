@@ -86,8 +86,9 @@ export const paymentRepository = {
       return prisma.deposit.update({ where: { depositId }, data: { status, ...evidencesUpdate } });
     }
 
-    // Cọc PAID = "chốt kho": trong CÙNG transaction (a) giữ chỗ + CHẶN overbooking (reserveOrderStock
-    // ném 409 → rollback cả cọc), (b) đưa đơn NEW → CONFIRMED + confirmedAt, (c) payment_status=DEPOSITED.
+    // Cọc PAID = "chốt kho": trong CÙNG transaction (a) giữ chỗ phần khả dụng (reserveOrderStock KHÔNG
+    // còn chặn/ném 409 nếu thiếu — phần thiếu thuê NCC), (b) đưa đơn NEW → CONFIRMED + confirmedAt,
+    // (c) payment_status=DEPOSITED. Cọc không còn bị rollback chỉ vì kho nội bộ không đủ.
     const now = new Date();
     return prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { orderId }, select: { orderStatus: true } });

@@ -143,6 +143,14 @@ async function updateTransactionStatus(req: Request, res: Response) {
   ok(res, transaction);
 }
 
+// Staff LEAD (hoặc Manager/Admin) xác nhận "đã nhận" — chỉ Đã duyệt → Đã nhận (xem service).
+async function receiveTransaction(req: Request, res: Response) {
+  if (!req.user) throw AppError.unauthorized();
+  const { id } = req.params as unknown as TransactionIdParam;
+  const transaction = await supplierService.receiveSupplierTransaction(id, req.user);
+  ok(res, transaction);
+}
+
 async function updateTransactionPaymentStatus(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { id } = req.params as unknown as TransactionIdParam;
@@ -170,5 +178,6 @@ export const supplierController = {
   updateTransaction,
   deleteTransaction,
   updateTransactionStatus,
+  receiveTransaction,
   updateTransactionPaymentStatus,
 };

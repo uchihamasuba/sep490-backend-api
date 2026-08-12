@@ -609,7 +609,31 @@ async function deleteSupplierTransaction(transactionId: string, actor: Actor): P
 
   await supplierTransactionRepository.deleteTransaction(transactionId);
 }
-async function updateTransactionStatus(transactionId: string, body: UpdateSupplierTransactionStatusBody, actor: Actor): Promise<SupplierTransactionDetailDTO> {
+// Staff LEAD (hoặc Manager/Admin) xác nhận "đã nhận": CHỈ Đã duyệt → Đã nhận, không gì khác. Tách khỏi
+// updateTransactionStatus (máy trạng thái đầy đủ, Manager/Admin) để cấp đúng 1 quyền cho LEAD mà không mở
+// duyệt/hủy/hoàn thành. Ghi thẳng RECEIVED qua repo → KHÔNG dính auto-complete (RECEIVED+PAID→COMPLETED)
+// nên LEAD không thể vô tình đóng đơn. Chỉ đơn GẮN ORDER: assertActorCanAccessTransaction đã tự chặn STAFF
+// với đơn không gắn order (orderId=null) + yêu cầu LEAD trên đơn đó.
+async function receiveSupplierTransaction(transactionId: string, actor: Actor): Promise<SupplierTransactionDetailDTO> {
+  const existingTx = await supplierTransactionRepository.findById(transactionId);
+  if (!existingTx) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
+
+  await assertActorCanAccessTransaction(actor, existingTx.orderId);
+
+  if (existingTx.status !== 'APPROVED') {
+    throw AppError.badRequest('Chỉ giao dịch ở trạng thái Đã duyệt mới xác nhận đã nhận được');
+  }
+
+  // Đơn đã thanh toán: mốc tài chính do Manager chốt — không để LEAD chạm vào (tránh mọi rủi ro đóng đơn).
+  if (actor.role === 'STAFF' && existingTx.paymentStatus === 'PAID') {
+    throw AppError.forbidden('Đơn đã thanh toán — vui lòng để Manager hoàn tất');
+  }
+
+  const updated = await supplierTransactionRepository.updateTransactionStatus(transactionId, 'RECEIVED', actor.id);
+  return mapTransactionDetail(updated!);
+}
+
+async function updateTransactionStatus(transactionId: string, body: UpdateSupplierTransactionStatusBody, actor: Actor): Promise<SupplierTransactionDetailDTO> {
   const existingTx = await supplierTransactionRepository.findById(transactionId);
   if (!existingTx) throw AppError.notFound('Không tìm thấy giao dịch nhà cung cấp');
 
@@ -678,6 +702,7 @@ export const supplierService = {
   listSupplierTransactions,
   getSupplierTransactionById,
   receiveTransactionItem,
+  receiveSupplierTransaction,
   createSupplierTransaction,
   updateSupplierTransaction,
   deleteSupplierTransaction,

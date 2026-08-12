@@ -173,6 +173,15 @@ supplierTransactionRouter.patch(
   asyncHandler(supplierController.updateTransactionStatus),
 );
 
+// Xác nhận "đã nhận" (Đã duyệt → Đã nhận) — mở cho STAFF LEAD (giới hạn theo đơn họ phụ trách, chỉ đơn gắn
+// order) + Manager/Admin. Endpoint riêng, KHÔNG mở cả /:id/status cho STAFF (đó vẫn Manager/Admin-only).
+supplierTransactionRouter.post(
+  '/:id/receive',
+  requireRole('STAFF', 'MANAGER', 'ADMIN'),
+  validate(transactionIdParamSchema, 'params'),
+  asyncHandler(supplierController.receiveTransaction),
+);
+
 supplierTransactionRouter.patch(
   '/:id/payment-status',
   requireRole('MANAGER', 'ADMIN'),
