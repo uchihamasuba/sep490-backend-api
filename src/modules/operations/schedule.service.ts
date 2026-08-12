@@ -353,12 +353,14 @@ async function checkIn(
   }
 
   await scheduleRepository.checkIn(assignee.assigneeId, checkInEvidenceId, latitude, longitude);
-  if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
-    await scheduleRepository.updateStatus(planId, 'IN_PROGRESS', undefined, undefined);
-    // LEAD check-in lịch Lắp đặt = mốc thi công thật bắt đầu → đơn CONFIRMED tự chuyển IN_PROGRESS
-    // (guard "chỉ tiến" nằm trong repo.promoteOrderToInProgress; khảo sát/thu hồi KHÔNG kích hoạt).
-    if (plan.task.taskCode === 'SETUP') {
-      await scheduleRepository.promoteOrderToInProgress(plan.orderId);
+  if (plan.status !== 'CANCELLED') {
+    // BẤT KỲ check-in nào (mọi loại lịch: khảo sát/lắp đặt/thu hồi, mọi vai trò) = có người bắt đầu làm
+    // → đơn CONFIRMED tự chuyển IN_PROGRESS. Guard "chỉ tiến" (updateMany where CONFIRMED) nằm trong repo
+    // nên idempotent, không lùi COMPLETED/CANCELLED. (Trước đây chỉ LEAD check-in lịch Lắp đặt mới đổi.)
+    await scheduleRepository.promoteOrderToInProgress(plan.orderId);
+    // Riêng LEAD check-in mới đưa PLAN sang IN_PROGRESS (mốc cấp lịch trình, khác mốc cấp đơn ở trên).
+    if (assignee.role === 'LEAD') {
+      await scheduleRepository.updateStatus(planId, 'IN_PROGRESS', undefined, undefined);
     }
   }
 
