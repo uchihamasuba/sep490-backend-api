@@ -367,7 +367,11 @@ async function listItemReservations(itemId: string, from?: Date, to?: Date): Pro
 
 async function listReports(query: ListReportsQuery): Promise<{ data: ReportDTO[]; meta: ListMeta }> {
   const skip = (query.page - 1) * query.limit;
-  const { rows, totalItems } = await inventoryRepository.findReports({ status: query.status, orderId: query.orderId }, skip, query.limit);
+  const { rows, totalItems } = await inventoryRepository.findReports(
+    { status: query.status, orderId: query.orderId, reportType: query.reportType, transactionId: query.transactionId },
+    skip,
+    query.limit,
+  );
   return { data: rows.map(mapReport), meta: toMeta(query.page, query.limit, totalItems) };
 }
 
@@ -430,6 +434,14 @@ async function confirmReport(reportId: string, actor: Actor): Promise<ReportDTO>
     if (!isLead) {
       throw AppError.forbidden('Chỉ Leader giữ vai trò LEAD trong kế hoạch của đơn hàng này mới được xác nhận báo cáo');
     }
+  }
+
+  // Báo cáo SUPPLIER = thiết bị THUÊ của NCC được trả lại cho NCC — KHÔNG nhập về kho nội bộ. Chỉ đánh dấu
+  // đã duyệt phiếu trả, tuyệt đối không áp hiệu ứng tồn kho (nếu áp sẽ cộng nhầm hàng NCC vào tồn kho mình,
+  // hoặc crash khi item không có dòng inventory). Đối soát/đền bù NCC là nghiệp vụ tách riêng.
+  if (report.reportType === 'SUPPLIER') {
+    const confirmed = await inventoryRepository.confirmReportOnly(reportId, actor.id);
+    return mapReport(confirmed);
   }
 
   for (const line of report.items) {

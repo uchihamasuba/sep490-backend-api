@@ -74,6 +74,11 @@ export const reservationsTimelineQuerySchema = z.object({
 export const listReportsQuerySchema = z.object({
   status: reportStatusEnum.optional(),
   orderId: z.string().trim().min(1).optional(),
+  // Lọc theo loại báo cáo: INTERNAL (hoàn kho nội bộ) hoặc SUPPLIER (trả thiết bị thuê NCC). Cho phép
+  // FE (trang suppliers/returns) chỉ kéo về báo cáo SUPPLIER thay vì lọc client-side toàn trang.
+  reportType: reportTypeEnum.optional(),
+  // Lọc theo đúng 1 giao dịch NCC (khi cần xem báo cáo trả cho 1 phiếu thuê cụ thể).
+  transactionId: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });

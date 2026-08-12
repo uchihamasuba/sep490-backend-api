@@ -54,6 +54,8 @@ export interface MovementListFilter {
 export interface ReportListFilter {
   status?: CollectedEquipmentReportStatus;
   orderId?: string;
+  reportType?: CollectedEquipmentReportType;
+  transactionId?: string;
 }
 
 function buildInventoryWhere(filter: InventoryListFilter): Prisma.InventoryWhereInput {
@@ -271,6 +273,8 @@ export const inventoryRepository = {
     const where: Prisma.CollectedEquipmentReportWhereInput = {};
     if (filter.status) where.status = filter.status;
     if (filter.orderId) where.orderId = filter.orderId;
+    if (filter.reportType) where.reportType = filter.reportType;
+    if (filter.transactionId) where.transactionId = filter.transactionId;
 
     const [rows, totalItems] = await Promise.all([
       prisma.collectedEquipmentReport.findMany({ where, skip, take, include: reportInclude, orderBy: { createdAt: 'desc' } }),
@@ -353,6 +357,20 @@ export const inventoryRepository = {
       }
     });
 
+    const report = await prisma.collectedEquipmentReport.findUnique({ where: { reportId }, include: reportInclude });
+    if (!report) throw AppError.internal('Không tìm thấy phiếu thu hồi thiết bị sau khi xác nhận');
+    return report;
+  },
+
+  // Xác nhận báo cáo thu hồi KHÔNG áp bất kỳ hiệu ứng tồn kho nào — dùng cho báo cáo loại SUPPLIER (thiết
+  // bị THUÊ của Nhà cung cấp): hàng thuộc sở hữu NCC, trả lại cho NCC, không nhập về kho nội bộ nên tuyệt
+  // đối không được đụng `inventory` (không +damaged, không −total, không ghi INBOUND). Chỉ đánh dấu Manager
+  // đã duyệt phiếu trả NCC (đối soát tiền đền bù NCC là nghiệp vụ tách riêng, không thuộc luồng này).
+  async confirmReportOnly(reportId: string, confirmedBy: string): Promise<ReportWithDetails> {
+    await prisma.collectedEquipmentReport.update({
+      where: { reportId },
+      data: { status: 'CONFIRMED', confirmedBy, confirmedAt: new Date() },
+    });
     const report = await prisma.collectedEquipmentReport.findUnique({ where: { reportId }, include: reportInclude });
     if (!report) throw AppError.internal('Không tìm thấy phiếu thu hồi thiết bị sau khi xác nhận');
     return report;
