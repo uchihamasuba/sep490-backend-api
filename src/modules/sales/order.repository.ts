@@ -57,7 +57,7 @@ export type OrderWithDetails = Prisma.OrderGetPayload<{ include: typeof detailIn
 
 const picklistInclude = {
   customer: { select: { customerName: true } },
-  orderItems: { select: { quantity: true, preparedQty: true } },
+  orderItems: { select: { itemId: true, quantity: true, preparedQty: true } },
   pickedUpByUser: { select: { fullName: true } },
 } satisfies Prisma.OrderInclude;
 
@@ -472,7 +472,15 @@ export const orderRepository = {
           });
           const needByItem = new Map<string, number>();
           for (const it of items) needByItem.set(it.itemId, (needByItem.get(it.itemId) ?? 0) + it.quantity);
+          // Trừ phần THUÊ NCC — chỉ xuất kho phần nội bộ THẬT rời kho (đồ thuê đến từ NCC, không qua kho).
+          // Nếu không trừ: chặn nhầm "Không đủ tồn on-hand" và ghi OUTBOUND vượt số thật rời kho (lệch tồn).
+          const rented = await reservationRepository.getRentedByItemForOrder(orderId, tx);
+          for (const [itemId, r] of rented) {
+            const cur = needByItem.get(itemId);
+            if (cur !== undefined) needByItem.set(itemId, Math.max(0, cur - r));
+          }
           for (const [itemId, qty] of needByItem) {
+            if (qty <= 0) continue; // đã thuê đủ → item này không xuất kho nội bộ
             // Khóa dòng inventory rồi kiểm tồn vật lý (on-hand) trước khi ghi OUTBOUND.
             await tx.$queryRaw`SELECT inventory_id FROM inventory WHERE item_id = ${itemId} FOR UPDATE`;
             const onHand = await reservationRepository.getOnHandNow(itemId, tx);
@@ -661,7 +669,7 @@ export const orderPicklistRepository = {
     const where = buildPicklistWhere({ search });
     return prisma.order.findMany({
       where,
-      select: { orderId: true, pickedUpAt: true, orderItems: { select: { quantity: true, preparedQty: true } } },
+      select: { orderId: true, pickedUpAt: true, orderItems: { select: { itemId: true, quantity: true, preparedQty: true } } },
     });
   },
 

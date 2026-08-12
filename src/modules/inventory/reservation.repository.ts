@@ -259,6 +259,19 @@ async function reserveOrderStock(
   }
   if (needByItem.size === 0) return; // đơn không có thiết bị nội bộ → không giữ chỗ
 
+  // Trừ phần đã THUÊ NCC (RENTAL) để bù thiếu (getRentedByItemForOrder). "Thuê từ NCC" chỉ tạo
+  // supplier-transaction gắn orderId, KHÔNG đổi source order_item (vẫn INTERNAL) — nếu không trừ, giữ
+  // chỗ sẽ đòi đủ 100% số nội bộ và chặn nhầm "Không đủ thiết bị" dù đã thuê bù.
+  const rented = await getRentedByItemForOrder(orderId, tx);
+  for (const [itemId, r] of rented) {
+    const cur = needByItem.get(itemId);
+    if (cur !== undefined) needByItem.set(itemId, Math.max(0, cur - r));
+  }
+  for (const [itemId, need] of [...needByItem]) {
+    if (need <= 0) needByItem.delete(itemId); // đã thuê đủ → không cần giữ kho nội bộ item này
+  }
+  if (needByItem.size === 0) return; // toàn bộ nhu cầu đã được thuê ngoài bù
+
   const { startAt, endAt } = orderWindow(order.eventDate, order.endDate);
 
   // Khóa các dòng inventory liên quan (MySQL row lock) để chống race giữa nhiều lần xác nhận.
@@ -319,8 +332,45 @@ async function resyncReservationsForOrder(tx: Prisma.TransactionClient, orderId:
   await reserveOrderStock(tx, orderId, order.createdBy);
 }
 
+// Số lượng đã THUÊ NCC (RENTAL, chưa hủy) theo item cho 1 đơn. Đồ thuê đến từ NCC, KHÔNG giữ/rời kho nội
+// bộ → phải trừ khỏi mọi phép tính "nhu cầu nội bộ" (giữ chỗ, xuất kho, sẵn sàng chuẩn bị) để không chặn
+// nhầm "thiếu thiết bị" khi đã thuê bù. "Thuê từ NCC" không đổi source order_item (vẫn INTERNAL).
+async function getRentedByItemForOrder(orderId: string, tx?: Prisma.TransactionClient): Promise<Map<string, number>> {
+  const db = tx ?? prisma;
+  const rows = await db.supplierTransactionItem.findMany({
+    where: { transaction: { orderId, transactionType: 'RENTAL', status: { not: 'CANCELLED' } } },
+    select: { itemId: true, quantity: true },
+  });
+  const map = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.itemId) continue;
+    map.set(r.itemId, (map.get(r.itemId) ?? 0) + r.quantity);
+  }
+  return map;
+}
+
+// Bản gộp nhiều đơn (cho danh sách picklist) — trả về orderId -> (itemId -> số đã thuê).
+async function getRentedByItemForOrders(orderIds: string[]): Promise<Map<string, Map<string, number>>> {
+  const result = new Map<string, Map<string, number>>();
+  if (orderIds.length === 0) return result;
+  const rows = await prisma.supplierTransactionItem.findMany({
+    where: { transaction: { orderId: { in: orderIds }, transactionType: 'RENTAL', status: { not: 'CANCELLED' } } },
+    select: { itemId: true, quantity: true, transaction: { select: { orderId: true } } },
+  });
+  for (const r of rows) {
+    const oid = r.transaction.orderId;
+    if (!oid || !r.itemId) continue;
+    if (!result.has(oid)) result.set(oid, new Map());
+    const m = result.get(oid)!;
+    m.set(r.itemId, (m.get(r.itemId) ?? 0) + r.quantity);
+  }
+  return result;
+}
+
 export const reservationRepository = {
   orderWindow,
+  getRentedByItemForOrder,
+  getRentedByItemForOrders,
   resyncWindowsForOrder,
   resyncReservationsForOrder,
   getReservedForRange,

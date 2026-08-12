@@ -804,14 +804,23 @@ export interface PicklistListMeta {
 // "Sẵn sàng xuất kho" — không có cột `items_confirmed_at` riêng trong schema thật hiện tại, dùng công
 // thức tổng hợp trực tiếp trên order_items (docs/api/picklistxuatkho_api.md mục 6, phương án fallback
 // khi chưa có cột xác nhận riêng): mọi dòng đã prepared đủ số lượng và đơn có ít nhất 1 dòng.
-function isReadyToPickUp(order: { pickedUpAt: Date | null; orderItems: { quantity: number; preparedQty: number }[] }): boolean {
-  if (order.pickedUpAt) return false;
-  if (order.orderItems.length === 0) return false;
-  return order.orderItems.every((item) => item.preparedQty >= item.quantity);
+// "Cần chuẩn bị" nội bộ mỗi dòng = quantity − số đã THUÊ NCC cho item đó (đồ thuê không lấy từ kho nội
+// bộ). Leader chỉ cần chuẩn bị đủ phần nội bộ ròng thì đơn coi như sẵn sàng xuất kho.
+function netInternalNeed(item: { itemId: string; quantity: number }, rentedByItem: Map<string, number>): number {
+  return Math.max(0, item.quantity - (rentedByItem.get(item.itemId) ?? 0));
 }
 
-function mapPicklistItem(row: OrderForPicklist, coordinatorName: string | null): PicklistItemDTO {
-  const totalItemsCount = row.orderItems.reduce((sum, item) => sum + item.quantity, 0);
+function isReadyToPickUp(
+  order: { pickedUpAt: Date | null; orderItems: { itemId: string; quantity: number; preparedQty: number }[] },
+  rentedByItem: Map<string, number>,
+): boolean {
+  if (order.pickedUpAt) return false;
+  if (order.orderItems.length === 0) return false;
+  return order.orderItems.every((item) => item.preparedQty >= netInternalNeed(item, rentedByItem));
+}
+
+function mapPicklistItem(row: OrderForPicklist, coordinatorName: string | null, rentedByItem: Map<string, number>): PicklistItemDTO {
+  const totalItemsCount = row.orderItems.reduce((sum, item) => sum + netInternalNeed(item, rentedByItem), 0);
   const preparedItemsCount = row.orderItems.reduce((sum, item) => sum + item.preparedQty, 0);
   return {
     orderId: row.orderId,
@@ -838,12 +847,18 @@ async function listPicklists(query: ListPicklistsQuery): Promise<{ data: Picklis
 
   const coordinators = await orderPicklistRepository.findLeadCoordinatorsByOrderIds(rows.map((r) => r.orderId));
 
+  // Số đã thuê NCC theo đơn — để "cần chuẩn bị"/"sẵn sàng" tính đúng phần nội bộ ròng (trừ phần thuê).
+  const rentedByOrder = await reservationRepository.getRentedByItemForOrders([
+    ...new Set([...rows.map((r) => r.orderId), ...allForCounts.map((o) => o.orderId)]),
+  ]);
+  const emptyRented = new Map<string, number>();
+
   const totalCount = allForCounts.length;
   const exportedCount = allForCounts.filter((o) => o.pickedUpAt !== null).length;
-  const readyCount = allForCounts.filter((o) => isReadyToPickUp(o)).length;
+  const readyCount = allForCounts.filter((o) => isReadyToPickUp(o, rentedByOrder.get(o.orderId) ?? emptyRented)).length;
 
   return {
-    data: rows.map((row) => mapPicklistItem(row, coordinators.get(row.orderId) ?? null)),
+    data: rows.map((row) => mapPicklistItem(row, coordinators.get(row.orderId) ?? null, rentedByOrder.get(row.orderId) ?? emptyRented)),
     meta: { page, limit, totalCount, readyCount, exportedCount },
   };
 }
@@ -857,13 +872,14 @@ async function markPicklistPickedUp(orderId: string, pickedUpBy: string): Promis
   if (existing.pickedUpAt) {
     throw AppError.conflict('Đơn hàng đã được đánh dấu xuất kho trước đó');
   }
-  if (!isReadyToPickUp({ pickedUpAt: existing.pickedUpAt, orderItems: existing.orderItems })) {
-    throw AppError.badRequest('Cần chuẩn bị đủ số lượng thiết bị (preparedQty >= quantity cho mọi dòng) trước khi xuất kho');
+  const rentedByItem = await reservationRepository.getRentedByItemForOrder(orderId);
+  if (!isReadyToPickUp({ pickedUpAt: existing.pickedUpAt, orderItems: existing.orderItems }, rentedByItem)) {
+    throw AppError.badRequest('Cần chuẩn bị đủ số lượng thiết bị nội bộ (đã trừ phần thuê NCC) cho mọi dòng trước khi xuất kho');
   }
 
   const updated = await orderRepository.markPickedUp(orderId, pickedUpBy);
   const coordinators = await orderPicklistRepository.findLeadCoordinatorsByOrderIds([orderId]);
-  return mapPicklistItem(updated, coordinators.get(orderId) ?? null);
+  return mapPicklistItem(updated, coordinators.get(orderId) ?? null, rentedByItem);
 }
 
 export const orderService = {
