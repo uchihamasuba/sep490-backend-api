@@ -60,6 +60,8 @@ export interface PicklistItemDTO {
   rentalPrice: number;
   source: string;
   quantityOrdered: number;
+  /** Số đã THUÊ NCC cho item này (đến từ NCC, không lấy từ kho nội bộ). Cần chuẩn bị/xuất kho nội bộ = quantityOrdered − quantityRented. */
+  quantityRented: number;
   quantityAvailable: number | null;
   quantityExported: number;
 }
@@ -214,6 +216,8 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
   if (!order) throw AppError.notFound('Không tìm thấy đơn hàng');
 
   const rows = await inventoryRepository.findOrderItemsForPicklist(orderId);
+  // Số đã thuê NCC theo item — để app hiện "cần chuẩn bị nội bộ" = quantityOrdered − quantityRented.
+  const rentedByItem = await reservationRepository.getRentedByItemForOrder(orderId);
 
   return Promise.all(rows.map(async (row) => {
     let quantityAvailable = null;
@@ -232,6 +236,7 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
       rentalPrice: Number(row.item.rentalPrice),
       source: row.source,
       quantityOrdered: row.quantity,
+      quantityRented: rentedByItem.get(row.itemId) ?? 0,
       quantityAvailable,
       quantityExported,
     };
