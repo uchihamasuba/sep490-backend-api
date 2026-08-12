@@ -255,6 +255,16 @@ export const scheduleRepository = {
     return prisma.attendance.update({ where: { assigneeId }, data: { checkOutAt: new Date(), latitude, longitude } });
   },
 
+  // LEAD check-in lịch "Lắp đặt thiết bị" = bắt đầu thi công thật → đưa đơn sang IN_PROGRESS. Dùng
+  // updateMany có where orderStatus='CONFIRMED' để CHỈ TIẾN (không lùi COMPLETED/CANCELLED) + idempotent
+  // (lần check-in sau không đổi gì vì đơn đã rời CONFIRMED).
+  promoteOrderToInProgress(orderId: string) {
+    return prisma.order.updateMany({
+      where: { orderId, orderStatus: 'CONFIRMED' },
+      data: { orderStatus: 'IN_PROGRESS' },
+    });
+  },
+
   attachEvidence(planId: string, evidenceIds: string[]) {
     return prisma.schedulePlan.update({ 
       where: { planId }, 

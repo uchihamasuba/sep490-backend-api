@@ -355,6 +355,11 @@ async function checkIn(
   await scheduleRepository.checkIn(assignee.assigneeId, checkInEvidenceId, latitude, longitude);
   if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
     await scheduleRepository.updateStatus(planId, 'IN_PROGRESS', undefined, undefined);
+    // LEAD check-in lịch Lắp đặt = mốc thi công thật bắt đầu → đơn CONFIRMED tự chuyển IN_PROGRESS
+    // (guard "chỉ tiến" nằm trong repo.promoteOrderToInProgress; khảo sát/thu hồi KHÔNG kích hoạt).
+    if (plan.task.taskCode === 'SETUP') {
+      await scheduleRepository.promoteOrderToInProgress(plan.orderId);
+    }
   }
 
   return getSchedulePlanById(planId);
