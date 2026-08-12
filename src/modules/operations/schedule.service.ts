@@ -188,6 +188,13 @@ async function listSchedulePlans(
   };
 }
 
+// Trang chủ mobile: các lịch mà chính người gọi (STAFF) đang check-in dở (chưa check-out). Không cần
+// filter/scope thêm — repo đã lọc theo attendance của đúng userId nên không lộ dữ liệu người khác.
+async function listMyActiveCheckIns(actor: Actor): Promise<SchedulePlanDTO[]> {
+  const rows = await scheduleRepository.findActiveCheckInsForUser(actor.id);
+  return rows.map(mapPlan);
+}
+
 async function getSchedulePlanById(planId: string, actor?: Actor): Promise<SchedulePlanDTO> {
   const plan = await findPlanOrThrow(planId);
   // STAFF chỉ đọc được kế hoạch mình có tham gia. Trả 404 (giống khi không tồn tại) để không lộ sự tồn
@@ -578,6 +585,7 @@ async function listAttendances(query: ListAttendancesQuery) {
 }
 export const scheduleService = {
   listSchedulePlans,
+  listMyActiveCheckIns,
   getSchedulePlanById,
   createSchedulePlan,
   updateSchedulePlan,

@@ -129,6 +129,24 @@ export const scheduleRepository = {
     return prisma.schedulePlan.findUnique({ where: { planId }, include: detailInclude });
   },
 
+  // Các lịch mà CHÍNH user này đã check-in nhưng CHƯA check-out (attendance.checkInAt != null &&
+  // checkOutAt == null). Dùng cho endpoint "việc đang làm" ở trang chủ mobile + nút check-out nhanh.
+  // @@unique([planId,userId]) + Attendance.assigneeId @unique đảm bảo không mơ hồ khi filter `some`.
+  findActiveCheckInsForUser(userId: string): Promise<SchedulePlanWithDetails[]> {
+    return prisma.schedulePlan.findMany({
+      where: {
+        assignees: {
+          some: {
+            userId,
+            attendance: { checkInAt: { not: null }, checkOutAt: null },
+          },
+        },
+      },
+      include: detailInclude,
+      orderBy: { startTime: 'asc' },
+    });
+  },
+
   async generateNextPlanCode(): Promise<string> {
     const count = await prisma.schedulePlan.count();
     return `PLN-${String(count + 1).padStart(3, '0')}`;

@@ -35,6 +35,13 @@ async function list(req: Request, res: Response) {
   ok(res, result.data, { ...result.meta });
 }
 
+// GET /schedule-plans/active — các lịch người gọi đang check-in dở (chưa check-out), cho trang chủ mobile.
+async function listActive(req: Request, res: Response) {
+  const actor = requireActor(req);
+  const data = await scheduleService.listMyActiveCheckIns(actor);
+  ok(res, data);
+}
+
 async function getById(req: Request, res: Response) {
   const actor = requireActor(req);
   const { planId } = req.params as unknown as PlanIdParam;
@@ -168,6 +175,7 @@ async function listAttendances(req: Request, res: Response) {
 
 export const scheduleController = {
   list,
+  listActive,
   getById,
   create,
   update,

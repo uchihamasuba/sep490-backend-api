@@ -37,6 +37,14 @@ scheduleRouter.get(
   asyncHandler(scheduleController.listAttendances)
 );
 
+// Việc người gọi đang check-in dở (trang chủ mobile). ĐĂNG KÝ TRƯỚC `/:planId` để Express không nuốt
+// "active" thành planId (giống mẹo /attendances ở trên). Chỉ STAFF; tự lọc theo user trong token.
+scheduleRouter.get(
+  '/active',
+  requireRole('STAFF'),
+  asyncHandler(scheduleController.listActive)
+);
+
 scheduleRouter.get(
   '/:planId',
   validate(planIdParamSchema, 'params'),
