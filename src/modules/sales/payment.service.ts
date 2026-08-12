@@ -3,6 +3,7 @@ import { AppError } from '../../utils/AppError';
 import { scheduleRepository } from '../operations/schedule.repository';
 import type { Actor } from '../operations/schedule.service';
 import { paymentRepository, type DepositWithOrder } from './payment.repository';
+import { orderRepository } from './order.repository';
 import type { ListDepositsQuery, MarkSettlementPaidBody, UpdateDepositStatusBody } from './payment.validators';
 
 const OPEN_DEPOSIT_STATUSES: DepositStatus[] = ['UNPAID'];
@@ -156,6 +157,8 @@ async function confirmSettlement(settlementId: string, confirmedBy: string, evid
   }
 
   const updated = await paymentRepository.confirmSettlement(settlementId, settlement.orderId, confirmedBy, evidenceIds);
+  // Quyết toán → PAID: có thể là điều kiện cuối để tự hoàn thành đơn (nếu mọi lịch đã xong). No-op nếu chưa đủ.
+  await orderRepository.maybeCompleteOrder(settlement.orderId);
   return mapSettlement(updated);
 }
 
@@ -178,6 +181,8 @@ async function markSettlementPaid(settlementId: string, body: MarkSettlementPaid
   }
 
   const updated = await paymentRepository.markSettlementPaid(settlementId, body.evidenceIds!, settlement.orderId);
+  // Leader thu tiền tại hiện trường → settlement PAID: thử tự hoàn thành đơn nếu mọi lịch đã xong.
+  await orderRepository.maybeCompleteOrder(settlement.orderId);
   return mapSettlement(updated);
 }
 

@@ -229,6 +229,37 @@ export const orderRepository = {
     return order;
   },
 
+  // Tự động hoàn thành đơn khi ĐỦ CẢ HAI: (1) mọi lịch trình của đơn đã COMPLETED/CANCELLED (không còn
+  // việc dở PENDING/CONFIRMED/IN_PROGRESS, và có ≥1 lịch), (2) có settlement PAID. Chỉ tiến IN_PROGRESS →
+  // COMPLETED (updateMany + guard orderStatus='IN_PROGRESS' nên idempotent, race-safe, không lùi/không
+  // nhảy từ NEW/CONFIRMED). Đủ điều kiện thì consume reservation như flow COMPLETED thủ công. Gọi sau khi
+  // Leader check-out xong lịch cuối và sau khi settlement → PAID. Song song với nút Manager ép COMPLETED
+  // trên web (giữ nguyên) — hàm này chỉ THÊM đường tự động, no-op nếu chưa đủ điều kiện.
+  async maybeCompleteOrder(orderId: string): Promise<void> {
+    const order = await prisma.order.findUnique({ where: { orderId }, select: { orderStatus: true } });
+    if (!order || order.orderStatus !== 'IN_PROGRESS') return;
+
+    const [totalPlans, unfinishedPlans, paidSettlements] = await Promise.all([
+      prisma.schedulePlan.count({ where: { orderId } }),
+      prisma.schedulePlan.count({ where: { orderId, status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] } } }),
+      prisma.settlement.count({ where: { orderId, status: 'PAID' } }),
+    ]);
+    if (totalPlans === 0 || unfinishedPlans > 0 || paidSettlements === 0) return;
+
+    await prisma.$transaction(
+      async (tx) => {
+        const res = await tx.order.updateMany({
+          where: { orderId, orderStatus: 'IN_PROGRESS' },
+          data: { orderStatus: 'COMPLETED' },
+        });
+        if (res.count > 0) {
+          await reservationRepository.consumeByOrder(orderId, tx);
+        }
+      },
+      { isolationLevel: 'ReadCommitted' },
+    );
+  },
+
   // Đổi ngày sự kiện (reschedule): cập nhật eventDate/endDate rồi dời cửa sổ giữ chỗ theo ngày mới
   // (resyncReservationsForOrder = xóa + tạo lại reservation với cửa sổ mới; chỉ giữ phần khả dụng, KHÔNG chặn nếu thiếu).
   async updateDates(orderId: string, eventDate: Date, endDate: Date | null): Promise<OrderWithDetails> {

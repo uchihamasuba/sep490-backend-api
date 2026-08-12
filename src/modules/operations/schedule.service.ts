@@ -3,6 +3,7 @@ import { calculateDistanceMeters } from '../../utils/geo.utils';
 import { AppError } from '../../utils/AppError';
 import { inventoryService, type MovementDTO } from '../inventory/inventory.service';
 import { scheduleRepository, type SchedulePlanWithDetails } from './schedule.repository';
+import { orderRepository } from '../sales/order.repository';
 import type {
   AddAssigneeBody,
   BatchUpdateSchedulePlanStatusBody,
@@ -393,6 +394,10 @@ async function checkOut(planId: string, userId: string, actor: Actor, latitude?:
   if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
     await scheduleRepository.updateStatus(planId, 'COMPLETED', undefined, undefined);
   }
+
+  // Vừa hoàn thành lịch (LEAD check-out) → có thể là lịch cuối: thử tự hoàn thành đơn nếu đã quyết toán.
+  // No-op nếu còn lịch dở hoặc chưa có settlement PAID.
+  await orderRepository.maybeCompleteOrder(plan.orderId);
 
   return getSchedulePlanById(planId);
 }
