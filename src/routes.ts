@@ -21,6 +21,7 @@ import evidenceRoutes from './modules/shared/evidence.routes';
 import notificationRoutes from './modules/shared/notification.routes';
 import settingsRoutes from './modules/shared/settings.routes';
 import mobileOrderRoutes from './modules/mobile/mobile.routes';
+import { reportRouter } from './modules/reports/report.routes';
 
 // Root router — mounted under /api/v1 in app.ts.
 // Feature modules register themselves here as they're built out.
@@ -52,5 +53,6 @@ api.use('/evidence', evidenceRoutes);
 api.use('/notifications', notificationRoutes);
 api.use('/settings', settingsRoutes);
 api.use('/mobile/orders', mobileOrderRoutes);
+api.use('/reports', reportRouter);
 
 export default api;
