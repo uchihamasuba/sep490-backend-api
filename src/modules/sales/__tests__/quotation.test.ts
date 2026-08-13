@@ -35,7 +35,7 @@ jest.mock('../quotation.repository', () => {
 const mockedCustomerRepo = customerRepository as jest.Mocked<typeof customerRepository>;
 const mockedQuotationRepo = quotationRepository as jest.Mocked<typeof quotationRepository>;
 
-function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
+function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' | 'LEADER' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
@@ -526,5 +526,52 @@ describe('HTTP routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ status: 'approved', totalAmount: 1_000_000, linkedOrderId: 'ord-1' });
     expect(res.body.data.items[0]).toMatchObject({ itemName: 'Loa JBL 1000W', categoryName: 'Âm thanh', unit: 'Cái' });
+  });
+  it('GET /api/v1/quotations returns 401 without token', async () => {
+    const res = await request(app).get('/api/v1/quotations');
+    expect(res.status).toBe(401);
+  });
+
+  it.each(['STAFF', 'LEADER'] as const)(
+    'GET /api/v1/quotations returns 403 for role %s',
+    async (role) => {
+      const res = await request(app)
+        .get('/api/v1/quotations')
+        .set('Authorization', authHeader(role));
+      expect(res.status).toBe(403);
+    }
+  );
+
+  it.each([
+    { query: 'page=0', expected: 400 },
+    { query: 'limit=101', expected: 400 },
+    { query: 'status=INVALID', expected: 400 },
+  ])('GET /api/v1/quotations validates query $query', async ({ query, expected }) => {
+    const res = await request(app)
+      .get(`/api/v1/quotations?${query}`)
+      .set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(expected);
+  });
+
+  it.each(['STAFF', 'LEADER', 'ADMIN'] as const)(
+    'PUT /api/v1/quotations/:id returns 403 for role %s',
+    async (role) => {
+      const res = await request(app)
+        .put('/api/v1/quotations/q1')
+        .send({ version: 'v1', items: [{ itemId: 'i1', quantity: 1, price: 100, discount: 0 }] })
+        .set('Authorization', authHeader(role));
+      expect(res.status).toBe(403);
+    }
+  );
+
+  it.each([
+    { body: { status: 'invalid' }, expected: 400 },
+    { body: { status: 'pending' }, expected: 400 }, // only approved or rejected
+  ])('PATCH /api/v1/quotations/:id/status validates body $body', async ({ body, expected }) => {
+    const res = await request(app)
+      .patch('/api/v1/quotations/q1/status')
+      .send(body)
+      .set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(expected);
   });
 });

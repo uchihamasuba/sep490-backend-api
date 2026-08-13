@@ -255,3 +255,39 @@ describe('DELETE /api/v1/deposits/:depositId', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('PUT /api/v1/settlements/:settlementId/mark-paid', () => {
+  it('returns 403 for non-STAFF roles', async () => {
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/mark-paid')
+      .send({ evidenceIds: ['img1.jpg'] })
+      .set('Authorization', authHeader('MANAGER'));
+
+    expect(res.status).toBe(403);
+  });
+
+  it('validates body requiring proofs array', async () => {
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/mark-paid')
+      .send({})
+      .set('Authorization', authHeader('STAFF'));
+
+    expect(res.status).toBe(400);
+  });
+
+  it('calls service markSettlementPaid', async () => {
+    // we need to mock paymentService instead of paymentRepository for this route since it's testing controller/routes
+    // Wait, the routes in this file are tested with the real service but mocked repository!
+    // So let's mock the repo for markSettlementPaid
+    const actualService = jest.requireActual('../payment.service').paymentService;
+    jest.spyOn(actualService, 'markSettlementPaid').mockResolvedValue({} as any);
+
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/mark-paid')
+      .send({ evidenceIds: ['img1.jpg'] })
+      .set('Authorization', authHeader('STAFF'));
+
+    expect(res.status).toBe(200);
+    expect(actualService.markSettlementPaid).toHaveBeenCalledWith('set-1', { evidenceIds: ['img1.jpg'] }, expect.objectContaining({ id: 'user-1' }));
+  });
+});

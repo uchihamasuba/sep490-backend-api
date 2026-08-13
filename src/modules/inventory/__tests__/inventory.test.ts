@@ -47,6 +47,7 @@ jest.mock('../reservation.repository', () => ({
     consumeByOrder: jest.fn(),
     countActiveByOrder: jest.fn(),
     orderWindow: jest.fn(),
+    getRentedByItemForOrder: jest.fn(),
   },
 }));
 
@@ -142,6 +143,7 @@ function fakeReport(overrides: Record<string, unknown> = {}) {
         item: { itemName: 'Loa JBL 1000W', unit: 'Cái' },
       },
     ],
+    evidences: [],
     ...overrides,
   };
 }
@@ -221,6 +223,7 @@ describe('GET /api/v1/inventory/picklist/:orderId', () => {
     ] as never);
     mockedResv.getOnHandNow.mockResolvedValue(8);
     mockedRepo.getExportedQuantity.mockResolvedValue(0);
+    mockedResv.getRentedByItemForOrder.mockResolvedValue(new Map());
 
     const res = await request(app).get('/api/v1/inventory/picklist/order-1').set('Authorization', authHeader('MANAGER'));
 
