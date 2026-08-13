@@ -19,6 +19,7 @@ export interface SurveyReportListItemDTO {
   location: string;
   status: SurveyStatus;
   reportedByName: string;
+  evidenceIds: string[];
 }
 
 export interface SurveyReportDetailDTO extends SurveyReportListItemDTO {
@@ -31,7 +32,6 @@ export interface SurveyReportDetailDTO extends SurveyReportListItemDTO {
   additionalRequests: string | null;
   proposedItems: string | null;
   notes: string | null;
-  evidenceIds: string[];
   confirmedByName: string | null;
   confirmedAt: string | null;
   createdAt: string;
@@ -62,7 +62,8 @@ function mapListItem(row: SurveyReportWithDetails): SurveyReportListItemDTO {
     surveyDate: row.surveyDate.toISOString(),
     location: row.location,
     status: row.status,
-    reportedByName: row.reporter.fullName,
+    reportedByName: row.reporter?.fullName,
+    evidenceIds: row.evidences ? row.evidences.map((e) => e.evidenceId) : [],
   };
 }
 
@@ -78,7 +79,6 @@ function mapDetail(row: SurveyReportWithDetails): SurveyReportDetailDTO {
     additionalRequests: row.additionalRequests,
     proposedItems: row.proposedItems,
     notes: row.notes,
-    evidenceIds: row.evidences ? row.evidences.map((e) => e.evidenceId) : [],
     confirmedByName: row.confirmer?.fullName ?? null,
     confirmedAt: row.confirmedAt ? row.confirmedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
