@@ -411,6 +411,19 @@ export const inventoryRepository = {
         });
         created.push(movement.movementId);
       }
+
+      // Hợp nhất "một đường xuất kho" (Phase 4): lần xuất kho hiện trường này cũng lật cờ mức đơn
+      // orders.pickedUpAt — trước đây chỉ nút web (markPickedUp / exportEquipment) mới set, nên khi Leader
+      // xuất kho thật trên mobile thì trang "Xuất kho & bàn giao" vẫn kẹt "Chưa xuất kho" (đọc pickedUpAt).
+      // updateMany + where pickedUpAt:null ⇒ idempotent: chỉ set ở lần xuất ĐẦU TIÊN, không đè mốc/nguời đã
+      // ghi trước đó (vd đã đánh dấu trên web). Ghi trong CÙNG transaction với OUTBOUND để không lệch.
+      if (created.length > 0) {
+        await tx.order.updateMany({
+          where: { orderId: params.orderId, pickedUpAt: null },
+          data: { pickedUpAt: new Date(), pickedUpBy: params.performedBy },
+        });
+      }
+
       return created;
     }, { isolationLevel: 'ReadCommitted' });
 
