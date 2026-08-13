@@ -26,6 +26,9 @@ export const listInventoryQuerySchema = z.object({
   itemId: z.string().trim().min(1).optional(),
   search: z.string().trim().min(1).optional(),
   date: z.coerce.date().optional(),
+  // Loại trừ reservation của 1 đơn khi tính "đã giữ chỗ" — trang chi tiết đơn truyền orderId của chính nó
+  // để xem khả dụng "cho đơn này" (không tự trừ phần đơn đã giữ). Không truyền = tính toàn hệ thống.
+  excludeOrderId: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(200).default(20),
 });

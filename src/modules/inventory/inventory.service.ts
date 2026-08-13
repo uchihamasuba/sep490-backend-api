@@ -181,7 +181,9 @@ async function listInventory(query: ListInventoryQuery): Promise<{ data: Invento
   // Gộp N+1: thay vì 2 query/dòng (reserved + outstanding), dùng 2 query GROUP BY cho cả trang.
   const itemIds = rows.map((row) => row.itemId);
   const [reservedMap, outstandingMap] = await Promise.all([
-    reservationRepository.getReservedForRangeBatch(itemIds, queryStart, queryEnd),
+    // excludeOrderId: khi trang chi tiết 1 đơn hỏi khả dụng "cho đơn này", loại trừ chính reservation của
+    // đơn đó để không tự trừ phần mình đã giữ (tránh cảnh báo "cần thuê" ảo sau khi CONFIRMED).
+    reservationRepository.getReservedForRangeBatch(itemIds, queryStart, queryEnd, { excludeOrderId: query.excludeOrderId }),
     reservationRepository.getOutstandingOutBatch(itemIds),
   ]);
   const data = rows.map((row) => {

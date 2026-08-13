@@ -81,14 +81,23 @@ async function getReservedForRangeBatch(
   itemIds: string[],
   start: Date,
   end: Date,
-  opts: { statuses?: ReservationStatus[]; tx?: Tx } = {},
+  opts: { statuses?: ReservationStatus[]; excludeOrderId?: string; tx?: Tx } = {},
 ): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   if (itemIds.length === 0) return map;
   const statuses = opts.statuses ?? (['CONFIRMED'] as ReservationStatus[]);
   const rows = await db(opts.tx).inventoryReservation.groupBy({
     by: ['itemId'],
-    where: { itemId: { in: itemIds }, status: { in: statuses }, startAt: { lt: end }, endAt: { gt: start } },
+    where: {
+      itemId: { in: itemIds },
+      status: { in: statuses },
+      startAt: { lt: end },
+      endAt: { gt: start },
+      // Loại trừ reservation của CHÍNH đơn đang xét (xem khả dụng "cho đơn này"): nếu không, đơn đã
+      // CONFIRMED tự giữ chỗ rồi lại bị đếm chính phần đó là "đã bị giữ" ⇒ khả dụng tụt về 0, cảnh báo
+      // "cần thuê" sai (đơn tính reservation của nó chống lại nó). Khớp getReservedForRange đơn lẻ.
+      ...(opts.excludeOrderId ? { orderId: { not: opts.excludeOrderId } } : {}),
+    },
     _sum: { quantity: true },
   });
   for (const r of rows) map.set(r.itemId, r._sum.quantity ?? 0);
