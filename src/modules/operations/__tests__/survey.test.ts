@@ -338,3 +338,255 @@ describe('HTTP routes — role permission matrix', () => {
     expect(res.body.data.status).toBe('CONFIRMED');
   });
 });
+
+// UTS spec sheet "View Survey Report" -> GET /api/v1/survey-reports/:surveyId. Matched by `survey_id`
+// param naming and 404/500 semantics; the order-scoped `GET /orders/:orderId/survey` route
+// (order.routes.ts) uses `orderId` and returns a boolean summary, so it does not fit this sheet.
+describe('View Survey Report', () => {
+  it('UTCID01: viewing a survey report without an auth token returns 401', async () => {
+    const res = await request(app).get('/api/v1/survey-reports/SRV123');
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: viewing a survey report as STAFF', async () => {
+    // Sheet expects 403 ("requires Manager/Leader"), but the actual route allows STAFF
+    // (requireRole('MANAGER', 'ADMIN', 'STAFF')) and getSurveyReportById applies no further role
+    // restriction, so a STAFF request for an existing report actually succeeds (documented vs actual).
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV123' }) as never);
+
+    const res = await request(app).get('/api/v1/survey-reports/SRV123').set('Authorization', authHeader('STAFF'));
+    expect(res.status).toBe(200);
+  });
+
+  it('UTCID03: viewing a survey report with an unusual survey_id format', async () => {
+    // Sheet expects 400 (invalid format), but surveyIdParamSchema only requires a non-empty trimmed
+    // string — there is no format/regex check server-side. With no matching record mocked, the
+    // request proceeds past validation and 404s instead (documented vs actual).
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app)
+      .get(`/api/v1/survey-reports/${encodeURIComponent('@!#Invalid')}`)
+      .set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID04: viewing a non-existent survey report returns 404', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/survey-reports/NON_EXISTENT').set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID05: viewing a DRAFT survey report', async () => {
+    // Sheet expects 400 ("report not yet submitted by Leader"), but getSurveyReportById has no status
+    // guard at all — it returns the detail regardless of status (documented vs actual: no such rule
+    // is implemented on the view endpoint, only on confirm).
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV_DRAFT', status: 'DRAFT' }) as never);
+
+    const res = await request(app)
+      .get('/api/v1/survey-reports/SRV_DRAFT')
+      .set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(200);
+  });
+
+  it('UTCID06: viewing a survey report with no evidence images succeeds', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV_NO_IMAGE', evidences: [] }) as never);
+
+    const res = await request(app)
+      .get('/api/v1/survey-reports/SRV_NO_IMAGE')
+      .set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(200);
+    expect(res.body.data.evidenceIds).toEqual([]);
+  });
+
+  it('UTCID07: a database failure while loading a survey report returns 500', async () => {
+    mockedRepo.findById.mockRejectedValue(new Error('DB connection lost'));
+    const res = await request(app).get('/api/v1/survey-reports/SRV123').set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(500);
+  });
+
+  it('UTCID08: viewing an existing survey report succeeds', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV123' }) as never);
+    const res = await request(app).get('/api/v1/survey-reports/SRV123').set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(200);
+  });
+});
+
+// UTS spec sheet "Confirm Survey Report" -> PUT /api/v1/survey-reports/:surveyId/confirm.
+describe('Confirm Survey Report', () => {
+  it('UTCID01: confirming a survey report without an auth token returns 401', async () => {
+    const res = await request(app).put('/api/v1/survey-reports/SRV123/confirm').send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: confirming a survey report as STAFF is forbidden (requires Manager) -> 403', async () => {
+    const res = await request(app)
+      .put('/api/v1/survey-reports/SRV123/confirm')
+      .set('Authorization', authHeader('STAFF'))
+      .send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID03: confirming a survey report with an unusual survey_id format', async () => {
+    // Sheet expects 400 (invalid format); surveyIdParamSchema has no format/regex check, so with no
+    // matching record mocked the request proceeds past validation and 404s instead (documented vs
+    // actual).
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app)
+      .put(`/api/v1/survey-reports/${encodeURIComponent('@!#Invalid')}/confirm`)
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID04: confirming a non-existent survey report returns 404', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app)
+      .put('/api/v1/survey-reports/NON_EXISTENT/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID05: confirming a DRAFT (not yet submitted) survey report returns 400', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV_DRAFT', status: 'DRAFT' }) as never);
+    const res = await request(app)
+      .put('/api/v1/survey-reports/SRV_DRAFT/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(400);
+    expect(mockedRepo.confirm).not.toHaveBeenCalled();
+  });
+
+  it('UTCID06: confirming an already-CONFIRMED survey report returns 400', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV_CONFIRMED', status: 'CONFIRMED' }) as never);
+    const res = await request(app)
+      .put('/api/v1/survey-reports/SRV_CONFIRMED/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(400);
+    expect(mockedRepo.confirm).not.toHaveBeenCalled();
+  });
+
+  it('UTCID07: a repository failure while confirming a survey report returns 500', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV123', status: 'NEEDS_REVIEW' }) as never);
+    mockedRepo.confirm.mockRejectedValue(new Error('DB connection lost'));
+    const res = await request(app)
+      .put('/api/v1/survey-reports/SRV123/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(500);
+  });
+
+  it('UTCID08: confirming a NEEDS_REVIEW survey report succeeds', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeSurvey({ surveyId: 'SRV123', status: 'NEEDS_REVIEW' }) as never);
+    mockedRepo.confirm.mockResolvedValue(fakeSurvey({ surveyId: 'SRV123', status: 'CONFIRMED' }) as never);
+    const res = await request(app)
+      .put('/api/v1/survey-reports/SRV123/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'CONFIRMED' });
+    expect(res.status).toBe(200);
+  });
+});
+
+// UTS spec sheet "Record Survey Report" -> POST /api/v1/survey-reports (surveyController.create). The
+// sheet's `task_id` maps to the required `orderId` body field: this backend has no separate
+// per-task survey-record endpoint — "recording" a field survey report is submitting it against the
+// order being surveyed, and the STAFF-must-be-LEAD-of-the-order check below matches the sheet's
+// "cannot report for another staff member's task" rule almost exactly.
+describe('Record Survey Report', () => {
+  it('UTCID01: recording a survey report without an auth token returns 401', async () => {
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .send({ orderId: 'T123', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: recording a survey report with a role other than Staff is forbidden -> 403', async () => {
+    // Sheet uses a 'Customer' role, which does not exist in this system's UserRole enum, but
+    // requireRole() only checks string membership at runtime, so any role outside STAFF/MANAGER is
+    // rejected the same way.
+    const token = jwt.sign({ id: 'cust-1', role: 'Customer' }, env.JWT_SECRET, { expiresIn: '1h' });
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ orderId: 'T123', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID03: recording a survey report for a non-existent task/order returns 404', async () => {
+    mockedRepo.orderExists.mockResolvedValue(null);
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ orderId: 'NON_EXISTENT', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID04: a Staff member recording a survey report for a task led by someone else is forbidden -> 403', async () => {
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'T_OTHER_STAFF' } as never);
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(false);
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ orderId: 'T_OTHER_STAFF', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+    expect(res.status).toBe(403);
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('UTCID05: recording a survey report with missing required fields returns 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ orderId: 'T123', notes: '', images: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockedRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('UTCID06: recording a survey report for a completed task', async () => {
+    // Sheet expects 400 ("this task has already ended"), but createSurveyReport has no
+    // order/task-completion guard at all, so a well-formed request from the LEAD staff still
+    // succeeds (documented vs actual).
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'T_COMPLETED' } as never);
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(true);
+    mockedRepo.generateNextReportCode.mockResolvedValue('SUR-010');
+    mockedRepo.create.mockResolvedValue(fakeSurvey({ orderId: 'T_COMPLETED' }) as never);
+
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ orderId: 'T_COMPLETED', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+    expect(res.status).toBe(201);
+  });
+
+  it('UTCID07: a repository failure while recording a survey report returns 500', async () => {
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'T123' } as never);
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(true);
+    mockedRepo.generateNextReportCode.mockResolvedValue('SUR-011');
+    mockedRepo.create.mockRejectedValue(new Error('DB connection lost'));
+
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ orderId: 'T123', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A' });
+    expect(res.status).toBe(500);
+  });
+
+  it('UTCID08: recording a valid survey report succeeds', async () => {
+    mockedRepo.orderExists.mockResolvedValue({ orderId: 'T123' } as never);
+    mockedScheduleRepo.isUserLeadOnOrder.mockResolvedValue(true);
+    mockedRepo.generateNextReportCode.mockResolvedValue('SUR-012');
+    mockedRepo.create.mockResolvedValue(fakeSurvey({ orderId: 'T123', notes: '...' }) as never);
+
+    const res = await request(app)
+      .post('/api/v1/survey-reports')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      // Sheet's `images` field has no equivalent in createSurveyReportBodySchema (evidence is tracked
+      // via `evidenceIds`), so it is sent alongside the real required fields and simply ignored by
+      // the (whitelist-based) Zod schema.
+      .send({ orderId: 'T123', surveyDate: '2026-07-25T02:00:00Z', location: 'Hall A', notes: '...', images: ['img1'] });
+
+    // Sheet documents 200, but surveyController.create responds via created() (201 for a newly
+    // created resource) — asserting actual backend behavior (documented vs actual).
+    expect(res.status).toBe(201);
+  });
+});

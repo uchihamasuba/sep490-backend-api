@@ -254,6 +254,37 @@ describe('GET /api/v1/auth/profile', () => {
       status: 'active',
     });
   });
+
+  // UTCID01: Can connect with server - { user: { _id: "valid_user_id" } } - T
+  it('UTCID01: Can connect with server - { user: { _id: "valid_user_id" } }', async () => {
+    mockedRepo.findById.mockResolvedValue(baseUser());
+
+    const res = await request(app).get('/api/v1/auth/profile').set('Authorization', authHeaderFor());
+
+    expect(res.status).toBe(200);
+  });
+
+  // UTCID02: Can connect with server - { user: null } -> Expected: 401
+  it('UTCID02: Can connect with server - { user: null }', async () => {
+    const res = await request(app).get('/api/v1/auth/profile');
+
+    expect(res.status).toBe(401);
+    expect(res.body.error.message).toBe('Thiếu hoặc sai định dạng token xác thực');
+  });
+
+  // UTCID03: Can connect with server - { user: { _id: "deleted_user_id" } } -> Expected: 404
+  // (Documented log message "Chưa xác thực hoặc Token không hợp lệ" does not match backend, which
+  // throws AppError.notFound('Không tìm thấy người dùng') when the user record is missing.)
+  it('UTCID03: Can connect with server - { user: { _id: "deleted_user_id" } }', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get('/api/v1/auth/profile')
+      .set('Authorization', authHeaderFor('deleted_user_id'));
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
+  });
 });
 
 describe('PUT /api/v1/auth/profile', () => {

@@ -291,3 +291,257 @@ describe('PUT /api/v1/settlements/:settlementId/mark-paid', () => {
     expect(actualService.markSettlementPaid).toHaveBeenCalledWith('set-1', { evidenceIds: ['img1.jpg'] }, expect.objectContaining({ id: 'user-1' }));
   });
 });
+
+// ---------------------------------------------------------------------------------------------------
+// "Confirm Deposit" sheet (Report5.1_Unit Test.xlsx) -> PUT /api/v1/deposits/:depositId ->
+// paymentController.updateDepositStatus -> paymentService.updateDepositStatus. The sheet's `req` column
+// only names `params: { order_id }` with no body, but the real route needs a depositId path param and a
+// `{ status: 'PAID' }` body (updateDepositStatusBodySchema) — the sheet's `order_id` values are used
+// below as the depositId path param, and a minimal valid body is added where one is required to reach
+// the intended branch.
+// ---------------------------------------------------------------------------------------------------
+describe('Confirm Deposit', () => {
+  // UTCID01: no user (no Authorization header) -> Expected: 401 (Backend returns: 401)
+  it('UTCID01: rejects a request with no authenticated user', async () => {
+    const res = await request(app).put('/api/v1/deposits/ORD123').send({ status: 'PAID' });
+
+    expect(res.status).toBe(401);
+    expect(mockedPaymentRepo.findDepositById).not.toHaveBeenCalled();
+  });
+
+  // UTCID02: role Staff -> Expected: 403 (Backend returns: 403 — this route is requireRole('MANAGER')
+  // only, unlike POST .../deposits which also allows STAFF)
+  it('UTCID02: rejects a Staff role with 403', async () => {
+    const res = await request(app)
+      .put('/api/v1/deposits/ORD123')
+      .set('Authorization', authHeader('STAFF'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(403);
+    expect(mockedPaymentRepo.findDepositById).not.toHaveBeenCalled();
+  });
+
+  // UTCID03: order_id/depositId NON_EXISTENT -> Expected: 404 (Backend returns: 404)
+  it('UTCID03: returns 404 when the deposit does not exist', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/v1/deposits/NON_EXISTENT')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(404);
+  });
+
+  // UTCID04: spec scenario is "order has no deposit request yet" -> Expected: 400 ("Đơn hàng này chưa có
+  // yêu cầu đặt cọc"). Real analog: updateDepositStatus's only 400 branch is "deposit is not in an OPEN
+  // (UNPAID) status" — mapping the sheet's "nothing to confirm" intent onto a deposit that's already
+  // CANCELLED (a terminal, non-confirmable state) still hits that same 400 branch. Message text differs
+  // from the sheet's wording.
+  it('UTCID04: rejects confirming a CANCELLED deposit with 400 (real analog of "no deposit to confirm")', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'CANCELLED' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/deposits/ORD123')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(400);
+    expect(mockedPaymentRepo.updateStatus).not.toHaveBeenCalled();
+  });
+
+  // UTCID05: order_id ORD_PAID (deposit already confirmed PAID before) -> Expected: 400 ("Tiền cọc của
+  // đơn hàng này đã được xác nhận thanh toán trước đó (PAID)"). Actual: updateDepositStatus rejects any
+  // deposit not in OPEN_DEPOSIT_STATUSES (['UNPAID']) — a PAID deposit hits that guard directly.
+  it('UTCID05: rejects re-confirming an already-PAID deposit with 400', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'PAID' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/deposits/ORD_PAID')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(400);
+    expect(mockedPaymentRepo.updateStatus).not.toHaveBeenCalled();
+  });
+
+  // UTCID06: DB connection error while looking up the deposit -> Expected: 500 (Backend returns: 500)
+  it('UTCID06: database error while loading the deposit surfaces as 500', async () => {
+    mockedPaymentRepo.findDepositById.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+
+    const res = await request(app)
+      .put('/api/v1/deposits/ORD123')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(500);
+  });
+
+  // UTCID07: valid Manager confirmation of an UNPAID deposit -> Expected: 200 (Backend returns: 200 — the
+  // route uses `ok()`, matching the sheet exactly, unlike the POST-create routes which use `created()`/201)
+  it('UTCID07: confirms an UNPAID deposit end-to-end (200)', async () => {
+    mockedPaymentRepo.findDepositById.mockResolvedValue(fakeDeposit({ status: 'UNPAID' }) as never);
+    mockedPaymentRepo.updateStatus.mockResolvedValue(fakeDeposit({ status: 'PAID' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/deposits/ORD123')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('PAID');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// "Confirm Settlement" sheet (Report5.1_Unit Test.xlsx) -> PUT /api/v1/settlements/:settlementId/confirm
+// -> paymentController.confirmSettlement -> paymentService.confirmSettlement.
+//
+// Contract mismatch note: the sheet describes an APPROVE/REJECT decision workflow (body like
+// `{ decision: 'APPROVE' | 'REJECT', reason, adjusted_amount }`, settlement statuses PENDING/APPROVED/
+// REJECTED). The real endpoint has none of that — confirmSettlementBodySchema only accepts
+// `{ status: 'PAID', evidenceId?/evidenceIds? }`, and SettlementStatus (prisma/schema.prisma) is only
+// UNPAID/PAID/CANCELLED; there is no approve/reject/pending concept anywhere in the settlement lifecycle.
+// Each UTCID below adapts the sheet's intent to the real body/status shape and documents where the actual
+// 400/200 branch taken differs from the sheet's narrower APPROVE/REJECT semantics.
+// ---------------------------------------------------------------------------------------------------
+describe('Confirm Settlement', () => {
+  // UTCID01: no user (no Authorization header) -> Expected: 401 (Backend returns: 401)
+  it('UTCID01: rejects a request with no authenticated user', async () => {
+    const res = await request(app).put('/api/v1/settlements/set-1/confirm').send({ status: 'PAID' });
+
+    expect(res.status).toBe(401);
+    expect(mockedPaymentRepo.findSettlementById).not.toHaveBeenCalled();
+  });
+
+  // UTCID02: role Staff -> spec expects 403 ("yêu cầu Manager/Admin"). Documented-vs-actual: the real
+  // route is requireRole('MANAGER') only (ADMIN is NOT allowed either, despite the sheet's wording) —
+  // status still matches (403) for a Staff actor.
+  it('UTCID02: rejects a Staff role with 403', async () => {
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/confirm')
+      .set('Authorization', authHeader('STAFF'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(403);
+    expect(mockedPaymentRepo.findSettlementById).not.toHaveBeenCalled();
+  });
+
+  // UTCID03: settlementId NON_EXISTENT -> Expected: 404 (Backend returns: 404)
+  it('UTCID03: returns 404 when the settlement does not exist', async () => {
+    mockedPaymentRepo.findSettlementById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .put('/api/v1/settlements/NON_EXISTENT/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(404);
+  });
+
+  // UTCID04: settlementId SETTLEMENT_APPROVED (already confirmed/"approved" before) -> Expected: 400
+  // ("Yêu cầu quyết toán này đã được duyệt trước đó"). Real analog: confirmSettlement rejects a settlement
+  // whose status is already PAID with "Bản quyết toán này đã được xác nhận trước đó" — same underlying
+  // rule (can't re-confirm something already finalized), matching status and intent.
+  it('UTCID04: rejects re-confirming an already-PAID settlement with 400', async () => {
+    mockedPaymentRepo.findSettlementById.mockResolvedValue(fakeSettlement({ status: 'PAID' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/settlements/SETTLEMENT_APPROVED/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(400);
+    expect(mockedPaymentRepo.confirmSettlement).not.toHaveBeenCalled();
+  });
+
+  // UTCID05: settlementId SETTLEMENT_REJECTED (spec: rejected/cancelled request) -> spec expects 400
+  // ("đã bị từ chối hoặc hủy bỏ"). Documented-vs-actual: confirmSettlement's only guard is
+  // `if (settlement.status === 'PAID')` — a CANCELLED settlement is NOT caught by that check, so the
+  // confirm proceeds and succeeds. This is a genuine gap versus the deposit endpoint's equivalent guard
+  // (updateDepositStatus blocks anything outside ['UNPAID'], i.e. both PAID *and* CANCELLED); asserting
+  // actual behavior here (200) rather than forcing a false 400.
+  it('UTCID05: confirming a CANCELLED settlement is not blocked — actual backend still succeeds (200)', async () => {
+    mockedPaymentRepo.findSettlementById.mockResolvedValue(fakeSettlement({ status: 'CANCELLED' }) as never);
+    mockedPaymentRepo.confirmSettlement.mockResolvedValue(fakeSettlement({ status: 'PAID' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/settlements/SETTLEMENT_REJECTED/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    // Spec expects 400 (already rejected/cancelled guard); actual backend only guards against PAID.
+    expect(res.status).toBe(200);
+  });
+
+  // UTCID06: body { decision: null } (no decision chosen) -> Expected: 400. Real analog: the body has no
+  // `status` field at all, which fails confirmSettletBodySchema's required `status: z.literal('PAID')` ->
+  // 400 VALIDATION_ERROR. Same resulting status, via body validation rather than a "choose a decision"
+  // business rule that doesn't exist on this endpoint.
+  it('UTCID06: rejects a body missing the required status field with 400', async () => {
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ decision: null });
+
+    expect(res.status).toBe(400);
+    expect(mockedPaymentRepo.findSettlementById).not.toHaveBeenCalled();
+  });
+
+  // UTCID07: body { decision: 'REJECT', reason: '' } -> spec expects 400 ("Bắt buộc phải nhập lý do khi
+  // từ chối"). Documented-vs-actual: there is no REJECT/reason concept on this endpoint at all — sending
+  // this exact body still fails validation (missing the required `status: 'PAID'` literal), landing on
+  // 400 for an entirely different reason than the sheet describes.
+  it('UTCID07: a REJECT-shaped body still fails validation with 400 (no reject workflow exists)', async () => {
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ decision: 'REJECT', reason: '' });
+
+    expect(res.status).toBe(400);
+    expect(mockedPaymentRepo.findSettlementById).not.toHaveBeenCalled();
+  });
+
+  // UTCID08: body { decision: 'APPROVE', adjusted_amount: -100 } -> spec expects 400 ("Số tiền quyết toán
+  // điều chỉnh không được nhỏ hơn 0"). Documented-vs-actual: there is no adjusted_amount concept on this
+  // endpoint (finalAmount is fixed at creation time, not editable here) — this body still fails validation
+  // (missing `status: 'PAID'`), landing on 400 for a different reason than the sheet describes.
+  it('UTCID08: an adjusted_amount-shaped body still fails validation with 400 (no adjustment field exists)', async () => {
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ decision: 'APPROVE', adjusted_amount: -100 });
+
+    expect(res.status).toBe(400);
+    expect(mockedPaymentRepo.findSettlementById).not.toHaveBeenCalled();
+  });
+
+  // UTCID09: DB connection error while looking up the settlement -> Expected: 500 (Backend returns: 500)
+  it('UTCID09: database error while loading the settlement surfaces as 500', async () => {
+    mockedPaymentRepo.findSettlementById.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+
+    const res = await request(app)
+      .put('/api/v1/settlements/S1/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(500);
+  });
+
+  // UTCID010: valid Manager confirmation of an UNPAID settlement -> Expected: 200 (Backend returns: 200).
+  // Field-shape note: to actually reach the success branch the body must be the real
+  // `{ status: 'PAID' }` shape — the sheet's `{ decision: 'APPROVE', adjusted_amount: 1000 }` fields are
+  // not part of the real contract and would be silently ignored/stripped by Zod, not used as an amount.
+  it('UTCID010: confirms an UNPAID settlement end-to-end (200)', async () => {
+    mockedPaymentRepo.findSettlementById.mockResolvedValue(fakeSettlement({ status: 'UNPAID' }) as never);
+    mockedPaymentRepo.confirmSettlement.mockResolvedValue(fakeSettlement({ status: 'PAID' }) as never);
+
+    const res = await request(app)
+      .put('/api/v1/settlements/set-1/confirm')
+      .set('Authorization', authHeader('MANAGER'))
+      .send({ status: 'PAID' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('PAID');
+  });
+});

@@ -5,6 +5,7 @@ import { env } from '../../../config/env';
 import { scheduleRepository } from '../schedule.repository';
 import { scheduleService } from '../schedule.service';
 import type { Actor } from '../schedule.service';
+import { inventoryRepository } from '../../inventory/inventory.repository';
 
 jest.mock('../schedule.repository', () => ({
   scheduleRepository: {
@@ -29,10 +30,40 @@ jest.mock('../schedule.repository', () => ({
   },
 }));
 
+// Used by the "Confirm Warehouse Check-out" HTTP block below (recordWarehouseMovement delegates to
+// inventoryService.recordFieldOutbound, which reads items via inventoryRepository). Keep the real
+// InsufficientFieldStockError export so the service's `err instanceof InsufficientFieldStockError`
+// branch (-> 400) can still be exercised.
+jest.mock('../../inventory/inventory.repository', () => {
+  const actual = jest.requireActual('../../inventory/inventory.repository');
+  return {
+    ...actual,
+    inventoryRepository: {
+      itemExists: jest.fn(),
+      recordFieldOutbound: jest.fn(),
+    },
+  };
+});
+
+// recordFieldOutbound fires a fire-and-forget notification broadcast; mock it out so tests don't touch
+// real DB/FCM calls via an unawaited promise.
+jest.mock('../../shared/notification.service', () => ({
+  notificationService: { broadcastToPrivilegedUsers: jest.fn().mockResolvedValue(undefined) },
+}));
+
 const mockedRepo = scheduleRepository as jest.Mocked<typeof scheduleRepository>;
+const mockedInventoryRepo = inventoryRepository as jest.Mocked<typeof inventoryRepository>;
 
 function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF', userId = 'user-1') {
   const token = jwt.sign({ id: userId, role }, env.JWT_SECRET, { expiresIn: '1h' });
+  return `Bearer ${token}`;
+}
+
+// The sheet uses a "Customer" role that doesn't exist in this backend's UserRole enum (ADMIN/MANAGER/
+// STAFF only) — simulated the same way src/modules/operations/__tests__/survey.test.ts does: sign a
+// token with a role string outside the allow-list.
+function customerAuthHeader(userId = 'cust-1') {
+  const token = jwt.sign({ id: userId, role: 'CUSTOMER' }, env.JWT_SECRET, { expiresIn: '1h' });
   return `Bearer ${token}`;
 }
 
@@ -611,5 +642,116 @@ describe('PATCH /api/v1/schedule-plans/batch/status', () => {
       .send({ planIds: ['plan-1'], status: 'CANCELLED' });
 
     expect(res.status).toBe(403);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Real HTTP coverage for Report5.1_Unit Test.xlsx sheet "Confirm Warehouse
+// Check-out" (uts_full.json). Maps to scheduleController.recordWarehouseMovement
+// (POST /schedule-plans/:planId/warehouse-movement), which delegates to
+// inventoryService.recordFieldOutbound (docs/api/api.md gap (g)). There's no
+// separate "pick list" resource in this backend — the sheet's `pick_list_id`
+// corresponds to the schedule plan's `planId` here; the Leader records
+// field-outbound items directly against the plan.
+// ---------------------------------------------------------------------------
+describe('POST /api/v1/schedule-plans/:planId/warehouse-movement — HTTP coverage for "Confirm Warehouse Check-out"', () => {
+  const items = [{ itemId: 'item-1', quantity: 2 }];
+
+  it('UTCID01: no token -> 401 Unauthorized', async () => {
+    const res = await request(app).post('/api/v1/schedule-plans/PL123/warehouse-movement').send({ items });
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: non-Staff role (Customer) -> 403 Forbidden (requireRole STAFF gate)', async () => {
+    const res = await request(app)
+      .post('/api/v1/schedule-plans/PL123/warehouse-movement')
+      .set('Authorization', customerAuthHeader())
+      .send({ items });
+
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID03: non-existent pick_list_id (planId) -> 404 Not Found (message differs from doc)', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+
+    const res = await request(app)
+      .post('/api/v1/schedule-plans/NON_EXISTENT/warehouse-movement')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ items });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID04: caller is not the LEAD assignee of the plan -> 403 Forbidden (real message match)', async () => {
+    mockedRepo.findById.mockResolvedValue(
+      fakePlan({}, [fakeAssignee({ userId: 'other-lead', role: 'LEAD' })]) as never,
+    );
+
+    const res = await request(app)
+      .post('/api/v1/schedule-plans/PL_OTHER_STAFF/warehouse-movement')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ items });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.message).toBe('Chỉ Leader giữ vai trò LEAD trong kế hoạch này mới được ghi nhận xuất kho');
+  });
+
+  // Documented: re-confirming an already-recorded pick list -> 400 "already recorded". Actual: there is
+  // no such idempotency guard in recordFieldOutbound at all — the real 400 branch is insufficient field
+  // stock (InsufficientFieldStockError). Used here to reach a genuine 400 from this endpoint.
+  it('UTCID05: insufficient field stock -> 400 Bad Request (documented reason differs from actual)', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({}, [fakeAssignee({ userId: 'S1', role: 'LEAD' })]) as never);
+    mockedInventoryRepo.itemExists.mockResolvedValue({ itemId: 'item-1', itemName: 'May chieu' } as never);
+    mockedInventoryRepo.recordFieldOutbound.mockRejectedValue(
+      new (jest.requireActual('../../inventory/inventory.repository').InsufficientFieldStockError)('item-1', 1, 2),
+    );
+
+    const res = await request(app)
+      .post('/api/v1/schedule-plans/PL_ALREADY_OUT/warehouse-movement')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ items });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('UTCID06: repository throws a DB error -> 500 Internal Server Error', async () => {
+    mockedRepo.findById.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+
+    const res = await request(app)
+      .post('/api/v1/schedule-plans/PL123/warehouse-movement')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ items });
+
+    expect(res.status).toBe(500);
+    expect(res.body.error.message).toBe('Lỗi kết nối cơ sở dữ liệu');
+  });
+
+  // Documented expected_status is 200. Actual: POST endpoints in this backend that create a resource use
+  // the `created()` response helper -> 201, not 200 (documented vs actual REST convention).
+  it('UTCID07: valid warehouse check-out -> actual backend returns 201 Created, not the documented 200', async () => {
+    mockedRepo.findById.mockResolvedValue(fakePlan({}, [fakeAssignee({ userId: 'S1', role: 'LEAD' })]) as never);
+    mockedInventoryRepo.itemExists.mockResolvedValue({ itemId: 'item-1', itemName: 'May chieu' } as never);
+    mockedInventoryRepo.recordFieldOutbound.mockResolvedValue([
+      {
+        movementId: 'mv-1',
+        itemId: 'item-1',
+        item: { itemName: 'May chieu', unit: 'cai' },
+        orderId: 'ord-1',
+        reportId: null,
+        movementType: 'FIELD_OUTBOUND',
+        quantity: 2,
+        performer: { userId: 'S1', fullName: 'Nhan Vien S1' },
+        notes: null,
+        createdAt: new Date('2026-08-14T08:00:00Z'),
+      },
+    ] as never);
+
+    const res = await request(app)
+      .post('/api/v1/schedule-plans/PL123/warehouse-movement')
+      .set('Authorization', authHeader('STAFF', 'S1'))
+      .send({ items });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data[0].itemId).toBe('item-1');
   });
 });

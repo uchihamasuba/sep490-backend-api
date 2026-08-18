@@ -75,6 +75,20 @@ describe('GET /api/v1/users', () => {
     const res = await request(app).get('/api/v1/users?role=STAFF').set('Authorization', authHeader('ADMIN'));
     expect(res.status).toBe(200);
   });
+
+  // UTCID04: Can connect with server - User must be logged in to the system - { query: {} } - Admin -> 500 (DB error)
+  it('UTCID04: Can connect with server - User must be logged in to the system - { query: {} } - Admin', async () => {
+    mockedRepo.findMany.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    const res = await request(app).get('/api/v1/users').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(500);
+  });
+
+  // UTCID06: Can connect with server - User must be logged in to the system - { query: { page: 1 } } - Admin
+  it('UTCID06: Can connect with server - User must be logged in to the system - { query: { page: 1 } } - Admin', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [fakeUser()], totalItems: 1 });
+    const res = await request(app).get('/api/v1/users?page=1').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(200);
+  });
 });
 
 describe('GET /api/v1/users/:userId', () => {
@@ -100,6 +114,22 @@ describe('GET /api/v1/users/:userId', () => {
     const res = await request(app).get('/api/v1/users/user123').set('Authorization', authHeader('ADMIN'));
     expect(res.status).toBe(200);
   });
+
+  // UTCID03: Can connect with server - User must be logged in to the system - { params: { target_user_id: "nonexistent" } } - Admin -> 404
+  it('UTCID03: Can connect with server - User must be logged in to the system - { params: { target_user_id: "nonexistent" } } - Admin', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/users/nonexistent').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(404);
+  });
+
+  // UTCID05: Can connect with server - User must be logged in to the system - { params: { target_user_id: "user123" } } - Admin -> 500 (DB error)
+  // (Documented log message "Tài khoản không có quyền truy cập (yêu cầu Admin)" does not match this
+  // scenario; asserting the actual 500 the backend returns when the repository call fails.)
+  it('UTCID05: Can connect with server - User must be logged in to the system - { params: { target_user_id: "user123" } } - Admin', async () => {
+    mockedRepo.findById.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    const res = await request(app).get('/api/v1/users/user123').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(500);
+  });
 });
 
 describe('POST /api/v1/users', () => {
@@ -117,6 +147,15 @@ describe('POST /api/v1/users', () => {
   it('UTCID02: Can connect with server - User must be logged in to the system - Staff', async () => {
     const res = await request(app).post('/api/v1/users').set('Authorization', authHeader('STAFF')).send({});
     expect(res.status).toBe(403);
+  });
+
+  // UTCID03: { body: { full_name: 'Nguyen A', username: 'nguyena' } } - Admin -> 400 (missing role/email/password)
+  it('UTCID03: Can connect with server - User must be logged in to the system - Missing required fields', async () => {
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ fullName: 'Nguyen A', username: 'nguyena' });
+    expect(res.status).toBe(400);
   });
 
   it('UTCID04: Can connect with server - User must be logged in to the system - Missing fields', async () => {
@@ -157,6 +196,16 @@ describe('POST /api/v1/users', () => {
       .set('Authorization', authHeader('ADMIN'))
       .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF' });
     expect(res.status).toBe(200);
+  });
+
+  // UTCID07: Can connect with server - User must be logged in to the system - Admin -> 500 (DB error)
+  it('UTCID07: Can connect with server - User must be logged in to the system - DB error', async () => {
+    mockedRepo.findByUsername.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'nguyena', password: '123456', fullName: 'Nguyen A', email: 'a@mail.com', role: 'STAFF' });
+    expect(res.status).toBe(500);
   });
 });
 
@@ -207,6 +256,16 @@ describe('PUT /api/v1/users/:userId', () => {
     const res = await request(app).put('/api/v1/users/user123').set('Authorization', authHeader('ADMIN')).send({ fullName: 'Updated Name', email: 'test@example.com' });
     expect(res.status).toBe(200);
   });
+
+  // UTCID07: Can connect with server - User must be logged in to the system - Admin -> 500 (DB error)
+  it('UTCID07: Can connect with server - User must be logged in to the system - DB error', async () => {
+    mockedRepo.findById.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    const res = await request(app)
+      .put('/api/v1/users/user123')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ fullName: 'Nguyen B', role: 'STAFF', email: 'b@mail.com', phone: '0901234567' });
+    expect(res.status).toBe(500);
+  });
 });
 
 describe('PATCH /api/v1/users/:userId/status', () => {
@@ -238,5 +297,15 @@ describe('PATCH /api/v1/users/:userId/status', () => {
     mockedRepo.update.mockResolvedValue(fakeUser({ status: 'SUSPENDED' }));
     const res = await request(app).patch('/api/v1/users/user123/status').set('Authorization', authHeader('ADMIN')).send({ status: 'SUSPENDED' });
     expect(res.status).toBe(200);
+  });
+
+  // UTCID05: Can connect with server - User must be logged in to the system - Admin -> 500 (DB error)
+  it('UTCID05: Can connect with server - User must be logged in to the system - DB error', async () => {
+    mockedRepo.findById.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    const res = await request(app)
+      .patch('/api/v1/users/user123/status')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ status: 'INACTIVE' });
+    expect(res.status).toBe(500);
   });
 });

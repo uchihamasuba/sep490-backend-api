@@ -7,6 +7,7 @@ import { customerRepository } from '../customer.repository';
 import { computeOrderLines, computeOrderTotal, orderRepository } from '../order.repository';
 import { orderService } from '../order.service';
 import { quotationRepository } from '../quotation.repository';
+import { reservationRepository } from '../../inventory/reservation.repository';
 
 jest.mock('../customer.repository', () => ({
   customerRepository: { findById: jest.fn() },
@@ -53,6 +54,7 @@ jest.mock('../order.repository', () => {
 const mockedCustomerRepo = customerRepository as jest.Mocked<typeof customerRepository>;
 const mockedQuotationRepo = quotationRepository as jest.Mocked<typeof quotationRepository>;
 const mockedOrderRepo = orderRepository as jest.Mocked<typeof orderRepository>;
+const mockedReservationRepo = reservationRepository as jest.Mocked<typeof reservationRepository>;
 
 
 
@@ -441,5 +443,332 @@ describe('HTTP routes', () => {
     expect(res.status).toBe(200);
     expect(res.body.data).toMatchObject({ orderId: 'ord-1', totalAmount: 1_000_000 });
     expect(res.body.data.items[0]).toMatchObject({ itemName: 'Loa JBL 1000W', unit: 'Cái', subtotal: 1_000_000 });
+  });
+});
+
+describe('GET /api/v1/orders (View Order List)', () => {
+  it('UTCID01: rejects unauthenticated requests with 401', async () => {
+    const res = await request(app).get('/api/v1/orders');
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: is forbidden for Staff (route requires Manager/Admin)', async () => {
+    const res = await request(app).get('/api/v1/orders').set('Authorization', authHeader('STAFF'));
+    expect(res.status).toBe(403);
+  });
+
+  // Sheet's query key is `status`, but the real schema field is `orderStatus` (listOrdersQuerySchema).
+  // Using the real field name here so the invalid-value rejection is genuinely exercised end-to-end
+  // instead of silently being stripped as an unknown key by zod.
+  it('UTCID03: rejects an invalid orderStatus filter with 400', async () => {
+    const res = await request(app)
+      .get('/api/v1/orders')
+      .query({ orderStatus: 'INVALID_STATUS' })
+      .set('Authorization', authHeader());
+
+    expect(res.status).toBe(400);
+    expect(mockedOrderRepo.findMany).not.toHaveBeenCalled();
+  });
+
+  it('UTCID04: surfaces a repository failure as 500', async () => {
+    mockedOrderRepo.findMany.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    mockedOrderRepo.countByStatusGlobal.mockResolvedValue({
+      all: 0,
+      new: 0,
+      confirmed: 0,
+      inProgress: 0,
+      completed: 0,
+      cancelled: 0,
+    });
+
+    const res = await request(app).get('/api/v1/orders').set('Authorization', authHeader());
+    expect(res.status).toBe(500);
+  });
+
+  it('UTCID05: returns 200 with an empty list when the search term matches nothing', async () => {
+    mockedOrderRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 } as never);
+    mockedOrderRepo.countByStatusGlobal.mockResolvedValue({
+      all: 0,
+      new: 0,
+      confirmed: 0,
+      inProgress: 0,
+      completed: 0,
+      cancelled: 0,
+    });
+
+    const res = await request(app)
+      .get('/api/v1/orders')
+      .query({ search: 'MADON_AO123' })
+      .set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([]);
+  });
+
+  // Sheet's `status: 'PENDING'` isn't a valid orderStatus value (real enum: NEW/CONFIRMED/IN_PROGRESS/
+  // COMPLETED/CANCELLED) — substituting a valid status so the "filter finds matches" success path is real.
+  it('UTCID06: returns 200 with matching rows when filtered by a valid orderStatus', async () => {
+    mockedOrderRepo.findMany.mockResolvedValue({
+      rows: [
+        {
+          orderId: 'ord-9',
+          orderCode: 'ORD-009',
+          customerId: 'cus-1',
+          eventType: 'Conference',
+          eventName: 'Tech Summit',
+          eventDate: new Date('2026-08-15T09:00:00Z'),
+          location: 'Hall A',
+          guestCount: 10,
+          totalAmount: 100000,
+          paymentStatus: 'UNPAID',
+          orderStatus: 'NEW',
+          createdAt: new Date('2026-07-19T09:47:37.000Z'),
+          customer: { customerName: 'Nguyễn Minh Trí', phone: '0910000000' },
+        },
+      ],
+      totalItems: 1,
+    } as never);
+    mockedOrderRepo.countByStatusGlobal.mockResolvedValue({
+      all: 1,
+      new: 1,
+      confirmed: 0,
+      inProgress: 0,
+      completed: 0,
+      cancelled: 0,
+    });
+
+    const res = await request(app)
+      .get('/api/v1/orders')
+      .query({ orderStatus: 'NEW' })
+      .set('Authorization', authHeader());
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(1);
+    expect(res.body.data[0]).toMatchObject({ orderId: 'ord-9', orderStatus: 'NEW' });
+  });
+});
+
+// "Track Order Status" (separate UT sheet, method `trackOrderStatus`) has no distinct route in
+// order.routes.ts — it describes the exact same request shape (params.order_id, same role/error cases)
+// as "View Order Details", both hitting GET /:orderId. Rather than duplicating 6 identical scenarios,
+// this single describe block covers both sheets' UTCIDs together.
+describe('GET /api/v1/orders/:orderId (View Order Details & Track Order Status)', () => {
+  // Sheet's `order_id: null` can't be sent as a literal empty path segment (Express wouldn't route to
+  // `/:orderId` at all — it would 404 on no matching route). A whitespace-only segment reaches the same
+  // real validation failure instead (orderIdParamSchema: `z.string().trim().min(1, ...)`).
+  it('UTCID01: rejects a blank order_id with 400', async () => {
+    const res = await request(app).get('/api/v1/orders/%20').set('Authorization', authHeader());
+    expect(res.status).toBe(400);
+    expect(mockedOrderRepo.findById).not.toHaveBeenCalled();
+  });
+
+  it('UTCID02: rejects unauthenticated requests with 401', async () => {
+    const res = await request(app).get('/api/v1/orders/ORD123');
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID03: returns 404 for a non-existent order', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/orders/NON_EXISTENT').set('Authorization', authHeader());
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID04: is forbidden for Staff (route requires Manager/Admin)', async () => {
+    const res = await request(app).get('/api/v1/orders/ORD123').set('Authorization', authHeader('STAFF'));
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID05: surfaces a repository failure as 500', async () => {
+    mockedOrderRepo.findById.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    const res = await request(app).get('/api/v1/orders/ORD123').set('Authorization', authHeader());
+    expect(res.status).toBe(500);
+  });
+
+  it('UTCID06: returns 200 with the mapped order detail', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(
+      buildOrderRow({ orderId: 'ORD123', items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100000 }] }) as never,
+    );
+    const res = await request(app).get('/api/v1/orders/ORD123').set('Authorization', authHeader());
+    expect(res.status).toBe(200);
+    expect(res.body.data.orderId).toBe('ORD123');
+  });
+});
+
+// "Cancel Order" — cancelling isn't a dedicated DELETE endpoint here (DELETE /:orderId is a hard delete
+// restricted to NEW/CANCELLED orders — a different guard/DELETABLE_STATUSES). The real "hủy đơn hàng"
+// action matching the sheet's error message ("không thể hủy đơn đã hoàn thành/đã hủy") is the status
+// transition PUT /:orderId/status with { orderStatus: 'CANCELLED', cancelReason }.
+describe('PUT /api/v1/orders/:orderId/status (Cancel Order)', () => {
+  it('UTCID01: rejects unauthenticated requests with 401', async () => {
+    const res = await request(app)
+      .put('/api/v1/orders/ORD123/status')
+      .send({ orderStatus: 'CANCELLED', cancelReason: 'Khách hủy sự kiện' });
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: is forbidden for Staff (route requires Manager)', async () => {
+    const res = await request(app)
+      .put('/api/v1/orders/ORD123/status')
+      .set('Authorization', authHeader('STAFF'))
+      .send({ orderStatus: 'CANCELLED', cancelReason: 'Khách hủy sự kiện' });
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID03: returns 404 when the order does not exist', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(null);
+    const res = await request(app)
+      .put('/api/v1/orders/NON_EXISTENT/status')
+      .set('Authorization', authHeader())
+      .send({ orderStatus: 'CANCELLED', cancelReason: 'Khách hủy sự kiện' });
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID04: rejects cancelling an already-terminal (COMPLETED) order with 400', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(
+      buildOrderRow({
+        orderId: 'ORD_COMPLETED',
+        orderStatus: 'COMPLETED',
+        items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100000 }],
+      }) as never,
+    );
+    const res = await request(app)
+      .put('/api/v1/orders/ORD_COMPLETED/status')
+      .set('Authorization', authHeader())
+      .send({ orderStatus: 'CANCELLED', cancelReason: 'Khách hủy sự kiện' });
+
+    expect(res.status).toBe(400);
+    expect(mockedOrderRepo.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('UTCID05: surfaces a repository failure as 500', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(
+      buildOrderRow({ orderId: 'ORD123', orderStatus: 'NEW', items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100000 }] }) as never,
+    );
+    mockedOrderRepo.updateStatus.mockRejectedValue(new Error('Hủy đơn hàng thất bại'));
+
+    const res = await request(app)
+      .put('/api/v1/orders/ORD123/status')
+      .set('Authorization', authHeader())
+      .send({ orderStatus: 'CANCELLED', cancelReason: 'Khách hủy sự kiện' });
+
+    expect(res.status).toBe(500);
+  });
+
+  it('UTCID06: cancels a non-terminal order and returns 200', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(
+      buildOrderRow({ orderId: 'ORD123', orderStatus: 'NEW', items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100000 }] }) as never,
+    );
+    mockedOrderRepo.updateStatus.mockResolvedValue(
+      buildOrderRow({ orderId: 'ORD123', orderStatus: 'CANCELLED', items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100000 }] }) as never,
+    );
+
+    const res = await request(app)
+      .put('/api/v1/orders/ORD123/status')
+      .set('Authorization', authHeader())
+      .send({ orderStatus: 'CANCELLED', cancelReason: 'Khách hủy sự kiện' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.orderStatus).toBe('CANCELLED');
+  });
+});
+
+describe('POST /api/v1/orders (Create Order)', () => {
+  it('UTCID01: rejects unauthenticated requests with 401', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .send({ customerId: 'cus-1', eventType: 'Conference', eventDate: '2026-08-15T09:00:00Z', location: 'Hall A', items: [] });
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: is forbidden for Staff (route requires Manager)', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', authHeader('STAFF'))
+      .send({ customerId: 'cus-1', eventType: 'Conference', eventDate: '2026-08-15T09:00:00Z', location: 'Hall A', items: [] });
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID03: rejects a missing customerId with 400', async () => {
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', authHeader())
+      .send({ customerId: null, eventType: 'Conference', eventDate: '2026-08-15T09:00:00Z', location: 'Hall A', items: [] });
+
+    expect(res.status).toBe(400);
+    expect(mockedCustomerRepo.findById).not.toHaveBeenCalled();
+  });
+
+  // Sheet expects a hard 400 when the requested quantity exceeds stock. The actual backend
+  // (computeStockWarnings in order.service.ts) treats this as a *soft* warning returned alongside a
+  // successful response — it never blocks order creation (blocking only happens later, at the deposit
+  // step, per the file-level comment in order.test.ts's inventory mock). Asserting the real behavior.
+  it('UTCID04: creating with an over-quantity item still succeeds (201) with a stock warning, not a 400', async () => {
+    mockedCustomerRepo.findById.mockResolvedValue(fakeCustomer() as never);
+    mockedOrderRepo.findItemsByIds.mockResolvedValue([fakeItem()]);
+    mockedOrderRepo.generateNextOrderCode.mockResolvedValue('ORD-010');
+    mockedOrderRepo.create.mockResolvedValue(
+      buildOrderRow({ orderCode: 'ORD-010', items: [{ itemId: 'item-1', quantity: 999, unitPrice: 500000 }] }) as never,
+    );
+    mockedReservationRepo.getAvailableForRange.mockResolvedValueOnce(1);
+
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', authHeader())
+      .send({
+        customerId: 'cus-1',
+        eventType: 'Conference',
+        eventDate: '2026-08-15T09:00:00Z',
+        location: 'Hall A',
+        items: [{ itemId: 'item-1', quantity: 999, unitPrice: 500000, source: 'INTERNAL' }],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('UTCID05: surfaces a repository failure as 500', async () => {
+    mockedCustomerRepo.findById.mockResolvedValue(fakeCustomer() as never);
+    mockedOrderRepo.findItemsByIds.mockResolvedValue([fakeItem()]);
+    mockedOrderRepo.generateNextOrderCode.mockResolvedValue('ORD-011');
+    mockedOrderRepo.create.mockRejectedValue(new Error('Tạo đơn hàng thất bại'));
+
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', authHeader())
+      .send({
+        customerId: 'cus-1',
+        eventType: 'Conference',
+        eventDate: '2026-08-15T09:00:00Z',
+        location: 'Hall A',
+        items: [{ itemId: 'item-1', quantity: 1, unitPrice: 500000, source: 'INTERNAL' }],
+      });
+
+    expect(res.status).toBe(500);
+  });
+
+  // Sheet expects "200: Successful response" — the actual backend returns 201 Created for a successful
+  // POST (order.controller.ts calls `created(res, result)`), matching REST convention for resource
+  // creation. Asserting the real status code rather than forcing 200.
+  it('UTCID06: creates an order successfully and returns 201', async () => {
+    mockedCustomerRepo.findById.mockResolvedValue(fakeCustomer() as never);
+    mockedOrderRepo.findItemsByIds.mockResolvedValue([fakeItem()]);
+    mockedOrderRepo.generateNextOrderCode.mockResolvedValue('ORD-012');
+    mockedOrderRepo.create.mockResolvedValue(
+      buildOrderRow({ orderCode: 'ORD-012', items: [{ itemId: 'item-1', quantity: 2, unitPrice: 500000 }] }) as never,
+    );
+
+    const res = await request(app)
+      .post('/api/v1/orders')
+      .set('Authorization', authHeader())
+      .send({
+        customerId: 'cus-1',
+        eventType: 'Conference',
+        eventDate: '2026-08-15T09:00:00Z',
+        location: 'Hall A',
+        items: [{ itemId: 'item-1', quantity: 2, unitPrice: 500000, source: 'INTERNAL' }],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({ orderId: 'ord-1', orderCode: 'ORD-012' });
   });
 });
