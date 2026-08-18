@@ -37,8 +37,10 @@ export interface CatalogItemDTO {
   priceValidTo: string | null;
   imageUrl: string | null;
   status: string;
-  quantityTotal: number;
-  quantityAvailable: number;
+  inventory: {
+    quantityTotal: number;
+    quantityAvailable: number;
+  } | null;
   isCombo: boolean;
   createdAt: string;
   updatedAt: string;
@@ -72,8 +74,12 @@ function mapItem(row: CatalogItemWithType): CatalogItemDTO {
     priceValidTo: row.priceValidTo ? row.priceValidTo.toISOString() : null,
     imageUrl: row.imageUrl,
     status: row.status,
-    quantityTotal: row.inventory?.quantityTotal ?? 0,
-    quantityAvailable: (row.inventory?.quantityTotal ?? 0) - (row.inventory?.quantityDamaged ?? 0),
+    inventory: row.inventory
+      ? {
+          quantityTotal: row.inventory.quantityTotal,
+          quantityAvailable: row.inventory.quantityTotal - row.inventory.quantityDamaged,
+        }
+      : null,
     isCombo: (row._count?.components ?? 0) > 0,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
