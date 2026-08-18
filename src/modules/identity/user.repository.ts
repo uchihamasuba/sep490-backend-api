@@ -60,4 +60,14 @@ export const userRepository = {
   updatePasswordHash(userId: string, passwordHash: string) {
     return prisma.user.update({ where: { userId }, data: { passwordHash } });
   },
+
+  findPrivilegedUsers() {
+    return prisma.user.findMany({
+      where: {
+        role: { in: ['ADMIN', 'MANAGER'] },
+        status: 'ACTIVE',
+      },
+      select: { userId: true },
+    });
+  },
 };

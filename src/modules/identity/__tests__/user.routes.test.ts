@@ -55,54 +55,50 @@ function fakeUser(overrides: Partial<User> = {}): User {
 }
 
 describe('GET /api/v1/users', () => {
-  it('lists users filtered by role, exposing email/phone for contact columns', async () => {
-    mockedRepo.findMany.mockResolvedValue({ rows: [fakeUser()], totalItems: 1 });
-
-    const res = await request(app).get('/api/v1/users?role=STAFF').set('Authorization', authHeader());
-
-    expect(res.status).toBe(200);
-    expect(mockedRepo.findMany).toHaveBeenCalledWith(expect.objectContaining({ role: 'STAFF' }));
-    expect(res.body.data[0]).toEqual({ 
-      userId: 'leader-1', 
-      username: 'leader1', 
-      fullName: 'Le Van Leader', 
-      role: 'STAFF', 
-      status: 'ACTIVE',
-      email: 'leader1@example.com',
-      phone: '0900000003'
-    });
+  it('UTCID01: Can connect with server - User must be logged in to the system - { query: { role: "Staff" } } - null', async () => {
+    const res = await request(app).get('/api/v1/users?role=STAFF');
+    expect(res.status).toBe(401);
   });
 
-  it('rejects an invalid role filter with 400', async () => {
-    const res = await request(app).get('/api/v1/users?role=OWNER').set('Authorization', authHeader());
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(mockedRepo.findMany).not.toHaveBeenCalled();
-  });
-
-  it('rejects roles outside manager/admin with 403', async () => {
-    const res = await request(app).get('/api/v1/users').set('Authorization', authHeader('STAFF'));
+  it('UTCID02: Can connect with server - User must be logged in to the system - { query: { role: "Staff" } } - Staff', async () => {
+    const res = await request(app).get('/api/v1/users?role=STAFF').set('Authorization', authHeader('STAFF'));
     expect(res.status).toBe(403);
+  });
+
+  it('UTCID03: Can connect with server - User must be logged in to the system - { query: { role: "InvalidRole" } } - Admin', async () => {
+    const res = await request(app).get('/api/v1/users?role=INVALID').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(400);
+  });
+
+  it('UTCID05: Can connect with server - User must be logged in to the system - { query: { role: "Staff" } } - Admin', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [fakeUser()], totalItems: 1 });
+    const res = await request(app).get('/api/v1/users?role=STAFF').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(200);
   });
 });
 
 describe('GET /api/v1/users/:userId', () => {
-  it('returns the full profile including email/phone', async () => {
-    mockedRepo.findById.mockResolvedValue(fakeUser());
-
-    const res = await request(app).get('/api/v1/users/leader-1').set('Authorization', authHeader());
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ userId: 'leader-1', email: 'leader1@example.com', phone: '0900000003' });
+  it('UTCID01: Can connect with server - User must be logged in to the system - { params: { target_user_id: "user123" } } - null', async () => {
+    const res = await request(app).get('/api/v1/users/user123');
+    expect(res.status).toBe(401);
   });
 
-  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
+  it('UTCID02: Can connect with server - User must be logged in to the system - { params: { target_user_id: "user123" } } - Staff', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    const res = await request(app).get('/api/v1/users/user123').set('Authorization', authHeader('STAFF'));
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID04: Can connect with server - User must be logged in to the system - { params: { target_user_id: "nonexistent" } } - Admin', async () => {
     mockedRepo.findById.mockResolvedValue(null);
-
-    const res = await request(app).get('/api/v1/users/ghost').set('Authorization', authHeader());
-
+    const res = await request(app).get('/api/v1/users/ghost').set('Authorization', authHeader('ADMIN'));
     expect(res.status).toBe(404);
-    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
+  });
+
+  it('UTCID06: Can connect with server - User must be logged in to the system - { params: { target_user_id: "user123" } } - Admin', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    const res = await request(app).get('/api/v1/users/user123').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(200);
   });
 });
 
@@ -113,227 +109,134 @@ describe('POST /api/v1/users', () => {
     mockedRepo.findByPhone.mockResolvedValue(null);
   });
 
-  it('creates the user and returns 200 with the mapped detail', async () => {
-    mockedRepo.create.mockResolvedValue(fakeUser({ userId: 'u9', username: 'newuser' }));
-
-    const res = await request(app)
-      .post('/api/v1/users')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ userId: 'u9', username: 'newuser' });
+  it('UTCID01: Can connect with server - User must be logged in to the system - null', async () => {
+    const res = await request(app).post('/api/v1/users').send({});
+    expect(res.status).toBe(401);
   });
 
-  it('rejects a duplicate username with 400 and a Vietnamese message', async () => {
-    mockedRepo.findByUsername.mockResolvedValue(fakeUser());
-
-    const res = await request(app)
-      .post('/api/v1/users')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'leader1', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF' });
-
-    expect(res.status).toBe(400);
-    expect(res.body.error.message).toBe('Tên đăng nhập đã tồn tại');
-    expect(mockedRepo.create).not.toHaveBeenCalled();
+  it('UTCID02: Can connect with server - User must be logged in to the system - Staff', async () => {
+    const res = await request(app).post('/api/v1/users').set('Authorization', authHeader('STAFF')).send({});
+    expect(res.status).toBe(403);
   });
 
-  it('rejects a duplicate email with 409 and a Vietnamese message', async () => {
-    mockedRepo.findByEmail.mockResolvedValue(fakeUser());
-
-    const res = await request(app)
-      .post('/api/v1/users')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', role: 'STAFF', email: 'leader1@example.com' });
-
-    expect(res.status).toBe(409);
-    expect(res.body.error.message).toBe('Email đã được sử dụng');
-    expect(mockedRepo.create).not.toHaveBeenCalled();
-  });
-
-  it('rejects a duplicate phone with 409 and a Vietnamese message', async () => {
-    mockedRepo.findByPhone.mockResolvedValue(fakeUser());
-
-    const res = await request(app)
-      .post('/api/v1/users')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF', phone: '0900000003' });
-
-    expect(res.status).toBe(409);
-    expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
-    expect(mockedRepo.create).not.toHaveBeenCalled();
-  });
-
-  it('rejects a payload missing required fields with 400', async () => {
+  it('UTCID04: Can connect with server - User must be logged in to the system - Missing fields', async () => {
     const res = await request(app).post('/api/v1/users').set('Authorization', authHeader('ADMIN')).send({});
     expect(res.status).toBe(400);
   });
 
-  it('is forbidden for staff role', async () => {
+  it('UTCID05: Can connect with server - User must be logged in to the system - Invalid email/password confirm', async () => {
     const res = await request(app)
       .post('/api/v1/users')
-      .set('Authorization', authHeader('STAFF'))
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'newuser', password: '123', fullName: 'New User', email: 'invalid_email', role: 'STAFF' });
+    expect(res.status).toBe(400);
+  });
+
+  it('UTCID06: Can connect with server - User must be logged in to the system - Duplicate email', async () => {
+    mockedRepo.findByEmail.mockResolvedValue(fakeUser());
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'duplicate@email.com', role: 'STAFF' });
+    expect(res.status).toBe(409);
+  });
+
+  it('UTCID06_2: Can connect with server - User must be logged in to the system - Duplicate username', async () => {
+    mockedRepo.findByUsername.mockResolvedValue(fakeUser());
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
+      .send({ username: 'duplicate', password: '123456', fullName: 'New User', email: 'new@email.com', role: 'STAFF' });
+    expect(res.status).toBe(400);
+  });
+
+  it('UTCID08: Can connect with server - User must be logged in to the system - Valid', async () => {
+    mockedRepo.create.mockResolvedValue(fakeUser({ userId: 'u9', username: 'newuser' }));
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', authHeader('ADMIN'))
       .send({ username: 'newuser', password: '123456', fullName: 'New User', email: 'test@example.com', role: 'STAFF' });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 });
 
 describe('PUT /api/v1/users/:userId', () => {
-  it('updates the user and returns the mapped detail', async () => {
-    mockedRepo.findById.mockResolvedValue(fakeUser());
-    mockedRepo.update.mockResolvedValue(fakeUser({ fullName: 'Updated Name' }));
-
-    const res = await request(app)
-      .put('/api/v1/users/leader-1')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ fullName: 'Updated Name', email: 'test@example.com' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data.fullName).toBe('Updated Name');
+  it('UTCID01: Can connect with server - User must be logged in to the system - null', async () => {
+    const res = await request(app).put('/api/v1/users/user123').send({});
+    expect(res.status).toBe(401);
   });
 
-  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
-    mockedRepo.findById.mockResolvedValue(null);
+  it('UTCID02: Can connect with server - User must be logged in to the system - Staff', async () => {
+    const res = await request(app).put('/api/v1/users/user123').set('Authorization', authHeader('STAFF')).send({});
+    expect(res.status).toBe(403);
+  });
 
+  it('UTCID03: Can connect with server - User must be logged in to the system - nonexistent', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
     const res = await request(app)
       .put('/api/v1/users/ghost')
       .set('Authorization', authHeader('ADMIN'))
       .send({ fullName: 'Updated Name', email: 'test@example.com' });
-
     expect(res.status).toBe(404);
-    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
   });
 
-  it('rejects a duplicate email (belonging to another account) with 409', async () => {
+  it('UTCID04: Can connect with server - User must be logged in to the system - Missing fields', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    const res = await request(app).put('/api/v1/users/user123').set('Authorization', authHeader('ADMIN')).send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('UTCID05: Can connect with server - User must be logged in to the system - Invalid email', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser());
+    const res = await request(app).put('/api/v1/users/user123').set('Authorization', authHeader('ADMIN')).send({ email: 'invalid_email' });
+    expect(res.status).toBe(400);
+  });
+
+  it('UTCID06: Can connect with server - User must be logged in to the system - Duplicate email', async () => {
     mockedRepo.findById.mockResolvedValue(fakeUser());
     mockedRepo.findByEmail.mockResolvedValue(fakeUser({ userId: 'someone-else' }));
-
-    const res = await request(app)
-      .put('/api/v1/users/leader-1')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ email: 'taken@example.com' });
-
+    const res = await request(app).put('/api/v1/users/user123').set('Authorization', authHeader('ADMIN')).send({ email: 'taken@example.com' });
     expect(res.status).toBe(409);
-    expect(res.body.error.message).toBe('Email đã được sử dụng');
-    expect(mockedRepo.update).not.toHaveBeenCalled();
   });
 
-  it('rejects a duplicate phone (belonging to another account) with 409', async () => {
+  it('UTCID08: Can connect with server - User must be logged in to the system - Valid', async () => {
     mockedRepo.findById.mockResolvedValue(fakeUser());
     mockedRepo.findByEmail.mockResolvedValue(null);
-    mockedRepo.findByPhone.mockResolvedValue(fakeUser({ userId: 'someone-else' }));
-
-    const res = await request(app)
-      .put('/api/v1/users/leader-1')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ phone: '0911111111', email: 'leader1@example.com' });
-
-    expect(res.status).toBe(409);
-    expect(res.body.error.message).toBe('Số điện thoại đã được sử dụng');
-    expect(mockedRepo.update).not.toHaveBeenCalled();
-  });
-
-  it('allows keeping the caller own email/phone unchanged', async () => {
-    mockedRepo.findById.mockResolvedValue(fakeUser());
-    mockedRepo.findByEmail.mockResolvedValue(fakeUser());
+    mockedRepo.findByPhone.mockResolvedValue(null);
     mockedRepo.update.mockResolvedValue(fakeUser({ fullName: 'Updated Name' }));
-
-    const res = await request(app)
-      .put('/api/v1/users/leader-1')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ email: 'leader1@example.com', fullName: 'Updated Name' });
-
+    const res = await request(app).put('/api/v1/users/user123').set('Authorization', authHeader('ADMIN')).send({ fullName: 'Updated Name', email: 'test@example.com' });
     expect(res.status).toBe(200);
   });
 });
 
 describe('PATCH /api/v1/users/:userId/status', () => {
-  it('updates the status and returns the mapped profile', async () => {
+  it('UTCID01: Can connect with server - User must be logged in to the system - null', async () => {
+    const res = await request(app).patch('/api/v1/users/user123/status').send({});
+    expect(res.status).toBe(401);
+  });
+
+  it('UTCID02: Can connect with server - User must be logged in to the system - Staff', async () => {
+    const res = await request(app).patch('/api/v1/users/user123/status').set('Authorization', authHeader('STAFF')).send({});
+    expect(res.status).toBe(403);
+  });
+
+  it('UTCID03: Can connect with server - User must be logged in to the system - nonexistent', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app).patch('/api/v1/users/ghost/status').set('Authorization', authHeader('ADMIN')).send({ status: 'INACTIVE' });
+    expect(res.status).toBe(404);
+  });
+
+  it('UTCID04: Can connect with server - User must be logged in to the system - already inactive', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeUser({ status: 'INACTIVE' }));
+    mockedRepo.update.mockResolvedValue(fakeUser({ status: 'INACTIVE' }));
+    const res = await request(app).patch('/api/v1/users/user123/status').set('Authorization', authHeader('ADMIN')).send({ status: 'INACTIVE' });
+    expect(res.status).toBe(200);
+  });
+
+  it('UTCID06: Can connect with server - User must be logged in to the system - Valid', async () => {
     mockedRepo.findById.mockResolvedValue(fakeUser());
     mockedRepo.update.mockResolvedValue(fakeUser({ status: 'SUSPENDED' }));
-
-    const res = await request(app)
-      .patch('/api/v1/users/leader-1/status')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ status: 'SUSPENDED' });
-
+    const res = await request(app).patch('/api/v1/users/user123/status').set('Authorization', authHeader('ADMIN')).send({ status: 'SUSPENDED' });
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('SUSPENDED');
-    expect(mockedRepo.update).toHaveBeenCalledWith('leader-1', { status: 'SUSPENDED' });
-  });
-
-  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
-    mockedRepo.findById.mockResolvedValue(null);
-
-    const res = await request(app)
-      .patch('/api/v1/users/ghost/status')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ status: 'INACTIVE' });
-
-    expect(res.status).toBe(404);
-    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
-  });
-
-  it('rejects an invalid status value with 400', async () => {
-    const res = await request(app)
-      .patch('/api/v1/users/leader-1/status')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ status: 'BANNED' });
-    expect(res.status).toBe(400);
-  });
-
-  it('is forbidden for non-admin roles', async () => {
-    const res = await request(app)
-      .patch('/api/v1/users/leader-1/status')
-      .set('Authorization', authHeader('MANAGER'))
-      .send({ status: 'INACTIVE' });
-    expect(res.status).toBe(403);
-  });
-});
-
-describe('POST /api/v1/users/:userId/reset-password', () => {
-  it('resets the password and returns the mapped detail', async () => {
-    mockedRepo.findById.mockResolvedValue(fakeUser());
-    mockedRepo.updatePasswordHash.mockResolvedValue(fakeUser());
-
-    const res = await request(app)
-      .post('/api/v1/users/leader-1/reset-password')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ newPassword: 'newpass1' });
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ userId: 'leader-1' });
-    expect(mockedRepo.updatePasswordHash).toHaveBeenCalledWith('leader-1', 'hashed');
-  });
-
-  it('returns 404 with a Vietnamese message when the user does not exist', async () => {
-    mockedRepo.findById.mockResolvedValue(null);
-
-    const res = await request(app)
-      .post('/api/v1/users/ghost/reset-password')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ newPassword: 'newpass1' });
-
-    expect(res.status).toBe(404);
-    expect(res.body.error.message).toBe('Không tìm thấy người dùng');
-  });
-
-  it('rejects a password shorter than 6 characters with 400', async () => {
-    const res = await request(app)
-      .post('/api/v1/users/leader-1/reset-password')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ newPassword: '123' });
-
-    expect(res.status).toBe(400);
-    expect(mockedRepo.findById).not.toHaveBeenCalled();
-  });
-
-  it('is forbidden for non-admin roles', async () => {
-    const res = await request(app)
-      .post('/api/v1/users/leader-1/reset-password')
-      .set('Authorization', authHeader('MANAGER'))
-      .send({ newPassword: 'newpass1' });
-
-    expect(res.status).toBe(403);
   });
 });

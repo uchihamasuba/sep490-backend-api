@@ -20,6 +20,7 @@ import type {
   RepairInventoryBody,
   ScrapInventoryBody,
 } from './inventory.validators';
+import { notificationService } from '../shared/notification.service';
 
 export interface InventoryDTO {
   itemId: string;
@@ -292,6 +293,12 @@ async function adjustInventory(body: AdjustInventoryBody, actorId: string): Prom
     notes: body.notes || null,
   });
 
+  const deltaSign = body.deltaTotal > 0 ? '+' : '';
+  void notificationService.broadcastToPrivilegedUsers(
+    'Nhật ký biến động kho',
+    `Điều chỉnh thủ công ${deltaSign}${body.deltaTotal} ${updated.item.unit} - ${updated.item.itemName}`,
+  );
+
   const now = new Date();
   const reservedQty = await reservationRepository.getReservedForRange(body.itemId, now, new Date(now.getTime() + 24 * 60 * 60 * 1000));
   const onHandAfter = updated.quantityTotal - updated.quantityDamaged - (await reservationRepository.getOutstandingOut(body.itemId));
@@ -329,6 +336,12 @@ async function scrapInventory(body: ScrapInventoryBody, actorId: string): Promis
     });
   }
   const updated = await inventoryRepository.scrapDamaged(body.itemId, body.quantity, actorId, body.notes || null);
+  
+  void notificationService.broadcastToPrivilegedUsers(
+    'Nhật ký biến động kho',
+    `Thanh lý ${body.quantity} ${row.item.unit} thiết bị hỏng - ${row.item.itemName}`,
+  );
+
   return mapInventoryFresh(updated);
 }
 
@@ -471,6 +484,15 @@ async function confirmReport(reportId: string, actor: Actor): Promise<ReportDTO>
     })),
   );
 
+  const totalDamaged = report.items.reduce((sum, line) => sum + line.damagedQuantity, 0);
+  const totalLost = report.items.reduce((sum, line) => sum + line.lostQuantity, 0);
+  if (totalDamaged > 0 || totalLost > 0) {
+    void notificationService.broadcastToPrivilegedUsers(
+      `Báo cáo thu hồi từ đơn ${report.order.orderCode}`,
+      `Thiết bị có vấn đề (Hỏng: ${totalDamaged}, Mất: ${totalLost}) được báo cáo bởi ${report.reporter.fullName}`,
+    );
+  }
+
   return mapReport(confirmed);
 }
 
@@ -498,6 +520,12 @@ async function recordFieldOutbound(planId: string, body: WarehouseMovementBody, 
       notes: body.notes || null,
       items: body.items,
     });
+
+    void notificationService.broadcastToPrivilegedUsers(
+      `Xuất kho hiện trường cho ${plan.order.orderCode}`,
+      `Đơn hàng ${plan.order.orderCode} vừa xuất kho tại hiện trường`,
+    );
+
     return movements.map(mapMovement);
   } catch (err) {
     if (err instanceof InsufficientFieldStockError) {

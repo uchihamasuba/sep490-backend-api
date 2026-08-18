@@ -34,6 +34,7 @@ import type {
   UpdateOrderQuotationBody,
   UpdateOrderStatusBody,
 } from './order.validators';
+import { notificationService } from '../shared/notification.service';
 
 const TERMINAL_STATUSES: OrderStatus[] = ['COMPLETED', 'CANCELLED'];
 // Đã chốt (thay cho DELETE cứng không giới hạn — docs/api/danhsachdondat_api.md mục 4 khuyến nghị dùng
@@ -382,6 +383,34 @@ async function updateOrderStatus(orderId: string, body: UpdateOrderStatusBody): 
     fromStatus: existing.orderStatus,
     actorId: existing.createdBy,
   });
+
+  if (body.orderStatus === 'CONFIRMED' && existing.orderStatus !== 'CONFIRMED') {
+    const itemsForWarnings = existing.orderItems.map((item) => ({
+      itemId: item.itemId,
+      quantity: item.quantity,
+      source: item.source,
+      unitPrice: Number(item.unitPrice),
+    }));
+    const warnings = await computeStockWarnings(itemsForWarnings, existing.eventDate, existing.endDate ?? null);
+    
+    // Broadcast shortage notifications
+    for (const warning of warnings) {
+      void notificationService.broadcastToPrivilegedUsers(
+        'Tình trạng thiếu hụt thiết bị',
+        `Thiết bị ${warning.itemName} thiếu hụt cho đơn ${existing.orderCode}. Cần: ${warning.requested}, Khả dụng: ${warning.available}.`,
+      );
+    }
+
+    // Calculate total internal items locked
+    const internalItems = existing.orderItems.filter(i => !i.source || i.source === 'INTERNAL');
+    if (internalItems.length > 0) {
+      const totalLockedQty = internalItems.reduce((sum, item) => sum + item.quantity, 0);
+      void notificationService.broadcastToPrivilegedUsers(
+        `Số lượng khóa theo đơn ${existing.orderCode}`,
+        `Đã khóa tổng cộng ${totalLockedQty} thiết bị nội bộ cho đơn hàng ${existing.orderCode}.`,
+      );
+    }
+  }
 
   return mapDetail(updated);
 }

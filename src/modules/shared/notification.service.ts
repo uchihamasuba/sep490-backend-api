@@ -1,7 +1,9 @@
+import type { NotificationType } from '@prisma/client';
 import type { Message } from 'firebase-admin/messaging';
 import { getFirebaseMessaging } from '../../config/firebase';
 import { AppError } from '../../utils/AppError';
 import { logDeveloper, logger } from '../../utils/logger';
+import { userRepository } from '../identity/user.repository';
 import { notificationRepository } from './notification.repository';
 import type { ListNotificationsQuery, SendNotificationBody } from './notification.validators';
 
@@ -15,6 +17,9 @@ async function sendNotificationToUser(body: SendNotificationBody) {
     userId: body.userId,
     title: body.title,
     content: body.content ?? null,
+    notificationType: body.notificationType,
+    refType: body.refType,
+    refId: body.refId,
   });
 
   const deviceToken = user.deviceToken ?? null;
@@ -66,9 +71,25 @@ async function registerDeviceToken(userId: string, deviceToken: string) {
   return notificationRepository.updateUserDeviceToken(userId, deviceToken);
 }
 
+async function broadcastToPrivilegedUsers(title: string, content: string, type?: NotificationType, refId?: string, refType?: string) {
+  const users = await userRepository.findPrivilegedUsers();
+  const promises = users.map(user => 
+    sendNotificationToUser({
+      userId: user.userId,
+      title,
+      content,
+      notificationType: type,
+      refId,
+      refType,
+    })
+  );
+  await Promise.allSettled(promises);
+}
+
 export const notificationService = {
   sendNotificationToUser,
   getUserNotifications,
   markAsRead,
   registerDeviceToken,
+  broadcastToPrivilegedUsers,
 };

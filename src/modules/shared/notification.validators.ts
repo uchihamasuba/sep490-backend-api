@@ -1,9 +1,13 @@
 import { z } from 'zod';
+import { NotificationType } from '@prisma/client';
 
 export const sendNotificationSchema = z.object({
   userId: z.string().trim().min(1, 'Thiếu mã người dùng'),
   title: z.string().trim().min(1, 'Vui lòng nhập tiêu đề'),
   content: z.string().trim().optional(),
+  notificationType: z.nativeEnum(NotificationType).optional(),
+  refType: z.string().trim().optional(),
+  refId: z.string().trim().optional(),
 });
 
 export const notificationIdParamSchema = z.object({

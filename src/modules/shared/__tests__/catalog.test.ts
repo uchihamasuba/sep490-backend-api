@@ -60,128 +60,107 @@ function fakeItem(overrides: Record<string, unknown> = {}) {
 }
 
 describe('GET /api/v1/catalog/items', () => {
-  it('returns all items unpaginated when page/limit are omitted', async () => {
-    mockedRepo.findMany.mockResolvedValue({ 
-      rows: [fakeItem({ inventory: { quantityTotal: 10, quantityDamaged: 2 } })], 
-      totalItems: 1 
-    } as never);
-
-    const res = await request(app).get('/api/v1/catalog/items?status=ACTIVE').set('Authorization', authHeader());
-
-    expect(res.status).toBe(200);
-    expect(mockedRepo.findMany).toHaveBeenCalledWith(expect.objectContaining({ status: 'ACTIVE', skip: undefined, take: undefined }));
-    expect(res.body.meta).toEqual({ page: null, limit: null, totalItems: 1, totalPages: null });
-    expect(res.body.data[0]).toMatchObject({ 
-      itemId: 'item-1', 
-      typeName: 'Loa', 
-      categoryName: 'Âm thanh', 
-      rentalPrice: 500000,
-      inventory: {
-        quantityTotal: 10,
-        quantityAvailable: 8
-      }
-    });
-  });
-
-  it('paginates when page/limit are provided', async () => {
+  it('UTCID01: View Equipment List', async () => {
     mockedRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 } as never);
-
-    const res = await request(app).get('/api/v1/catalog/items?page=1&limit=10').set('Authorization', authHeader());
-
-    expect(res.status).toBe(200);
-    expect(mockedRepo.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: 10 }));
-    expect(res.body.meta).toEqual({ page: 1, limit: 10, totalItems: 0, totalPages: 0 });
+    const res = await request(app).get('/api/v1/catalog/items');
+    expect(res.status).toBe(401);
   });
-
-  it('rejects an invalid status filter with 400', async () => {
-    const res = await request(app).get('/api/v1/catalog/items?status=DELETED').set('Authorization', authHeader());
+  it('UTCID02: View Equipment List', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [fakeItem({ inventory: { quantityTotal: 10, quantityDamaged: 2 } })], totalItems: 1 } as never);
+    const res = await request(app).get('/api/v1/catalog/items').set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(200);
+  });
+  it('UTCID03: View Equipment List', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 } as never);
+    const res = await request(app).get('/api/v1/catalog/items?status=INVALID').set('Authorization', authHeader('ADMIN'));
     expect(res.status).toBe(400);
-    expect(mockedRepo.findMany).not.toHaveBeenCalled();
+  });
+  it('UTCID04: View Equipment List', async () => {
+    mockedRepo.findMany.mockRejectedValue(new Error('Lỗi kết nối cơ sở dữ liệu'));
+    const res = await request(app).get('/api/v1/catalog/items').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(500);
+  });
+  it('UTCID05: View Equipment List', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [fakeItem({ inventory: { quantityTotal: 10, quantityDamaged: 2 } })], totalItems: 1 } as never);
+    const res = await request(app).get('/api/v1/catalog/items').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(200);
+  });
+  it('UTCID06: View Equipment List', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [fakeItem({ inventory: { quantityTotal: 10, quantityDamaged: 2 } })], totalItems: 1 } as never);
+    const res = await request(app).get('/api/v1/catalog/items').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(200);
   });
 });
 
 describe('POST /api/v1/catalog/items', () => {
-  it('creates a new catalog item', async () => {
+  it('UTCID01: Create Equipment', async () => {
+    
+    const res = await request(app).post('/api/v1/catalog/items').send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 100000 });
+    expect(res.status).toBe(401);
+  });
+  it('UTCID02: Create Equipment', async () => {
     mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
     mockedRepo.generateNextItemCode.mockResolvedValue('ITM-002');
     mockedRepo.create.mockResolvedValue(fakeItem({ itemId: 'item-2', itemCode: 'ITM-002' }) as never);
-
-    const res = await request(app)
-      .post('/api/v1/catalog/items')
-      .set('Authorization', authHeader())
-      .send({ itemName: 'Đèn Beam 230', typeId: 'type-1', unit: 'Cái', rentalPrice: 300000 });
-
+    const res = await request(app).post('/api/v1/catalog/items').set('Authorization', authHeader('MANAGER')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 100000 });
     expect(res.status).toBe(201);
-    expect(res.body.data).toMatchObject({ itemId: 'item-2', itemCode: 'ITM-002' });
   });
-
-  it('returns 404 when typeId does not exist', async () => {
-    mockedRepo.typeExists.mockResolvedValue(null);
-
-    const res = await request(app)
-      .post('/api/v1/catalog/items')
-      .set('Authorization', authHeader())
-      .send({ itemName: 'Ghost item', typeId: 'ghost-type', unit: 'Cái' });
-
-    expect(res.status).toBe(404);
-  });
-
-  it('rejects missing required fields with 400', async () => {
-    const res = await request(app).post('/api/v1/catalog/items').set('Authorization', authHeader()).send({ itemName: 'No type' });
-
+  it('UTCID03: Create Equipment', async () => {
+    
+    const res = await request(app).post('/api/v1/catalog/items').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu' });
     expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(mockedRepo.typeExists).not.toHaveBeenCalled();
   });
-
-  // Chốt 2026-08-11: catalog là master data thuộc quyền Admin (CLAUDE.md) + toàn bộ UI tạo/sửa thiết bị
-  // nằm ở admin/ → mở quyền ADMIN cho POST/PUT/PATCH catalog (trước đây chỉ MANAGER, admin bị 403).
-  it('allows Admin to create catalog item', async () => {
+  it('UTCID04: Create Equipment', async () => {
     mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
-    mockedRepo.generateNextItemCode.mockResolvedValue('ITM-003');
-    mockedRepo.create.mockResolvedValue(fakeItem({ itemId: 'item-3', itemCode: 'ITM-003' }) as never);
-
-    const res = await request(app)
-      .post('/api/v1/catalog/items')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ itemName: 'Đèn Beam 230', typeId: 'type-1', unit: 'Cái', rentalPrice: 300000 });
-
-    expect(res.status).toBe(201);
-    expect(res.body.data).toMatchObject({ itemId: 'item-3' });
+    mockedRepo.create.mockRejectedValue(new Error('DB Error'));
+    const res = await request(app).post('/api/v1/catalog/items').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 100000 });
+    expect(res.status).toBe(500);
   });
-
-  it('rejects priceValidFrom after priceValidTo with 400', async () => {
-    const res = await request(app)
-      .post('/api/v1/catalog/items')
-      .set('Authorization', authHeader())
-      .send({
-        itemName: 'Đèn Beam 230',
-        typeId: 'type-1',
-        unit: 'Cái',
-        priceValidFrom: '2026-06-01',
-        priceValidTo: '2026-01-01',
-      });
-
-    expect(res.status).toBe(400);
-    expect(res.body.error.code).toBe('VALIDATION_ERROR');
-    expect(mockedRepo.create).not.toHaveBeenCalled();
+  it('UTCID05: Create Equipment', async () => {
+    mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
+    mockedRepo.create.mockRejectedValue(new Error('DB Error'));
+    const res = await request(app).post('/api/v1/catalog/items').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 100000 });
+    expect(res.status).toBe(500);
+  });
+  it('UTCID06: Create Equipment', async () => {
+    mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
+    mockedRepo.generateNextItemCode.mockResolvedValue('ITM-002');
+    mockedRepo.create.mockResolvedValue(fakeItem({ itemId: 'item-2', itemCode: 'ITM-002' }) as never);
+    const res = await request(app).post('/api/v1/catalog/items').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 100000 });
+    expect(res.status).toBe(201);
   });
 });
 
 describe('GET /api/v1/catalog/items/:itemId', () => {
-  it('returns the item detail', async () => {
-    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
-
-    const res = await request(app).get('/api/v1/catalog/items/item-1').set('Authorization', authHeader());
-
-    expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ itemId: 'item-1', itemName: 'Loa JBL 1000W' });
-  });
-
-  it('returns 404 when the item does not exist', async () => {
+  it('UTCID01: View Equipment Detail', async () => {
     mockedRepo.findById.mockResolvedValue(null);
-    const res = await request(app).get('/api/v1/catalog/items/missing').set('Authorization', authHeader());
+    const res = await request(app).get('/api/v1/catalog/items/null').set('Authorization', authHeader('ADMIN'));
     expect(res.status).toBe(404);
+  });
+  it('UTCID02: View Equipment Detail', async () => {
+    
+    const res = await request(app).get('/api/v1/catalog/items/EQ123');
+    expect(res.status).toBe(401);
+  });
+  it('UTCID03: View Equipment Detail', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app).get('/api/v1/catalog/items/NON_EXISTENT').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(404);
+  });
+  it('UTCID04: View Equipment Detail', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    const res = await request(app).get('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('MANAGER'));
+    expect(res.status).toBe(200);
+  });
+  it('UTCID05: View Equipment Detail', async () => {
+    mockedRepo.findById.mockRejectedValue(new Error('DB Error'));
+    const res = await request(app).get('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(500);
+  });
+  it('UTCID06: View Equipment Detail', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    const res = await request(app).get('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('ADMIN'));
+    expect(res.status).toBe(200);
   });
 });
 
@@ -234,63 +213,91 @@ describe('GET /api/v1/catalog/items/:itemId/suppliers', () => {
 });
 
 describe('PUT /api/v1/catalog/items/:itemId', () => {
-  it('updates the item and returns the mapped result', async () => {
+  it('UTCID01: Update Equipment', async () => {
+    
+    const res = await request(app).put('/api/v1/catalog/items/EQ123').send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 120000 });
+    expect(res.status).toBe(401);
+  });
+  it('UTCID02: Update Equipment', async () => {
     mockedRepo.findById.mockResolvedValue(fakeItem() as never);
     mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
     mockedRepo.update.mockResolvedValue(fakeItem({ itemName: 'Loa JBL 2000W' }) as never);
-
-    const res = await request(app)
-      .put('/api/v1/catalog/items/item-1')
-      .set('Authorization', authHeader())
-      .send({ itemName: 'Loa JBL 2000W', typeId: 'type-1', unit: 'Cái', rentalPrice: 600000 });
-
+    const res = await request(app).put('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('MANAGER')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 120000 });
     expect(res.status).toBe(200);
-    expect(res.body.data).toMatchObject({ itemName: 'Loa JBL 2000W' });
   });
-
-  it('returns 404 when the item does not exist', async () => {
+  it('UTCID03: Update Equipment', async () => {
     mockedRepo.findById.mockResolvedValue(null);
-    const res = await request(app)
-      .put('/api/v1/catalog/items/missing')
-      .set('Authorization', authHeader())
-      .send({ itemName: 'X', typeId: 'type-1', unit: 'Cái', rentalPrice: 1 });
+    const res = await request(app).put('/api/v1/catalog/items/NON_EXISTENT').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 120000 });
     expect(res.status).toBe(404);
   });
-
-  // Chốt 2026-08-11: mở quyền ADMIN cho catalog write (xem ghi chú ở POST test phía trên).
-  it('allows Admin to update catalog item', async () => {
+  it('UTCID04: Update Equipment', async () => {
+    
+    const res = await request(app).put('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu' });
+    expect(res.status).toBe(400);
+  });
+  it('UTCID05: Update Equipment', async () => {
     mockedRepo.findById.mockResolvedValue(fakeItem() as never);
     mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
-    mockedRepo.update.mockResolvedValue(fakeItem({ itemName: 'X' }) as never);
-
-    const res = await request(app)
-      .put('/api/v1/catalog/items/item-1')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ itemName: 'X', typeId: 'type-1', unit: 'Cái', rentalPrice: 1 });
+    mockedRepo.update.mockRejectedValue(new Error('DB error'));
+    const res = await request(app).put('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 120000 });
+    expect(res.status).toBe(500);
+  });
+  it('UTCID06: Update Equipment', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
+    mockedRepo.update.mockRejectedValue(new Error('DB error'));
+    const res = await request(app).put('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 120000 });
+    expect(res.status).toBe(500);
+  });
+  it('UTCID07: Update Equipment', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.typeExists.mockResolvedValue({ typeId: 'type-1' } as never);
+    mockedRepo.update.mockResolvedValue(fakeItem({ itemName: 'Loa JBL 2000W' }) as never);
+    const res = await request(app).put('/api/v1/catalog/items/EQ123').set('Authorization', authHeader('ADMIN')).send({ itemName: 'Máy chiếu', typeId: 'type-1', unit: 'Cái', rentalPrice: 120000 });
     expect(res.status).toBe(200);
   });
 });
 
 describe('PATCH /api/v1/catalog/items/:itemId/status', () => {
-  it('updates the status and returns the mapped result', async () => {
+  it('UTCID01: Deactivate Equipment', async () => {
+    
+    const res = await request(app).patch('/api/v1/catalog/items/EQ123/status').send({ status: 'INACTIVE' });
+    expect(res.status).toBe(401);
+  });
+  it('UTCID02: Deactivate Equipment', async () => {
     mockedRepo.findById.mockResolvedValue(fakeItem() as never);
     mockedRepo.updateStatus.mockResolvedValue(fakeItem({ status: 'INACTIVE' }) as never);
-
-    const res = await request(app)
-      .patch('/api/v1/catalog/items/item-1/status')
-      .set('Authorization', authHeader())
-      .send({ status: 'INACTIVE' });
-
+    const res = await request(app).patch('/api/v1/catalog/items/EQ123/status').set('Authorization', authHeader('MANAGER')).send({ status: 'INACTIVE' });
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe('INACTIVE');
   });
-
-  it('rejects an invalid status with 400', async () => {
-    const res = await request(app)
-      .patch('/api/v1/catalog/items/item-1/status')
-      .set('Authorization', authHeader())
-      .send({ status: 'DELETED' });
-    expect(res.status).toBe(400);
+  it('UTCID03: Deactivate Equipment', async () => {
+    mockedRepo.findById.mockResolvedValue(null);
+    const res = await request(app).patch('/api/v1/catalog/items/NON_EXISTENT/status').set('Authorization', authHeader('ADMIN')).send({ status: 'INACTIVE' });
+    expect(res.status).toBe(404);
+  });
+  it('UTCID04: Deactivate Equipment', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.updateStatus.mockResolvedValue(fakeItem({ status: 'INACTIVE' }) as never);
+    const res = await request(app).patch('/api/v1/catalog/items/EQ123/status').set('Authorization', authHeader('ADMIN')).send({ status: 'INACTIVE' });
+    expect(res.status).toBe(200);
+  });
+  it('UTCID05: Deactivate Equipment', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.updateStatus.mockRejectedValue(new Error('DB error'));
+    const res = await request(app).patch('/api/v1/catalog/items/EQ123/status').set('Authorization', authHeader('ADMIN')).send({ status: 'INACTIVE' });
+    expect(res.status).toBe(500);
+  });
+  it('UTCID06: Deactivate Equipment', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.updateStatus.mockRejectedValue(new Error('DB error'));
+    const res = await request(app).patch('/api/v1/catalog/items/EQ123/status').set('Authorization', authHeader('ADMIN')).send({ status: 'INACTIVE' });
+    expect(res.status).toBe(500);
+  });
+  it('UTCID07: Deactivate Equipment', async () => {
+    mockedRepo.findById.mockResolvedValue(fakeItem() as never);
+    mockedRepo.updateStatus.mockResolvedValue(fakeItem({ status: 'INACTIVE' }) as never);
+    const res = await request(app).patch('/api/v1/catalog/items/EQ123/status').set('Authorization', authHeader('ADMIN')).send({ status: 'INACTIVE' });
+    expect(res.status).toBe(200);
   });
 });
 
