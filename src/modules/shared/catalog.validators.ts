@@ -13,7 +13,13 @@ export const listCatalogItemsQuerySchema = z.object({
   typeId: z.string().trim().optional(),
   categoryId: z.string().trim().optional(),
   search: z.string().trim().optional(),
-  isCombo: z.coerce.boolean().optional(),
+  isCombo: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      if (val.toLowerCase() === 'true') return true;
+      if (val.toLowerCase() === 'false') return false;
+    }
+    return val;
+  }, z.boolean().optional()),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(1000).optional(),
 });
