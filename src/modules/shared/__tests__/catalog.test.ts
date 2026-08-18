@@ -61,14 +61,26 @@ function fakeItem(overrides: Record<string, unknown> = {}) {
 
 describe('GET /api/v1/catalog/items', () => {
   it('returns all items unpaginated when page/limit are omitted', async () => {
-    mockedRepo.findMany.mockResolvedValue({ rows: [fakeItem()], totalItems: 1 } as never);
+    mockedRepo.findMany.mockResolvedValue({ 
+      rows: [fakeItem({ inventory: { quantityTotal: 10, quantityDamaged: 2 } })], 
+      totalItems: 1 
+    } as never);
 
     const res = await request(app).get('/api/v1/catalog/items?status=ACTIVE').set('Authorization', authHeader());
 
     expect(res.status).toBe(200);
     expect(mockedRepo.findMany).toHaveBeenCalledWith(expect.objectContaining({ status: 'ACTIVE', skip: undefined, take: undefined }));
     expect(res.body.meta).toEqual({ page: null, limit: null, totalItems: 1, totalPages: null });
-    expect(res.body.data[0]).toMatchObject({ itemId: 'item-1', typeName: 'Loa', categoryName: 'Âm thanh', rentalPrice: 500000 });
+    expect(res.body.data[0]).toMatchObject({ 
+      itemId: 'item-1', 
+      typeName: 'Loa', 
+      categoryName: 'Âm thanh', 
+      rentalPrice: 500000,
+      inventory: {
+        quantityTotal: 10,
+        quantityAvailable: 8
+      }
+    });
   });
 
   it('paginates when page/limit are provided', async () => {
