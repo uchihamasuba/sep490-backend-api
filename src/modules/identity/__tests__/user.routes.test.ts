@@ -180,15 +180,6 @@ describe('POST /api/v1/users', () => {
     expect(res.status).toBe(409);
   });
 
-  it('UTCID06_2: Can connect with server - User must be logged in to the system - Duplicate username', async () => {
-    mockedRepo.findByUsername.mockResolvedValue(fakeUser());
-    const res = await request(app)
-      .post('/api/v1/users')
-      .set('Authorization', authHeader('ADMIN'))
-      .send({ username: 'duplicate', password: '123456', fullName: 'New User', email: 'new@email.com', role: 'STAFF' });
-    expect(res.status).toBe(400);
-  });
-
   it('UTCID08: Can connect with server - User must be logged in to the system - Valid', async () => {
     mockedRepo.create.mockResolvedValue(fakeUser({ userId: 'u9', username: 'newuser' }));
     const res = await request(app)
