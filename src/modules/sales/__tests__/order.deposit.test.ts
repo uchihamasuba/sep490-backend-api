@@ -202,14 +202,5 @@ describe('Create Deposit Payment Request', () => {
   });
 });
 
-describe('Confirm Deposit', () => {
-  for (let i = 1; i <= 7; i++) {
-    it(`UTCID0${i}: Confirm Deposit`, async () => {
-      expect(1).toBe(1);
-    });
-  }
-  // NOTE: real "Confirm Deposit" coverage (PUT /api/v1/deposits/:depositId -> paymentController.
-  // updateDepositStatus) lives in payment.test.ts, next to the other tests for that router — that file
-  // already mocks payment.repository and exercises this exact route. See the "Confirm Deposit" describe
-  // block added there.
-});
+// "Confirm Deposit" (PUT /api/v1/deposits/:depositId -> paymentController.updateDepositStatus) is
+// covered in payment.test.ts, next to the other tests for that router.

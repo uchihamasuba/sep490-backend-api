@@ -64,17 +64,8 @@ function buildSettlementRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('Confirm Settlement', () => {
-  for (let i = 1; i <= 10; i++) {
-    it(`UTCID0${i}: Confirm Settlement`, async () => {
-      expect(1).toBe(1);
-    });
-  }
-  // NOTE: real "Confirm Settlement" coverage (PUT /api/v1/settlements/:settlementId/confirm ->
-  // paymentController.confirmSettlement) lives in payment.test.ts next to the other tests for that
-  // router, which already mocks payment.repository for this exact route. See the "Confirm Settlement"
-  // describe block added there.
-});
+// "Confirm Settlement" (PUT /api/v1/settlements/:settlementId/confirm -> paymentController.
+// confirmSettlement) is covered in payment.test.ts, next to the other tests for that router.
 
 // ---------------------------------------------------------------------------------------------------
 // Real coverage for "Create Settlement Request" (POST /orders/:orderId/settlement ->
