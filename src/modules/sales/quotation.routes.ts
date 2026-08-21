@@ -20,28 +20,28 @@ quotationRouter.use(requireAuth);
 
 quotationRouter.get(
   '/',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(listQuotationsQuerySchema, 'query'),
   asyncHandler(quotationController.list),
 );
 
 quotationRouter.get(
   '/:quotationId',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(quotationIdParamSchema, 'params'),
   asyncHandler(quotationController.getById),
 );
 
 quotationRouter.get(
   '/:quotationId/picklist',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(quotationIdParamSchema, 'params'),
   asyncHandler(quotationController.getPicklist),
 );
 
 quotationRouter.put(
   '/:quotationId',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'STAFF'),
   validate(quotationIdParamSchema, 'params'),
   validate(updateQuotationBodySchema, 'body'),
   asyncHandler(quotationController.update),
@@ -49,7 +49,7 @@ quotationRouter.put(
 
 quotationRouter.patch(
   '/:quotationId/status',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'STAFF'),
   validate(quotationIdParamSchema, 'params'),
   validate(updateQuotationStatusBodySchema, 'body'),
   asyncHandler(quotationController.updateStatus),
@@ -57,14 +57,14 @@ quotationRouter.patch(
 
 quotationRouter.put(
   '/:quotationId/view',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(quotationIdParamSchema, 'params'),
   asyncHandler(quotationController.markAsViewed),
 );
 
 quotationRouter.delete(
   '/:quotationId',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'STAFF'),
   validate(quotationIdParamSchema, 'params'),
   asyncHandler(quotationController.remove),
 );
@@ -76,7 +76,7 @@ customerQuotationRouter.use(requireAuth);
 
 customerQuotationRouter.get(
   '/',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(customerIdParamSchema, 'params'),
   validate(listCustomerQuotationsQuerySchema, 'query'),
   asyncHandler(quotationController.listByCustomer),

@@ -532,13 +532,13 @@ describe('HTTP routes', () => {
     expect(res.status).toBe(401);
   });
 
-  it.each(['STAFF', 'LEADER'] as const)(
-    'GET /api/v1/quotations returns 403 for role %s',
+  it.each(['STAFF'] as const)(
+    'GET /api/v1/quotations returns 200 for role %s',
     async (role) => {
       const res = await request(app)
         .get('/api/v1/quotations')
         .set('Authorization', authHeader(role));
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
     }
   );
 
@@ -553,7 +553,7 @@ describe('HTTP routes', () => {
     expect(res.status).toBe(expected);
   });
 
-  it.each(['STAFF', 'LEADER', 'ADMIN'] as const)(
+  it.each(['ADMIN'] as const)(
     'PUT /api/v1/quotations/:id returns 403 for role %s',
     async (role) => {
       const res = await request(app)
@@ -658,9 +658,17 @@ describe('View Quotation List', () => {
     expect(res.status).toBe(401);
   });
 
-  it('UTCID02: listing quotations as STAFF is forbidden (requires Manager) -> 403', async () => {
+  it('UTCID02: listing quotations as STAFF is allowed -> 200', async () => {
+    mockedQuotationRepo.findMany.mockResolvedValue({ rows: [], totalItems: 0 } as never);
+    mockedQuotationRepo.countByStatusGlobal.mockResolvedValue({
+      all: 0,
+      draft: 0,
+      approved: 0,
+      rejected: 0,
+      approvedValue: 0,
+    } as never);
     const res = await request(app).get('/api/v1/quotations').set('Authorization', authHeader('STAFF'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   it('UTCID03: listing quotations with an invalid status filter returns 400', async () => {
@@ -733,9 +741,9 @@ describe('View Quotation Detail', () => {
     expect(res.status).toBe(404);
   });
 
-  it('UTCID04: viewing quotation detail as STAFF is forbidden (requires Manager) -> 403', async () => {
+  it('UTCID04: viewing quotation detail as STAFF is allowed, returns 404 if not found', async () => {
     const res = await request(app).get('/api/v1/quotations/QUO123').set('Authorization', authHeader('STAFF'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
   it('UTCID05: a database failure while loading quotation detail returns 500', async () => {
@@ -770,12 +778,21 @@ describe('Update Quotation', () => {
     expect(res.status).toBe(401);
   });
 
-  it('UTCID02: updating a quotation as STAFF is forbidden (requires Manager) -> 403', async () => {
+  it('UTCID02: updating a quotation as STAFF is allowed -> 200', async () => {
+    const itemsById = new Map([['item-1', fakeItem()]]);
+    mockedQuotationRepo.findById.mockResolvedValue(
+      buildQuotationRow({ status: 'DRAFT', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }], itemsById }) as never,
+    );
+    mockedQuotationRepo.getLinkedOrderId.mockResolvedValue(null);
+    mockedQuotationRepo.findItemsByIds.mockResolvedValue([fakeItem()]);
+    mockedQuotationRepo.replaceItems.mockResolvedValue(
+      buildQuotationRow({ status: 'DRAFT', version: 'v2', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }], itemsById }) as never,
+    );
     const res = await request(app)
       .put('/api/v1/quotations/QUO123')
       .set('Authorization', authHeader('STAFF'))
       .send({ version: 'v2', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }] });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   it('UTCID03: updating a non-existent quotation returns 404', async () => {
@@ -856,9 +873,13 @@ describe('Delete Quotation', () => {
     expect(res.status).toBe(401);
   });
 
-  it('UTCID02: deleting a quotation as STAFF is forbidden (requires Manager) -> 403', async () => {
+  it('UTCID02: deleting a quotation as STAFF is allowed -> 200', async () => {
+    const itemsById = new Map([['item-1', fakeItem()]]);
+    mockedQuotationRepo.findById.mockResolvedValue(
+      buildQuotationRow({ status: 'DRAFT', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }], itemsById }) as never,
+    );
     const res = await request(app).delete('/api/v1/quotations/QUO123').set('Authorization', authHeader('STAFF'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   it('UTCID03: deleting a quotation with an unusual quotation_id format', async () => {

@@ -82,9 +82,9 @@ describe('GET /api/v1/customers', () => {
     expect(res.status).toBe(401);
   });
 
-  it('rejects roles outside manager/admin with 403', async () => {
+  it('allows STAFF to access', async () => {
     const res = await request(app).get('/api/v1/customers').set('Authorization', authHeader('STAFF'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   // UTCID01: no authenticated user -> Expected: 401
@@ -93,10 +93,13 @@ describe('GET /api/v1/customers', () => {
     expect(res.status).toBe(401);
   });
 
-  // UTCID02: role Staff -> Expected: 403 (requires Manager/Admin)
-  it('UTCID02: returns 403 for a Staff role', async () => {
+  // UTCID02: role Staff -> Expected: 200 (now authorized)
+  it('UTCID02: returns 200 for a Staff role', async () => {
+    mockedRepo.findMany.mockResolvedValue({ rows: [baseCustomer()], totalItems: 46 });
+    mockedRepo.countByStatus.mockResolvedValue({ all: 46, active: 40, inactive: 6 });
+    mockedRepo.getOrderStatsByCustomerIds.mockResolvedValue([]);
     const res = await request(app).get('/api/v1/customers').set('Authorization', authHeader('STAFF'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   // UTCID03: invalid status filter -> Expected: 400
@@ -360,11 +363,13 @@ describe('GET /api/v1/customers/:customerId', () => {
     expect(res.status).toBe(404);
   });
 
-  // UTCID04: role Staff -> Expected: 403 (requires Manager/Admin)
-  it('UTCID04: returns 403 for a Staff role', async () => {
+  // UTCID04: returns 404 for a Staff role if customer does not exist
+  it('UTCID04: returns 404 for a Staff role', async () => {
+    // In this test block, we mock customerService.getCustomerById to resolve to null
+    mockedRepo.findById.mockResolvedValue(null);
     const res = await request(app).get('/api/v1/customers/CUS123').set('Authorization', authHeader('STAFF'));
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 
   // UTCID05: repository failure -> Expected: 500

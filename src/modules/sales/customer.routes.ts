@@ -17,7 +17,7 @@ router.use(requireAuth);
 // tương ứng với /api/v1/customers
 router.get(
   '/',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(listCustomersQuerySchema, 'query'),
   asyncHandler(customerController.list),
 );
@@ -35,7 +35,7 @@ router.get('/next-code', requireRole('MANAGER', 'ADMIN'), asyncHandler(customerC
 
 router.get(
   '/:customerId',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(customerIdParamSchema, 'params'),
   asyncHandler(customerController.getById),
 );
@@ -57,7 +57,7 @@ router.delete(
 
 router.get(
   '/:customerId/summary',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(customerIdParamSchema, 'params'),
   asyncHandler(customerController.summary),
 );
