@@ -39,6 +39,7 @@ export interface QuotationListItemDTO {
   discount: number;
   totalAmount: number;
   status: ApiQuotationStatus;
+  isManagerViewed: boolean;
   createdAt: string;
 }
 
@@ -68,6 +69,7 @@ export interface QuotationDetailDTO {
   totalAmount: number;
   status: ApiQuotationStatus;
   notes: string | null;
+  isManagerViewed: boolean;
   createdBy: { userId: string; fullName: string; role: string };
   createdAt: string;
   updatedAt: string;
@@ -96,6 +98,7 @@ function mapListItem(row: {
   discountTotal: unknown;
   totalAmount: unknown;
   status: QuotationStatus;
+  isManagerViewed: boolean;
   createdAt: Date;
   customer: { customerName: string; phone: string };
 }): QuotationListItemDTO {
@@ -110,6 +113,7 @@ function mapListItem(row: {
     discount: toNumber(row.discountTotal),
     totalAmount: toNumber(row.totalAmount),
     status: STATUS_TO_API[row.status],
+    isManagerViewed: row.isManagerViewed,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -129,6 +133,7 @@ function mapDetail(row: QuotationWithDetails, linkedOrderId: string | null): Quo
     totalAmount: toNumber(row.totalAmount),
     status: STATUS_TO_API[row.status],
     notes: row.notes,
+    isManagerViewed: row.isManagerViewed,
     createdBy: { userId: row.creator.userId, fullName: row.creator.fullName, role: row.creator.role },
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -242,7 +247,7 @@ async function getQuotationById(quotationId: string): Promise<QuotationDetailDTO
 async function createQuotationForCustomer(
   customerId: string,
   body: CreateQuotationBody,
-  createdByUserId: string,
+  creator: { id: string; role: string },
 ): Promise<QuotationDetailDTO> {
   const customer = await customerRepository.findById(customerId);
   if (!customer) throw AppError.notFound('Không tìm thấy khách hàng');
@@ -250,11 +255,14 @@ async function createQuotationForCustomer(
   const { itemsById } = await resolveAndValidateLines(body.items);
   const quotationCode = await quotationRepository.generateNextQuotationCode();
 
+  const isManagerViewed = ['MANAGER', 'ADMIN'].includes(creator.role);
+
   const created = await quotationRepository.create({
     customerId,
     version: body.version,
     notes: body.notes || null,
-    createdBy: createdByUserId,
+    createdBy: creator.id,
+    isManagerViewed,
     quotationCode,
     itemInputs: body.items,
     itemsById,
@@ -367,6 +375,11 @@ async function getPicklist(quotationId: string) {
   return { quotationItems: formattedItems };
 }
 
+async function markAsViewed(quotationId: string): Promise<{ success: boolean }> {
+  await quotationRepository.updateManagerViewed(quotationId, true);
+  return { success: true };
+}
+
 export const quotationService = {
   listQuotations,
   listQuotationsByCustomer,
@@ -376,4 +389,5 @@ export const quotationService = {
   updateQuotationStatus,
   deleteQuotation,
   getPicklist,
+  markAsViewed,
 };

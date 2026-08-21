@@ -35,7 +35,8 @@ async function createForCustomer(req: Request, res: Response) {
   if (!req.user) throw AppError.unauthorized();
   const { customerId } = req.params as unknown as CustomerIdParam;
   const body = req.body as CreateQuotationBody;
-  const quotation = await quotationService.createQuotationForCustomer(customerId, body, req.user.id);
+  // Truyền toàn bộ req.user để check role bên trong service
+  const quotation = await quotationService.createQuotationForCustomer(customerId, body, req.user);
   created(res, quotation);
 }
 
@@ -50,6 +51,12 @@ async function updateStatus(req: Request, res: Response) {
   const { quotationId } = req.params as unknown as QuotationIdParam;
   const body = req.body as UpdateQuotationStatusBody;
   const quotation = await quotationService.updateQuotationStatus(quotationId, body.status);
+  ok(res, quotation);
+}
+
+async function markAsViewed(req: Request, res: Response) {
+  const { quotationId } = req.params as unknown as QuotationIdParam;
+  const quotation = await quotationService.markAsViewed(quotationId);
   ok(res, quotation);
 }
 
@@ -72,6 +79,7 @@ export const quotationController = {
   createForCustomer,
   update,
   updateStatus,
+  markAsViewed,
   remove,
   getPicklist,
 };

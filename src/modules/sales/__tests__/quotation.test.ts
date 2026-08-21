@@ -153,7 +153,7 @@ describe('quotationService.createQuotationForCustomer', () => {
       quotationService.createQuotationForCustomer(
         'missing',
         { version: 'v1', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }] },
-        'user-1',
+        { id: 'user-1', role: 'MANAGER' },
       ),
     ).rejects.toMatchObject({ status: 404 });
   });
@@ -166,7 +166,7 @@ describe('quotationService.createQuotationForCustomer', () => {
       quotationService.createQuotationForCustomer(
         'cus-1',
         { version: 'v1', items: [{ itemId: 'ghost-item', quantity: 1, price: 100, discount: 0 }] },
-        'user-1',
+        { id: 'user-1', role: 'MANAGER' },
       ),
     ).rejects.toMatchObject({ status: 400, code: 'BAD_REQUEST' });
   });
@@ -179,7 +179,7 @@ describe('quotationService.createQuotationForCustomer', () => {
       quotationService.createQuotationForCustomer(
         'cus-1',
         { version: 'v1', items: [{ itemId: 'item-1', quantity: 2, price: 500000, discount: 5_000_000 }] },
-        'user-1',
+        { id: 'user-1', role: 'MANAGER' },
       ),
     ).rejects.toMatchObject({ status: 400, code: 'BAD_REQUEST' });
 
@@ -201,7 +201,7 @@ describe('quotationService.createQuotationForCustomer', () => {
     const result = await quotationService.createQuotationForCustomer(
       'cus-1',
       { version: 'v1', items: [{ itemId: 'item-1', quantity: 2, price: 500000, discount: 100000 }] },
-      'user-1',
+      { id: 'user-1', role: 'MANAGER' },
     );
 
     expect(result.subtotal).toBe(1_000_000);
@@ -489,10 +489,10 @@ describe('HTTP routes', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('POST /api/v1/customers/:customerId/quotations is forbidden for non-Manager roles', async () => {
+  it('POST /api/v1/customers/:customerId/quotations is forbidden for LEADER role', async () => {
     const res = await request(app)
       .post('/api/v1/customers/cus-1/quotations')
-      .set('Authorization', authHeader('ADMIN'))
+      .set('Authorization', authHeader('LEADER'))
       .send({ version: 'v1', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }] });
 
     expect(res.status).toBe(403);
@@ -586,10 +586,10 @@ describe('Create Quotation', () => {
     expect(res.status).toBe(401);
   });
 
-  it('UTCID02: creating a quotation as STAFF is forbidden (requires Manager) -> 403', async () => {
+  it('UTCID02: creating a quotation as LEADER is forbidden -> 403', async () => {
     const res = await request(app)
       .post('/api/v1/customers/cus-1/quotations')
-      .set('Authorization', authHeader('STAFF'))
+      .set('Authorization', authHeader('LEADER'))
       .send({ version: 'v1', items: [{ itemId: 'item-1', quantity: 1, price: 100, discount: 0 }] });
 
     expect(res.status).toBe(403);

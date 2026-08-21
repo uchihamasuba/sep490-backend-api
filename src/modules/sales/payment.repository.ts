@@ -91,12 +91,13 @@ export const paymentRepository = {
     // (c) payment_status=DEPOSITED. Cọc không còn bị rollback chỉ vì kho nội bộ không đủ.
     const now = new Date();
     return prisma.$transaction(async (tx) => {
-      const order = await tx.order.findUnique({ where: { orderId }, select: { orderStatus: true } });
+      const order = await tx.order.findUnique({ where: { orderId }, select: { orderStatus: true, paymentStatus: true } });
       const active = !!order && ['NEW', 'CONFIRMED', 'IN_PROGRESS'].includes(order.orderStatus);
       if (active) {
         await reservationRepository.reserveOrderStock(tx, orderId, approvedBy);
       }
       const promote = order?.orderStatus === 'NEW';
+      const shouldUpdatePaymentStatus = order?.paymentStatus === 'UNPAID';
 
       const deposit = await tx.deposit.update({
         where: { depositId },
@@ -104,7 +105,7 @@ export const paymentRepository = {
       });
       await tx.order.update({
         where: { orderId },
-        data: { paymentStatus: 'DEPOSITED', ...(promote ? { orderStatus: 'CONFIRMED', confirmedAt: now } : {}) },
+        data: { ...(shouldUpdatePaymentStatus ? { paymentStatus: 'DEPOSITED' } : {}), ...(promote ? { orderStatus: 'CONFIRMED', confirmedAt: now } : {}) },
       });
       return deposit;
     }, { isolationLevel: 'ReadCommitted' });

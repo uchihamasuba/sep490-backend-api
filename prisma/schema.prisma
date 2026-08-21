@@ -395,6 +395,7 @@ model Quotation {
   totalAmount   Decimal         @default(0) @map("total_amount") @db.Decimal(14, 2)
   status        QuotationStatus @default(DRAFT)
   notes         String?         @db.Text
+  isManagerViewed Boolean       @default(false) @map("is_manager_viewed")
   createdBy     String          @map("created_by") @db.VarChar(36)
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamp(0)
   updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)

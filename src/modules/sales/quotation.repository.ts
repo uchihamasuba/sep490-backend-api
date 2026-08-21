@@ -28,6 +28,7 @@ export interface QuotationListFilter {
   status?: QuotationStatus;
   search?: string;
   customerId?: string;
+  isManagerViewed?: boolean;
 }
 
 export interface QuotationListParams extends QuotationListFilter {
@@ -47,6 +48,7 @@ function buildWhere(filter: QuotationListFilter): Prisma.QuotationWhereInput {
   const where: Prisma.QuotationWhereInput = {};
   if (filter.status) where.status = filter.status;
   if (filter.customerId) where.customerId = filter.customerId;
+  if (filter.isManagerViewed !== undefined) where.isManagerViewed = filter.isManagerViewed;
   if (filter.search) {
     const q = filter.search;
     where.OR = [{ quotationCode: { contains: q } }, { customer: { customerName: { contains: q } } }];
@@ -137,6 +139,7 @@ export const quotationRepository = {
     version: string;
     notes: string | null;
     createdBy: string;
+    isManagerViewed: boolean;
     quotationCode: string;
     itemInputs: QuotationLineInput[];
     itemsById: Map<string, Item>;
@@ -151,6 +154,7 @@ export const quotationRepository = {
         version: params.version,
         notes: params.notes,
         createdBy: params.createdBy,
+        isManagerViewed: params.isManagerViewed,
         subtotal: totals.subtotal,
         discountTotal: totals.discountTotal,
         totalAmount: totals.totalAmount,
@@ -168,6 +172,10 @@ export const quotationRepository = {
       },
       include: detailInclude,
     });
+  },
+
+  updateManagerViewed(quotationId: string, isManagerViewed: boolean) {
+    return prisma.quotation.update({ where: { quotationId }, data: { isManagerViewed } });
   },
 
   async replaceItems(params: {

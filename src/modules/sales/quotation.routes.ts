@@ -55,6 +55,13 @@ quotationRouter.patch(
   asyncHandler(quotationController.updateStatus),
 );
 
+quotationRouter.put(
+  '/:quotationId/view',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(quotationIdParamSchema, 'params'),
+  asyncHandler(quotationController.markAsViewed),
+);
+
 quotationRouter.delete(
   '/:quotationId',
   requireRole('MANAGER'),
@@ -77,7 +84,7 @@ customerQuotationRouter.get(
 
 customerQuotationRouter.post(
   '/',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(customerIdParamSchema, 'params'),
   validate(createQuotationBodySchema, 'body'),
   asyncHandler(quotationController.createForCustomer),

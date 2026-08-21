@@ -14,6 +14,7 @@ export const listQuotationsQuerySchema = z.object({
   search: z.string().trim().min(1).optional(),
   status: quotationApiStatusEnum.optional(),
   customerId: z.string().trim().min(1).optional(),
+  isManagerViewed: z.preprocess((val) => val === 'true', z.boolean()).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(10),
 });

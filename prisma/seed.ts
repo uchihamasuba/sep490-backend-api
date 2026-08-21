@@ -692,7 +692,8 @@ async function main(): Promise<void> {
   for (let i = 0; i < quotationStatuses.length; i++) {
     const status = quotationStatuses[i];
     const customer = randomChoice(customers);
-    const creator = randomChoice(managers);
+    const creator = randomChoice([...managers, ...operationalPool]);
+    const isManagerViewed = ['MANAGER', 'ADMIN'].includes(creator.role);
     const chosenItems = sample(items, randomInt(2, 5));
 
     const lines = chosenItems.map((it) => {
@@ -720,6 +721,7 @@ async function main(): Promise<void> {
         status,
         notes: `Báo giá dịch vụ tổ chức sự kiện cho ${customer.name}.`,
         createdBy: creator.userId,
+        isManagerViewed,
         items: {
           create: lines.map((l) => ({
             itemId: l.itemId,
