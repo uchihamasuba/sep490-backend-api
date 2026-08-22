@@ -573,9 +573,12 @@ describe('GET /api/v1/orders/:orderId (View Order Details & Track Order Status)'
     expect(res.status).toBe(404);
   });
 
-  it('UTCID04: is forbidden for Staff (route requires Manager/Admin)', async () => {
+  it('UTCID04: is allowed for Staff', async () => {
+    mockedOrderRepo.findById.mockResolvedValue(
+      buildOrderRow({ orderId: 'ORD123', items: [{ itemId: 'item-1', quantity: 1, unitPrice: 100000 }] }) as never,
+    );
     const res = await request(app).get('/api/v1/orders/ORD123').set('Authorization', authHeader('STAFF'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 
   it('UTCID05: surfaces a repository failure as 500', async () => {
@@ -609,7 +612,7 @@ describe('GET /api/v1/orders/:orderId (Track Order Status — mirrors "View Orde
   it('UTCID03: non-existent order -> 404 (see View Order Details UTCID03)', () => {
     expect(true).toBe(true);
   });
-  it('UTCID04: Staff role -> 403 (see View Order Details UTCID04)', () => {
+  it('UTCID04: Staff role -> 200 (see View Order Details UTCID04)', () => {
     expect(true).toBe(true);
   });
   it('UTCID05: repository failure -> 500 (see View Order Details UTCID05)', () => {

@@ -55,7 +55,7 @@ router.get(
 
 router.get(
   '/:orderId',
-  requireRole('MANAGER', 'ADMIN'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(orderIdParamSchema, 'params'),
   asyncHandler(orderController.getById),
 );
@@ -170,7 +170,7 @@ router.patch(
 
 router.patch(
   '/:orderId/quotation',
-  requireRole('MANAGER'),
+  requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(orderIdParamSchema, 'params'),
   validate(updateOrderQuotationBodySchema, 'body'),
   asyncHandler(orderController.updateQuotation),
