@@ -157,8 +157,49 @@ async function listTransactions(query: ListTransactionsQuery): Promise<Transacti
   };
 }
 
+// ============================================================================
+// Danh sách ngân hàng (proxy banks.json của VietQR/SePay) — để Admin CHỌN ngân hàng khi cấu hình tài
+// khoản thay vì gõ tay mã BIN. Cache in-memory 24h (danh sách ít đổi); fetch fail mà còn cache cũ thì
+// trả cache. `bin` dùng làm mã ngân hàng cho SePay, `shortName` là tên hiển thị.
+// ============================================================================
+export interface BankDTO {
+  bin: string;
+  code: string;
+  shortName: string;
+  name: string;
+}
+
+let banksCache: { at: number; data: BankDTO[] } | null = null;
+const BANKS_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function listBanks(): Promise<BankDTO[]> {
+  const now = Date.now();
+  if (banksCache && now - banksCache.at < BANKS_TTL_MS) return banksCache.data;
+
+  try {
+    const res = await fetch(env.BANKS_JSON_URL, { method: 'GET' });
+    if (!res.ok) throw new Error(`banks.json ${res.status}`);
+    const body = (await res.json()) as { data?: Record<string, unknown>[] };
+    const rows = Array.isArray(body.data) ? body.data : [];
+    const data: BankDTO[] = rows
+      .filter((b) => b.bin && b.short_name)
+      .map((b) => ({
+        bin: String(b.bin),
+        code: String(b.code ?? ''),
+        shortName: String(b.short_name),
+        name: String(b.name ?? b.short_name),
+      }));
+    banksCache = { at: now, data };
+    return data;
+  } catch {
+    if (banksCache) return banksCache.data; // fetch lỗi nhưng còn cache cũ → dùng tạm
+    throw AppError.internal('Không tải được danh sách ngân hàng từ nguồn banks.json');
+  }
+}
+
 export const settingsService = {
   getBankAccount,
   updateBankAccount,
   listTransactions,
+  listBanks,
 };

@@ -14,6 +14,10 @@ router.use(requireAuth);
 // (mobile hiện QR tại hiện trường) đều cần lấy tài khoản để dựng mã QR. Thông tin TK vốn công khai.
 router.get('/bank-account', asyncHandler(settingsController.getBankAccount));
 
+// GET banks: danh sách ngân hàng (proxy banks.json) để Admin CHỌN khi cấu hình — dữ liệu công khai,
+// mọi role đăng nhập đọc được.
+router.get('/banks', asyncHandler(settingsController.listBanks));
+
 // PUT bank-account: chỉ ADMIN cấu hình (master data / cấu hình hệ thống — đúng ranh giới RBAC).
 router.put(
   '/bank-account',

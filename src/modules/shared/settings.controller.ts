@@ -20,8 +20,14 @@ async function listTransactions(req: Request, res: Response) {
   ok(res, result);
 }
 
+async function listBanks(_req: Request, res: Response) {
+  const banks = await settingsService.listBanks();
+  ok(res, banks);
+}
+
 export const settingsController = {
   getBankAccount,
   updateBankAccount,
   listTransactions,
+  listBanks,
 };

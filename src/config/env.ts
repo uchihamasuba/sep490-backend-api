@@ -35,6 +35,10 @@ const envSchema = z.object({
   SEPAY_API_TOKEN: z.string().optional(),
   SEPAY_API_BASE: z.string().default('https://userapi.sepay.vn/v2'),
 
+  // Nguồn danh sách ngân hàng (VietQR/SePay banks.json) để Admin chọn khi cấu hình tài khoản — thay vì
+  // gõ tay mã BIN. BE proxy + cache để tránh CORS và giảm gọi lại.
+  BANKS_JSON_URL: z.string().default('https://vietqr.app/banks.json'),
+
   // SMTP (Gmail App Password) dùng cho mời nhân viên & reset mật khẩu qua email. Optional: chỉ các
   // tính năng gửi email phụ thuộc, không chặn boot server khi chưa cấu hình.
   SMTP_HOST: z.string().optional(),
