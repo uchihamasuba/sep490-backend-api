@@ -97,7 +97,12 @@ export const paymentRepository = {
         await reservationRepository.reserveOrderStock(tx, orderId, approvedBy);
       }
       const promote = order?.orderStatus === 'NEW';
-      const shouldUpdatePaymentStatus = order?.paymentStatus === 'UNPAID';
+      // paymentStatus CHỈ tiến 1 chiều UNPAID → DEPOSITED, KHÔNG BAO GIỜ kéo lùi. Chặn bug: Manager quên
+      // xác nhận cọc sớm; sau khi đơn đã quyết toán (paymentStatus=PAID) + hoàn thành mới xác nhận khoản
+      // cọc sót → nếu set DEPOSITED vô điều kiện sẽ kéo PAID → DEPOSITED. Guard: chỉ đổi khi đang UNPAID
+      // và đơn CHƯA terminal (COMPLETED/CANCELLED — đơn đã kết thúc thì paymentStatus do quyết toán quyết định).
+      const isTerminal = order?.orderStatus === 'COMPLETED' || order?.orderStatus === 'CANCELLED';
+      const shouldUpdatePaymentStatus = order?.paymentStatus === 'UNPAID' && !isTerminal;
 
       const deposit = await tx.deposit.update({
         where: { depositId },
