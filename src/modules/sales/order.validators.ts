@@ -133,6 +133,13 @@ export const createDepositBodySchema = z.object({
   paymentMethod: z.string().trim().min(1).optional(),
   qrCodeUrl: z.string().trim().min(1).optional(),
   notes: z.string().trim().optional(),
+  evidenceId: z.string().trim().min(1).optional(),
+  evidenceIds: z.array(z.string().trim().min(1)).optional(),
+}).transform((data) => {
+  if (!data.evidenceIds && data.evidenceId) {
+    data.evidenceIds = [data.evidenceId];
+  }
+  return data;
 });
 
 export const createSettlementBodySchema = z.object({

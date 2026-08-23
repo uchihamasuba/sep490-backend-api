@@ -341,8 +341,33 @@ export const orderRepository = {
     qrCodeUrl: string | null;
     notes: string | null;
     requestedBy: string;
+    status?: DepositStatus;
+    approvedBy?: string;
+    approvedAt?: Date;
+    paymentDate?: Date;
+    evidenceIds?: string[];
   }) {
-    return prisma.deposit.create({ data });
+    return prisma.deposit.create({
+      data: {
+        depositCode: data.depositCode,
+        orderId: data.orderId,
+        amount: data.amount,
+        dueDate: data.dueDate,
+        paymentMethod: data.paymentMethod,
+        qrCodeUrl: data.qrCodeUrl,
+        notes: data.notes,
+        requestedBy: data.requestedBy,
+        ...(data.status && { status: data.status }),
+        ...(data.approvedBy && { approvedBy: data.approvedBy }),
+        ...(data.approvedAt && { approvedAt: data.approvedAt }),
+        ...(data.paymentDate && { paymentDate: data.paymentDate }),
+        ...(data.evidenceIds && data.evidenceIds.length > 0 && {
+          evidences: {
+            create: data.evidenceIds.map(id => ({ evidenceId: id }))
+          }
+        })
+      }
+    });
   },
 
   async generateNextDepositCode(): Promise<string> {

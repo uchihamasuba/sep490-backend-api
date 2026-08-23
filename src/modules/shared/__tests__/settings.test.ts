@@ -2,6 +2,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { app } from '../../../app';
 import { env } from '../../../config/env';
+import { prisma } from '../../../db/prisma';
 
 function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
   const token = jwt.sign({ id: 'user-1', role }, env.JWT_SECRET, { expiresIn: '1h' });
@@ -9,39 +10,37 @@ function authHeader(role: 'MANAGER' | 'ADMIN' | 'STAFF' = 'MANAGER') {
 }
 
 describe('GET /api/v1/settings/bank-account', () => {
-  const originalEnv = { ...env };
+  beforeEach(async () => {
+    await prisma.companyBankAccount.deleteMany();
+  });
 
-  afterEach(() => {
-    Object.assign(env, originalEnv);
+  afterAll(async () => {
+    await prisma.companyBankAccount.deleteMany();
   });
 
   it('returns the configured bank account', async () => {
-    Object.assign(env, {
-      COMPANY_BANK_BIN: '970436',
-      COMPANY_BANK_NAME: 'MB Bank',
-      COMPANY_BANK_ACCOUNT_NUMBER: '0000000000',
-      COMPANY_BANK_ACCOUNT_NAME: 'CONG TY SEP490',
+    await prisma.companyBankAccount.create({
+      data: {
+        bankBin: '970436',
+        bankName: 'MB Bank',
+        accountNumber: '0000000000',
+        accountName: 'CONG TY SEP490',
+      },
     });
 
     const res = await request(app).get('/api/v1/settings/bank-account').set('Authorization', authHeader());
 
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({
+    expect(res.body.data).toEqual(expect.objectContaining({
       bankBin: '970436',
       bankName: 'MB Bank',
       accountNumber: '0000000000',
       accountName: 'CONG TY SEP490',
-    });
+      configured: true,
+    }));
   });
 
   it('returns null fields when not configured', async () => {
-    Object.assign(env, {
-      COMPANY_BANK_BIN: undefined,
-      COMPANY_BANK_NAME: undefined,
-      COMPANY_BANK_ACCOUNT_NUMBER: undefined,
-      COMPANY_BANK_ACCOUNT_NAME: undefined,
-    });
-
     const res = await request(app).get('/api/v1/settings/bank-account').set('Authorization', authHeader());
 
     expect(res.status).toBe(200);
@@ -50,6 +49,8 @@ describe('GET /api/v1/settings/bank-account', () => {
       bankName: null,
       accountNumber: null,
       accountName: null,
+      configured: false,
+      updatedAt: null,
     });
   });
 
@@ -58,8 +59,8 @@ describe('GET /api/v1/settings/bank-account', () => {
     expect(res.status).toBe(401);
   });
 
-  it('rejects roles outside manager/admin with 403', async () => {
+  it('allows STAFF to read bank account with 200', async () => {
     const res = await request(app).get('/api/v1/settings/bank-account').set('Authorization', authHeader('STAFF'));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(200);
   });
 });

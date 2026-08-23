@@ -611,6 +611,8 @@ async function createDeposit(orderId: string, body: CreateDepositBody, actor: Ac
     }
   }
 
+  const hasEvidence = body.evidenceIds && body.evidenceIds.length > 0;
+  
   const depositCode = await orderRepository.generateNextDepositCode();
   const created = await orderRepository.createDeposit({
     depositCode,
@@ -621,6 +623,11 @@ async function createDeposit(orderId: string, body: CreateDepositBody, actor: Ac
     qrCodeUrl: body.qrCodeUrl ?? null,
     notes: body.notes || null,
     requestedBy: actor.id,
+    evidenceIds: body.evidenceIds,
+    status: hasEvidence ? 'PAID' : 'UNPAID',
+    approvedBy: hasEvidence ? actor.id : undefined,
+    approvedAt: hasEvidence ? new Date() : undefined,
+    paymentDate: hasEvidence ? new Date() : undefined,
   });
   return mapDeposit(created);
 }
