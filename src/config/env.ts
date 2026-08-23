@@ -29,6 +29,12 @@ const envSchema = z.object({
   COMPANY_BANK_ACCOUNT_NUMBER: z.string().optional(),
   COMPANY_BANK_ACCOUNT_NAME: z.string().optional(),
 
+  // SePay — token BÍ MẬT gọi userapi.sepay.vn (v2) để lấy "Lịch sử giao dịch". Optional: chỉ tính năng
+  // này phụ thuộc, không chặn boot. KHÔNG bao giờ trả token ra FE — BE proxy GET /settings/transactions.
+  // BE lọc giao dịch theo account_number của tài khoản Admin đã cấu hình.
+  SEPAY_API_TOKEN: z.string().optional(),
+  SEPAY_API_BASE: z.string().default('https://userapi.sepay.vn/v2'),
+
   // SMTP (Gmail App Password) dùng cho mời nhân viên & reset mật khẩu qua email. Optional: chỉ các
   // tính năng gửi email phụ thuộc, không chặn boot server khi chưa cấu hình.
   SMTP_HOST: z.string().optional(),

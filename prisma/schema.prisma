@@ -294,6 +294,23 @@ model BusinessPolicy {
   @@map("business_policies")
 }
 
+// Tài khoản ngân hàng CÔNG TY để sinh mã QR (SePay/VietQR) nhận cọc/quyết toán. Trước đây hardcode ở FE
+// (src/constants/company-bank.ts) + đọc env ở settings.service — nay chuyển sang DB để ADMIN cấu hình
+// được trong app. Dùng dạng SINGLETON: app chỉ giữ 1 hàng (findFirst → update/create), không có API
+// tạo nhiều. `bankBin` là mã ngân hàng truyền cho SePay (param `bank`, chấp nhận bin/short_name).
+model CompanyBankAccount {
+  id            String   @id @default(dbgenerated("(uuid())")) @map("id") @db.VarChar(36)
+  bankBin       String   @map("bank_bin") @db.VarChar(50)
+  bankName      String   @map("bank_name") @db.VarChar(255)
+  accountNumber String   @map("account_number") @db.VarChar(50)
+  accountName   String   @map("account_name") @db.VarChar(255)
+  updatedBy     String?  @map("updated_by") @db.VarChar(36)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamp(0)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(0)
+
+  @@map("company_bank_accounts")
+}
+
 // ============================================================================
 // NHÓM 2 — CATALOG (Category > Type > Item)
 // ============================================================================

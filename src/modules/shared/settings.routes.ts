@@ -1,15 +1,34 @@
 import { Router } from 'express';
 import { requireAuth, requireRole } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
 import { asyncHandler } from '../../utils/asyncHandler';
 import { settingsController } from './settings.controller';
+import { listTransactionsQuerySchema, updateBankAccountBodySchema } from './settings.validators';
 
 // Mounted at /api/v1/settings
 const router = Router();
 
 router.use(requireAuth);
 
-// Manager + Admin đều đọc được (docs/api/more-require.md mục 1, đề xuất 2) — dùng cho trang chi tiết
-// đặt cọc/quyết toán ở cả 2 role.
-router.get('/bank-account', requireRole('MANAGER', 'ADMIN'), asyncHandler(settingsController.getBankAccount));
+// GET bank-account: MỌI role đăng nhập đọc được — Manager/Admin (web deposit/settlement) VÀ Leader Staff
+// (mobile hiện QR tại hiện trường) đều cần lấy tài khoản để dựng mã QR. Thông tin TK vốn công khai.
+router.get('/bank-account', asyncHandler(settingsController.getBankAccount));
+
+// PUT bank-account: chỉ ADMIN cấu hình (master data / cấu hình hệ thống — đúng ranh giới RBAC).
+router.put(
+  '/bank-account',
+  requireRole('ADMIN'),
+  validate(updateBankAccountBodySchema, 'body'),
+  asyncHandler(settingsController.updateBankAccount),
+);
+
+// GET transactions: Lịch sử giao dịch (proxy SePay). Admin + Manager đọc được (đọc từ tài khoản đã cấu
+// hình). Token SePay ở env — KHÔNG lộ ra FE.
+router.get(
+  '/transactions',
+  requireRole('MANAGER', 'ADMIN'),
+  validate(listTransactionsQuerySchema, 'query'),
+  asyncHandler(settingsController.listTransactions),
+);
 
 export default router;
