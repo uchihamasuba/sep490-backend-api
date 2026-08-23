@@ -44,6 +44,8 @@ jest.mock('../order.repository', () => {
       updateLiveChecklist: jest.fn(),
       updateQuotationId: jest.fn(),
       close: jest.fn(),
+      findItemsByIds: jest.fn().mockImplementation((ids: string[]) => Promise.resolve(ids.map(id => ({ itemId: id })))),
+      replaceItems: jest.fn(),
     },
   };
 });

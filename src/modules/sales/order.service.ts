@@ -584,6 +584,35 @@ async function updateOrderQuotation(orderId: string, body: UpdateOrderQuotationB
     if (linkedOrder && linkedOrder.orderId !== orderId) {
       throw AppError.conflict('Báo giá này đã được liên kết với một đơn hàng khác');
     }
+
+    if (existing.quotationId !== body.quotationId) {
+      const mergedByItemId = new Map<string, OrderLineInput>();
+      existing.orderItems.forEach((it) => {
+        mergedByItemId.set(it.itemId, {
+          itemId: it.itemId,
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice),
+          source: it.source as 'INTERNAL' | 'SUPPLIER',
+          notes: it.notes ?? undefined,
+        });
+      });
+      (quotation.items || []).forEach((qi) => {
+        const existingItem = mergedByItemId.get(qi.itemId);
+        if (existingItem) {
+          existingItem.quantity += qi.quantity;
+        } else {
+          mergedByItemId.set(qi.itemId, {
+            itemId: qi.itemId,
+            quantity: qi.quantity,
+            unitPrice: qi.quantity > 0 ? Math.round(Number(qi.lineTotal) / qi.quantity) : Number(qi.price),
+            source: 'INTERNAL',
+          });
+        }
+      });
+      const mergedItems = Array.from(mergedByItemId.values());
+      await validateItemsExist(mergedItems);
+      await orderRepository.replaceItems(orderId, mergedItems);
+    }
   } else {
     if (!existing.quotationId) {
       throw AppError.badRequest('Đơn hàng chưa liên kết báo giá nào để hủy liên kết');
@@ -613,6 +642,12 @@ async function createDeposit(orderId: string, body: CreateDepositBody, actor: Ac
 
   const hasEvidence = body.evidenceIds && body.evidenceIds.length > 0;
   
+  let isAutoPaid = hasEvidence;
+  if (actor.role === 'STAFF') {
+    const isBankTransfer = body.paymentMethod === 'bank_transfer';
+    isAutoPaid = isBankTransfer && hasEvidence;
+  }
+
   const depositCode = await orderRepository.generateNextDepositCode();
   const created = await orderRepository.createDeposit({
     depositCode,
@@ -624,10 +659,10 @@ async function createDeposit(orderId: string, body: CreateDepositBody, actor: Ac
     notes: body.notes || null,
     requestedBy: actor.id,
     evidenceIds: body.evidenceIds,
-    status: hasEvidence ? 'PAID' : 'UNPAID',
-    approvedBy: hasEvidence ? actor.id : undefined,
-    approvedAt: hasEvidence ? new Date() : undefined,
-    paymentDate: hasEvidence ? new Date() : undefined,
+    status: isAutoPaid ? 'PAID' : 'UNPAID',
+    approvedBy: isAutoPaid ? actor.id : undefined,
+    approvedAt: isAutoPaid ? new Date() : undefined,
+    paymentDate: isAutoPaid ? new Date() : undefined,
   });
   return mapDeposit(created);
 }
