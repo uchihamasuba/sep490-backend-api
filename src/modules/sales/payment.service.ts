@@ -4,6 +4,7 @@ import { scheduleRepository } from '../operations/schedule.repository';
 import type { Actor } from '../operations/schedule.service';
 import { paymentRepository, type DepositWithOrder } from './payment.repository';
 import { orderRepository } from './order.repository';
+import { notificationService } from '../shared/notification.service';
 import type { ListDepositsQuery, MarkSettlementPaidBody, UpdateDepositStatusBody } from './payment.validators';
 
 const OPEN_DEPOSIT_STATUSES: DepositStatus[] = ['UNPAID'];
@@ -158,7 +159,16 @@ async function confirmSettlement(settlementId: string, confirmedBy: string, evid
 
   const updated = await paymentRepository.confirmSettlement(settlementId, settlement.orderId, confirmedBy, evidenceIds);
   // Quyết toán → PAID: có thể là điều kiện cuối để tự hoàn thành đơn (nếu mọi lịch đã xong). No-op nếu chưa đủ.
-  await orderRepository.maybeCompleteOrder(settlement.orderId);
+  const completion = await orderRepository.maybeCompleteOrder(settlement.orderId);
+  if (completion.completed) {
+    void notificationService.broadcastToPrivilegedUsers(
+      'Đơn hàng hoàn thành',
+      `Đơn ${completion.orderCode ?? ''} đã hoàn thành`,
+      'ORDER',
+      settlement.orderId,
+      'ORDER',
+    );
+  }
   return mapSettlement(updated);
 }
 
@@ -182,7 +192,24 @@ async function markSettlementPaid(settlementId: string, body: MarkSettlementPaid
 
   const updated = await paymentRepository.markSettlementPaid(settlementId, body.evidenceIds!, settlement.orderId);
   // Leader thu tiền tại hiện trường → settlement PAID: thử tự hoàn thành đơn nếu mọi lịch đã xong.
-  await orderRepository.maybeCompleteOrder(settlement.orderId);
+  const completion = await orderRepository.maybeCompleteOrder(settlement.orderId);
+  // Báo Manager/Admin có quyết toán vừa được Leader ghi nhận tại hiện trường, chờ xác nhận (hàng đợi).
+  void notificationService.broadcastToPrivilegedUsers(
+    'Quyết toán ghi nhận tại hiện trường',
+    'Leader vừa ghi nhận đã thu tiền quyết toán một đơn hàng — chờ Manager xác nhận',
+    'PAYMENT',
+    settlement.orderId,
+    'ORDER',
+  );
+  if (completion.completed) {
+    void notificationService.broadcastToPrivilegedUsers(
+      'Đơn hàng hoàn thành',
+      `Đơn ${completion.orderCode ?? ''} đã hoàn thành`,
+      'ORDER',
+      settlement.orderId,
+      'ORDER',
+    );
+  }
   return mapSettlement(updated);
 }
 

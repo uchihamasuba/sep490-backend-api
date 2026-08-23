@@ -235,17 +235,20 @@ export const orderRepository = {
   // nhảy từ NEW/CONFIRMED). Đủ điều kiện thì consume reservation như flow COMPLETED thủ công. Gọi sau khi
   // Leader check-out xong lịch cuối và sau khi settlement → PAID. Song song với nút Manager ép COMPLETED
   // trên web (giữ nguyên) — hàm này chỉ THÊM đường tự động, no-op nếu chưa đủ điều kiện.
-  async maybeCompleteOrder(orderId: string): Promise<void> {
-    const order = await prisma.order.findUnique({ where: { orderId }, select: { orderStatus: true } });
-    if (!order || order.orderStatus !== 'IN_PROGRESS') return;
+  // Trả { completed } = TRUE chỉ khi lần gọi này THỰC SỰ đưa đơn IN_PROGRESS → COMPLETED (để caller bắn
+  // noti "đơn hoàn thành" đúng 1 lần, không lặp). orderCode kèm theo để soạn nội dung noti khỏi query lại.
+  async maybeCompleteOrder(orderId: string): Promise<{ completed: boolean; orderCode: string | null }> {
+    const order = await prisma.order.findUnique({ where: { orderId }, select: { orderStatus: true, orderCode: true } });
+    if (!order || order.orderStatus !== 'IN_PROGRESS') return { completed: false, orderCode: order?.orderCode ?? null };
 
     const [totalPlans, unfinishedPlans, paidSettlements] = await Promise.all([
       prisma.schedulePlan.count({ where: { orderId } }),
       prisma.schedulePlan.count({ where: { orderId, status: { in: ['PENDING', 'CONFIRMED', 'IN_PROGRESS'] } } }),
       prisma.settlement.count({ where: { orderId, status: 'PAID' } }),
     ]);
-    if (totalPlans === 0 || unfinishedPlans > 0 || paidSettlements === 0) return;
+    if (totalPlans === 0 || unfinishedPlans > 0 || paidSettlements === 0) return { completed: false, orderCode: order.orderCode };
 
+    let completed = false;
     await prisma.$transaction(
       async (tx) => {
         const res = await tx.order.updateMany({
@@ -253,11 +256,13 @@ export const orderRepository = {
           data: { orderStatus: 'COMPLETED' },
         });
         if (res.count > 0) {
+          completed = true;
           await reservationRepository.consumeByOrder(orderId, tx);
         }
       },
       { isolationLevel: 'ReadCommitted' },
     );
+    return { completed, orderCode: order.orderCode };
   },
 
   // Đổi ngày sự kiện (reschedule): cập nhật eventDate/endDate rồi dời cửa sổ giữ chỗ theo ngày mới

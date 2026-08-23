@@ -4,6 +4,7 @@ import { scheduleRepository } from './schedule.repository';
 import type { Actor } from './schedule.service';
 import { surveyRepository, type SurveyReportWithDetails } from './survey.repository';
 import type { CreateSurveyReportBody, ListSurveyReportsQuery } from './survey.validators';
+import { notificationService } from '../shared/notification.service';
 
 const CONFIRMABLE_STATUSES: SurveyStatus[] = ['NEEDS_REVIEW', 'SUBMITTED'];
 
@@ -155,7 +156,16 @@ async function createSurveyReport(body: CreateSurveyReportBody, actor: Actor): P
     reportedBy: actor.id,
   });
 
-  return mapDetail(created);
+  const dto = mapDetail(created);
+  // Báo Manager/Admin có báo cáo khảo sát mới chờ duyệt (hàng đợi xác nhận).
+  void notificationService.broadcastToPrivilegedUsers(
+    'Báo cáo khảo sát mới',
+    `Đơn ${dto.orderCode} có báo cáo khảo sát chờ duyệt`,
+    'SURVEY',
+    dto.orderId,
+    'ORDER',
+  );
+  return dto;
 }
 
 async function confirmSurveyReport(surveyId: string, confirmedBy: string): Promise<SurveyReportDetailDTO> {

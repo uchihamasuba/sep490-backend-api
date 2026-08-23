@@ -4,6 +4,7 @@ import { AppError } from '../../utils/AppError';
 import { inventoryService, type MovementDTO } from '../inventory/inventory.service';
 import { scheduleRepository, type SchedulePlanWithDetails } from './schedule.repository';
 import { orderRepository } from '../sales/order.repository';
+import { notificationService } from '../shared/notification.service';
 import type {
   AddAssigneeBody,
   BatchUpdateSchedulePlanStatusBody,
@@ -232,7 +233,17 @@ async function createSchedulePlan(body: CreateSchedulePlanBody, createdBy: strin
   });
 
   await scheduleRepository.syncOrderDates(created.orderId);
-  return mapPlan(created);
+  const dto = mapPlan(created);
+  // Bắn noti (FCM) cho từng nhân sự vừa được phân công — Leader/Technical Staff nhận trên mobile.
+  void notificationService.broadcastToUsers(
+    dto.assignees.map((a) => a.userId),
+    'Bạn được phân công công việc mới',
+    `${dto.taskName} — đơn ${dto.orderCode}`,
+    'SCHEDULE',
+    dto.planId,
+    'SCHEDULE_PLAN',
+  );
+  return dto;
 }
 
 async function updateSchedulePlan(planId: string, body: UpdateSchedulePlanBody): Promise<SchedulePlanDTO> {
@@ -286,7 +297,19 @@ async function updateSchedulePlanStatus(
   }
 
   const updated = await scheduleRepository.updateStatus(planId, body.status, body.notes, body.evidenceIds);
-  return mapPlan(updated);
+  const dto = mapPlan(updated);
+  // Hủy lịch → báo cho nhân sự đã phân công biết (mobile).
+  if (body.status === 'CANCELLED') {
+    void notificationService.broadcastToUsers(
+      dto.assignees.map((a) => a.userId),
+      'Lịch trình đã bị hủy',
+      `Lịch "${dto.taskName}" của đơn ${dto.orderCode} đã bị hủy`,
+      'SCHEDULE',
+      dto.planId,
+      'SCHEDULE_PLAN',
+    );
+  }
+  return dto;
 }
 
 async function addAssignee(planId: string, body: AddAssigneeBody): Promise<SchedulePlanDTO> {
@@ -307,7 +330,17 @@ async function addAssignee(planId: string, body: AddAssigneeBody): Promise<Sched
   }
 
   await scheduleRepository.addAssignee(planId, body.userId, body.role);
-  return getSchedulePlanById(planId);
+  const dto = await getSchedulePlanById(planId);
+  // Báo cho nhân sự vừa được thêm vào lịch (mobile).
+  void notificationService.broadcastToUsers(
+    [body.userId],
+    'Bạn được phân công công việc mới',
+    `${dto.taskName} — đơn ${dto.orderCode}`,
+    'SCHEDULE',
+    dto.planId,
+    'SCHEDULE_PLAN',
+  );
+  return dto;
 }
 
 async function removeAssignee(planId: string, userId: string): Promise<SchedulePlanDTO> {
@@ -369,6 +402,14 @@ async function checkIn(
     // Riêng LEAD check-in mới đưa PLAN sang IN_PROGRESS (mốc cấp lịch trình, khác mốc cấp đơn ở trên).
     if (assignee.role === 'LEAD') {
       await scheduleRepository.updateStatus(planId, 'IN_PROGRESS', undefined, undefined);
+      // LEAD check-in = công việc hiện trường bắt đầu → báo Manager/Admin theo dõi.
+      void notificationService.broadcastToPrivilegedUsers(
+        'Nhân sự đã check-in hiện trường',
+        `Bắt đầu thực hiện "${plan.task.taskName}" — đơn ${plan.order.orderCode}`,
+        'SCHEDULE',
+        plan.orderId,
+        'ORDER',
+      );
     }
   }
 
@@ -393,11 +434,28 @@ async function checkOut(planId: string, userId: string, actor: Actor, latitude?:
   await scheduleRepository.checkOut(assignee.assigneeId, latitude, longitude);
   if (assignee.role === 'LEAD' && plan.status !== 'CANCELLED') {
     await scheduleRepository.updateStatus(planId, 'COMPLETED', undefined, undefined);
+    // LEAD check-out = hoàn thành lịch hiện trường → báo Manager/Admin.
+    void notificationService.broadcastToPrivilegedUsers(
+      'Hoàn thành lịch hiện trường',
+      `Đã hoàn thành "${plan.task.taskName}" — đơn ${plan.order.orderCode}`,
+      'SCHEDULE',
+      plan.orderId,
+      'ORDER',
+    );
   }
 
   // Vừa hoàn thành lịch (LEAD check-out) → có thể là lịch cuối: thử tự hoàn thành đơn nếu đã quyết toán.
   // No-op nếu còn lịch dở hoặc chưa có settlement PAID.
-  await orderRepository.maybeCompleteOrder(plan.orderId);
+  const completion = await orderRepository.maybeCompleteOrder(plan.orderId);
+  if (completion.completed) {
+    void notificationService.broadcastToPrivilegedUsers(
+      'Đơn hàng hoàn thành',
+      `Đơn ${completion.orderCode ?? ''} đã hoàn thành`,
+      'ORDER',
+      plan.orderId,
+      'ORDER',
+    );
+  }
 
   return getSchedulePlanById(planId);
 }

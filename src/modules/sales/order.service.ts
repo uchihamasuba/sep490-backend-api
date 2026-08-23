@@ -384,6 +384,19 @@ async function updateOrderStatus(orderId: string, body: UpdateOrderStatusBody): 
     actorId: existing.createdBy,
   });
 
+  // Đổi tay sang COMPLETED (Manager dropdown / web ép hoàn thành sau quyết toán) → báo Admin/Manager.
+  // assertNotTerminal ở trên đảm bảo existing CHƯA terminal nên đây luôn là lần chuyển thật (không lặp
+  // với đường auto maybeCompleteOrder — đường đó đã COMPLETED thì assertNotTerminal chặn gọi lại).
+  if (body.orderStatus === 'COMPLETED') {
+    void notificationService.broadcastToPrivilegedUsers(
+      'Đơn hàng hoàn thành',
+      `Đơn ${existing.orderCode} đã hoàn thành`,
+      'ORDER',
+      orderId,
+      'ORDER',
+    );
+  }
+
   if (body.orderStatus === 'CONFIRMED' && existing.orderStatus !== 'CONFIRMED') {
     const itemsForWarnings = existing.orderItems.map((item) => ({
       itemId: item.itemId,
@@ -694,6 +707,14 @@ async function createChangeRequest(orderId: string, body: CreateChangeRequestBod
   }
 
   const created = await changeRequestRepository.create(orderId, body.type, body.items);
+  // Báo Manager/Admin có yêu cầu thay đổi thiết bị tại hiện trường — chờ duyệt (hàng đợi xác nhận).
+  void notificationService.broadcastToPrivilegedUsers(
+    'Yêu cầu thay đổi thiết bị hiện trường',
+    `Đơn ${existing.orderCode} có yêu cầu thay đổi thiết bị tại hiện trường, chờ duyệt`,
+    'ORDER',
+    orderId,
+    'ORDER',
+  );
   return mapChangeRequest(created);
 }
 

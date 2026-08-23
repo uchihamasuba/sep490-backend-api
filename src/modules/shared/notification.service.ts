@@ -73,7 +73,7 @@ async function registerDeviceToken(userId: string, deviceToken: string) {
 
 async function broadcastToPrivilegedUsers(title: string, content: string, type?: NotificationType, refId?: string, refType?: string) {
   const users = await userRepository.findPrivilegedUsers();
-  const promises = users.map(user => 
+  const promises = users.map(user =>
     sendNotificationToUser({
       userId: user.userId,
       title,
@@ -86,10 +86,20 @@ async function broadcastToPrivilegedUsers(title: string, content: string, type?:
   await Promise.allSettled(promises);
 }
 
+// Bắn noti tới 1 nhóm user CỤ THỂ (vd các assignee của 1 lịch trình — Leader/Technical Staff). Lọc trùng.
+async function broadcastToUsers(userIds: string[], title: string, content: string, type?: NotificationType, refId?: string, refType?: string) {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  const promises = uniqueIds.map(userId =>
+    sendNotificationToUser({ userId, title, content, notificationType: type, refId, refType }),
+  );
+  await Promise.allSettled(promises);
+}
+
 export const notificationService = {
   sendNotificationToUser,
   getUserNotifications,
   markAsRead,
   registerDeviceToken,
   broadcastToPrivilegedUsers,
+  broadcastToUsers,
 };

@@ -433,7 +433,16 @@ async function createReport(body: CreateReportBody, actor: Actor): Promise<Repor
     evidenceIds: body.evidenceIds ?? [],
   });
 
-  return mapReport(created);
+  const dto = mapReport(created);
+  // Báo Manager/Admin có báo cáo thu hồi thiết bị mới do Leader nộp tại hiện trường — chờ xác nhận.
+  void notificationService.broadcastToPrivilegedUsers(
+    'Báo cáo thu hồi thiết bị mới',
+    `Đơn ${dto.orderCode} có báo cáo thu hồi thiết bị chờ xác nhận`,
+    'INVENTORY',
+    dto.orderId,
+    'ORDER',
+  );
+  return dto;
 }
 
 // docs/api/api.md gap (k), đã chốt 2026-07-22: Leader tự xác nhận "đã trả kho/NCC" trên app, giới hạn
