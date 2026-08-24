@@ -18,6 +18,7 @@ import {
   updateLiveChecklistBodySchema,
   updateOrderItemBodySchema,
   updateOrderDatesBodySchema,
+  updateOrderInfoBodySchema,
   updateOrderItemsBodySchema,
   updateOrderQuotationBodySchema,
   updateOrderStatusBodySchema,
@@ -58,6 +59,13 @@ router.get(
   requireRole('MANAGER', 'ADMIN', 'STAFF'),
   validate(orderIdParamSchema, 'params'),
   asyncHandler(orderController.getById),
+);
+
+router.patch(
+  '/:orderId',
+  requireRole('MANAGER'),
+  validate(updateOrderInfoBodySchema, 'body'),
+  asyncHandler(orderController.updateInfo),
 );
 
 router.delete(

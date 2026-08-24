@@ -437,6 +437,23 @@ async function updateOrderItems(orderId: string, items: OrderLineInput[]): Promi
   return mapDetail(updated);
 }
 
+export interface UpdateOrderInfoBody {
+  eventName?: string;
+  eventType?: string;
+  guestCount?: number;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
+}
+
+async function updateInfo(orderId: string, data: UpdateOrderInfoBody): Promise<OrderDetailDTO> {
+  const existing = await findOrderOrThrow(orderId);
+  assertNotTerminal(existing);
+  const updated = await orderRepository.updateInfo(orderId, data);
+  return mapDetail(updated);
+}
+
 // Đổi ngày sự kiện (reschedule) — đơn CONFIRMED/IN_PROGRESS tự dời cửa sổ giữ chỗ + guard 409 nếu ngày
 // mới trùng khoảng thiếu hàng. Phí đổi ngày (miễn phí nếu >3 ngày trước lắp đặt) do Manager xử lý ở
 // settlement (additionalFee) — endpoint này chỉ đổi ngày + đồng bộ giữ chỗ.
@@ -980,6 +997,7 @@ export const orderService = {
   createOrder,
   updateOrderStatus,
   updateOrderItems,
+  updateInfo,
   updateOrderDates,
   deleteOrder,
   getOrderStats,

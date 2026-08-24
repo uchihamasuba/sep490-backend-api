@@ -58,6 +58,16 @@ export const createOrderBodySchema = z
     path: ['endDate'],
   });
 
+export const updateOrderInfoBodySchema = z.object({
+  eventName: z.string().trim().min(1, 'Tên sự kiện không được để trống').optional(),
+  eventType: z.string().trim().min(1, 'Loại sự kiện không được để trống').optional(),
+  location: z.string().trim().min(1, 'Vui lòng nhập địa điểm').optional(),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
+  guestCount: z.coerce.number().int().nonnegative().max(2_147_483_647, 'Số lượng khách quá lớn').optional(),
+  notes: z.string().trim().optional(),
+});
+
 // PUT /orders/:id/dates — đổi ngày sự kiện (reschedule). Đơn CONFIRMED/IN_PROGRESS sẽ tự dời cửa sổ
 // giữ chỗ thiết bị + re-check 409 nếu ngày mới trùng khoảng thiếu hàng.
 export const updateOrderDatesBodySchema = z

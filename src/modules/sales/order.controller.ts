@@ -56,6 +56,13 @@ async function updateItems(req: Request, res: Response) {
   ok(res, order);
 }
 
+async function updateInfo(req: Request, res: Response) {
+  const { orderId } = req.params as unknown as OrderIdParam;
+  const body = req.body as any; // We will define this type later in order.service.ts
+  const order = await orderService.updateInfo(orderId, body);
+  ok(res, order);
+}
+
 async function updateDates(req: Request, res: Response) {
   const { orderId } = req.params as unknown as OrderIdParam;
   const body = req.body as UpdateOrderDatesBody;
@@ -180,6 +187,7 @@ export const orderController = {
   create,
   updateStatus,
   updateItems,
+  updateInfo,
   updateDates,
   remove,
   stats,

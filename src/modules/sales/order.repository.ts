@@ -2,6 +2,7 @@ import type { DepositStatus, Item, OrderItemSource, OrderStatus, PaymentStatus, 
 import { prisma } from '../../db/prisma';
 import { AppError } from '../../utils/AppError';
 import { reservationRepository } from '../inventory/reservation.repository';
+import type { UpdateOrderInfoBody } from './order.service';
 
 export interface LiveShowChecklist {
   backdrop: boolean;
@@ -263,6 +264,13 @@ export const orderRepository = {
       { isolationLevel: 'ReadCommitted' },
     );
     return { completed, orderCode: order.orderCode };
+  },
+
+  async updateInfo(orderId: string, data: Partial<UpdateOrderInfoBody>): Promise<OrderWithDetails> {
+    await prisma.order.update({ where: { orderId }, data });
+    const order = await prisma.order.findUnique({ where: { orderId }, include: detailInclude });
+    if (!order) throw AppError.internal('Không tìm thấy đơn hàng sau khi cập nhật thông tin');
+    return order;
   },
 
   // Đổi ngày sự kiện (reschedule): cập nhật eventDate/endDate rồi dời cửa sổ giữ chỗ theo ngày mới
