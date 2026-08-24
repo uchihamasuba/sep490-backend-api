@@ -699,8 +699,11 @@ async function validateTransactionCompletion(existingTx: SupplierTransactionWith
 async function applyTransactionCompletion(existingTx: SupplierTransactionWithItems, actorId: string) {
   if (existingTx.transactionType === 'PURCHASE') {
     const itemsToAdd = existingTx.items
-      .filter(item => item.itemId && item.receivedQuantity > 0)
-      .map(item => ({ itemId: item.itemId!, quantity: item.receivedQuantity }));
+      .filter(item => item.itemId && (item.receivedQuantity > 0 || item.quantity > 0))
+      .map(item => ({ 
+        itemId: item.itemId!, 
+        quantity: item.receivedQuantity > 0 ? item.receivedQuantity : item.quantity 
+      }));
     
     if (itemsToAdd.length > 0) {
       await inventoryRepository.addInventoryFromPurchase(
