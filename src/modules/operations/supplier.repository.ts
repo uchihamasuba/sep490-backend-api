@@ -148,6 +148,7 @@ const transactionInclude = {
   supplier: { select: { supplierId: true, supplierName: true } },
   order: { select: { orderId: true, orderCode: true } },
   updater: { select: { fullName: true } },
+  collectedEquipmentReports: { select: { status: true } },
 } satisfies Prisma.SupplierTransactionInclude;
 
 export type SupplierTransactionWithDetails = Prisma.SupplierTransactionGetPayload<{ include: typeof transactionInclude }>;
@@ -278,6 +279,44 @@ export const supplierTransactionRepository = {
         ...(updatedBy ? { updatedBy } : {}),
       },
       include: transactionDetailInclude,
+    });
+  },
+
+  async applyRentalReturnPenalty(transactionId: string, items: { itemId: string; damagedQuantity: number; lostQuantity: number }[], updatedBy: string) {
+    await prisma.$transaction(async (tx) => {
+      const transaction = await tx.supplierTransaction.findUnique({
+        where: { transactionId },
+        select: { supplierId: true, estimatedCost: true }
+      });
+      if (!transaction) return;
+
+      let penalty = 0;
+      for (const item of items) {
+        const qty = item.damagedQuantity + item.lostQuantity;
+        if (qty > 0) {
+          const supplierItem = await tx.supplierItem.findUnique({
+            where: {
+              supplierId_itemId: {
+                supplierId: transaction.supplierId,
+                itemId: item.itemId
+              }
+            }
+          });
+          if (supplierItem) {
+            penalty += Number(supplierItem.purchasePrice) * qty;
+          }
+        }
+      }
+
+      if (penalty > 0) {
+        await tx.supplierTransaction.update({
+          where: { transactionId },
+          data: {
+            estimatedCost: { increment: penalty },
+            updatedBy
+          }
+        });
+      }
     });
   },
 

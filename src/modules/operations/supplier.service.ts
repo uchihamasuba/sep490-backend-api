@@ -7,6 +7,7 @@ import {
   type SupplierTransactionWithItems,
 } from './supplier.repository';
 import { scheduleRepository } from './schedule.repository';
+import { inventoryRepository } from '../inventory/inventory.repository';
 import type {
   CreateSupplierBody,
   ListSupplierTransactionsQuery,
@@ -665,9 +666,44 @@ async function updateTransactionStatus(transactionId: string, body: UpdateSuppli
   if (finalStatus === 'RECEIVED' && existingTx.paymentStatus === 'PAID') {
     finalStatus = 'COMPLETED';
   }
+  
+  if (finalStatus === 'COMPLETED') {
+    await validateTransactionCompletion(existingTx);
+  }
 
   const updated = await supplierTransactionRepository.updateTransactionStatus(transactionId, finalStatus, actor.id);
+  
+  if (finalStatus === 'COMPLETED') {
+    await applyTransactionCompletion(existingTx, actor.id);
+  }
+  
   return mapTransactionDetail(updated!);
+}
+
+async function validateTransactionCompletion(existingTx: SupplierTransactionWithItems) {
+  if (existingTx.transactionType === 'RENTAL') {
+    // Phải có biên bản thu hồi ĐÃ XÁC NHẬN
+    const hasConfirmedReport = existingTx.collectedEquipmentReports?.some(r => r.status === 'CONFIRMED');
+    if (!hasConfirmedReport) {
+      throw AppError.badRequest('Giao dịch THUÊ cần có Biên bản vật tư thu hồi đã được XÁC NHẬN trước khi Hoàn thành.');
+    }
+  }
+}
+
+async function applyTransactionCompletion(existingTx: SupplierTransactionWithItems, actorId: string) {
+  if (existingTx.transactionType === 'PURCHASE') {
+    const itemsToAdd = existingTx.items
+      .filter(item => item.itemId && item.receivedQuantity > 0)
+      .map(item => ({ itemId: item.itemId!, quantity: item.receivedQuantity }));
+    
+    if (itemsToAdd.length > 0) {
+      await inventoryRepository.addInventoryFromPurchase(
+        itemsToAdd, 
+        actorId, 
+        `Nhập kho từ đơn mua NCC (ID: ${existingTx.transactionId})`
+      );
+    }
+  }
 }
 
 async function updateTransactionPaymentStatus(transactionId: string, body: UpdateSupplierTransactionPaymentStatusBody, actor: Actor): Promise<SupplierTransactionDetailDTO> {
@@ -680,6 +716,10 @@ async function updateTransactionPaymentStatus(transactionId: string, body: Updat
   if (body.paymentStatus === 'PAID' && finalStatus === 'RECEIVED') {
     finalStatus = 'COMPLETED';
   }
+  
+  if (finalStatus === 'COMPLETED' && existingTx.status !== 'COMPLETED') {
+    await validateTransactionCompletion(existingTx);
+  }
 
   let updated;
   if (finalStatus !== existingTx.status) {
@@ -687,6 +727,11 @@ async function updateTransactionPaymentStatus(transactionId: string, body: Updat
   } else {
     updated = await supplierTransactionRepository.updateTransactionPaymentStatus(transactionId, body.paymentStatus, actor.id);
   }
+  
+  if (finalStatus === 'COMPLETED' && existingTx.status !== 'COMPLETED') {
+    await applyTransactionCompletion(existingTx, actor.id);
+  }
+  
   return mapTransactionDetail(updated!);
 }
 

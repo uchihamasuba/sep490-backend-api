@@ -227,6 +227,33 @@ export const inventoryRepository = {
     });
   },
 
+  async addInventoryFromPurchase(items: { itemId: string; quantity: number }[], performedBy: string, notes: string): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        if (item.quantity <= 0) continue;
+        
+        // Cập nhật tồn kho (nếu chưa có thì có thể lỗi Prisma, nhưng Item phải có Inventory - đã quy định)
+        await tx.inventory.update({
+          where: { itemId: item.itemId },
+          data: { quantityTotal: { increment: item.quantity } },
+        });
+        
+        // Ghi lại biến động nhập kho
+        await tx.inventoryMovement.create({
+          data: {
+            itemId: item.itemId,
+            orderId: null,
+            reportId: null,
+            movementType: 'INBOUND',
+            quantity: item.quantity,
+            performedBy,
+            notes,
+          },
+        });
+      }
+    });
+  },
+
   createMovement(data: {
     itemId: string;
     orderId: string | null;

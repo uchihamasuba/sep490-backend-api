@@ -9,6 +9,7 @@ import {
   type MovementWithDetails,
   type ReportWithDetails,
 } from './inventory.repository';
+import { supplierTransactionRepository } from '../operations/supplier.repository';
 import { reservationRepository } from './reservation.repository';
 import type {
   AdjustInventoryBody,
@@ -465,6 +466,14 @@ async function confirmReport(reportId: string, actor: Actor): Promise<ReportDTO>
   // hoặc crash khi item không có dòng inventory). Đối soát/đền bù NCC là nghiệp vụ tách riêng.
   if (report.reportType === 'SUPPLIER') {
     const confirmed = await inventoryRepository.confirmReportOnly(reportId, actor.id);
+    if (confirmed.transactionId) {
+      const items = confirmed.items.map(i => ({
+        itemId: i.itemId,
+        damagedQuantity: i.damagedQuantity,
+        lostQuantity: i.lostQuantity
+      }));
+      await supplierTransactionRepository.applyRentalReturnPenalty(confirmed.transactionId, items, actor.id);
+    }
     return mapReport(confirmed);
   }
 
