@@ -291,7 +291,15 @@ export const inventoryRepository = {
     return prisma.orderItem.findMany({
       where: { orderId },
       include: {
-        item: { select: { itemName: true, unit: true, rentalPrice: true, inventory: { select: { quantityTotal: true, quantityDamaged: true } } } },
+        item: {
+          select: {
+            itemName: true,
+            unit: true,
+            rentalPrice: true,
+            purchasePrice: true,
+            inventory: { select: { quantityTotal: true, quantityDamaged: true } },
+          },
+        },
       },
     });
   },

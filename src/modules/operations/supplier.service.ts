@@ -148,6 +148,10 @@ export interface SupplierTransactionItemDTO {
   itemName: string;
   quantity: number;
   unitCost: number;
+  /** Đơn giá MUA của NCC cho item này (supplier_items.purchase_price) — dùng để tính đền bù thiếu/hỏng
+   * (Số tiền = Giá mua × Số lượng), KHÔNG dùng unitCost (đơn giá thuê khi transactionType=RENTAL). null
+   * nếu item đã bị gỡ khỏi danh mục cung cấp của NCC này. */
+  purchasePrice: number | null;
   subtotal: number;
   receivedQuantity: number;
   notes: string | null;
@@ -157,7 +161,8 @@ export interface SupplierTransactionDetailDTO extends SupplierTransactionDTO {
   items: SupplierTransactionItemDTO[];
 }
 
-function mapTransactionItem(row: SupplierTransactionWithItems['items'][number]): SupplierTransactionItemDTO {
+function mapTransactionItem(row: SupplierTransactionWithItems['items'][number], supplierId: string): SupplierTransactionItemDTO {
+  const supplierItem = row.item?.suppliers.find((s) => s.supplierId === supplierId) ?? null;
   return {
     stItemId: row.stItemId,
     transactionId: row.transactionId,
@@ -165,6 +170,7 @@ function mapTransactionItem(row: SupplierTransactionWithItems['items'][number]):
     itemName: row.itemName,
     quantity: row.quantity,
     unitCost: toNumber(row.unitCost),
+    purchasePrice: supplierItem ? toNumber(supplierItem.purchasePrice) : null,
     subtotal: toNumber(row.subtotal),
     receivedQuantity: row.receivedQuantity,
     notes: row.notes,
@@ -174,7 +180,7 @@ function mapTransactionItem(row: SupplierTransactionWithItems['items'][number]):
 function mapTransactionDetail(row: SupplierTransactionWithItems): SupplierTransactionDetailDTO {
   return {
     ...mapTransaction(row),
-    items: row.items.map(mapTransactionItem),
+    items: row.items.map((item) => mapTransactionItem(item, row.supplierId)),
   };
 }
 
@@ -367,7 +373,7 @@ async function receiveTransactionItem(
   }
 
   const updated = await supplierTransactionRepository.updateItemReceivedQuantity(stItemId, body.receivedQuantity, actor.id);
-  return mapTransactionItem(updated);
+  return mapTransactionItem({ ...updated, item: item.item }, transaction.supplierId);
 }
 
 async function deleteSupplier(supplierId: string): Promise<void> {

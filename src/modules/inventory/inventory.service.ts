@@ -60,6 +60,8 @@ export interface PicklistItemDTO {
   itemName: string;
   unit: string;
   rentalPrice: number;
+  /** Giá mua thiết bị nội bộ — dùng để tính đền bù hỏng/mất (Số tiền = Giá mua × Số lượng), không dùng rentalPrice. */
+  purchasePrice: number | null;
   source: string;
   quantityOrdered: number;
   /** Số đã THUÊ NCC cho item này (đến từ NCC, không lấy từ kho nội bộ). Cần chuẩn bị/xuất kho nội bộ = quantityOrdered − quantityRented. */
@@ -238,6 +240,7 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
       itemName: row.item.itemName,
       unit: row.item.unit,
       rentalPrice: Number(row.item.rentalPrice),
+      purchasePrice: row.item.purchasePrice === null ? null : Number(row.item.purchasePrice),
       source: row.source,
       quantityOrdered: row.quantity,
       quantityRented: rentedByItem.get(row.itemId) ?? 0,

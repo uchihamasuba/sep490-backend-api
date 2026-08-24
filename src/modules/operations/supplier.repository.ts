@@ -161,9 +161,17 @@ function buildTransactionWhere(filter: SupplierTransactionListFilter): Prisma.Su
   return where;
 }
 
+// items.item.suppliers: cần để lấy purchasePrice của NCC cho từng item (đền bù thiếu/hỏng phải tính theo
+// đơn giá MUA của NCC, không phải unitCost — vốn là đơn giá THUÊ khi transactionType=RENTAL, xem
+// mapTransactionItem ở supplier.service.ts). Lọc theo supplierId của chính transaction ở tầng service vì
+// Prisma include không tham chiếu được field cùng cấp (supplierId) ngay tại đây.
 const transactionDetailInclude = {
   ...transactionInclude,
-  items: true,
+  items: {
+    include: {
+      item: { select: { suppliers: { select: { supplierId: true, purchasePrice: true } } } },
+    },
+  },
 } satisfies Prisma.SupplierTransactionInclude;
 
 export type SupplierTransactionWithItems = Prisma.SupplierTransactionGetPayload<{ include: typeof transactionDetailInclude }>;
