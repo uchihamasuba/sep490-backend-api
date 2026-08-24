@@ -352,26 +352,50 @@ export const orderRepository = {
     paymentDate?: Date;
     evidenceIds?: string[];
   }) {
-    return prisma.deposit.create({
-      data: {
-        depositCode: data.depositCode,
-        orderId: data.orderId,
-        amount: data.amount,
-        dueDate: data.dueDate,
-        paymentMethod: data.paymentMethod,
-        qrCodeUrl: data.qrCodeUrl,
-        notes: data.notes,
-        requestedBy: data.requestedBy,
-        ...(data.status && { status: data.status }),
-        ...(data.approvedBy && { approvedBy: data.approvedBy }),
-        ...(data.approvedAt && { approvedAt: data.approvedAt }),
-        ...(data.paymentDate && { paymentDate: data.paymentDate }),
-        ...(data.evidenceIds && data.evidenceIds.length > 0 && {
-          evidences: {
-            create: data.evidenceIds.map(id => ({ evidenceId: id }))
-          }
-        })
+    return prisma.$transaction(async (tx) => {
+      const deposit = await tx.deposit.create({
+        data: {
+          depositCode: data.depositCode,
+          orderId: data.orderId,
+          amount: data.amount,
+          dueDate: data.dueDate,
+          paymentMethod: data.paymentMethod,
+          qrCodeUrl: data.qrCodeUrl,
+          notes: data.notes,
+          requestedBy: data.requestedBy,
+          ...(data.status && { status: data.status }),
+          ...(data.approvedBy && { approvedBy: data.approvedBy }),
+          ...(data.approvedAt && { approvedAt: data.approvedAt }),
+          ...(data.paymentDate && { paymentDate: data.paymentDate }),
+          ...(data.evidenceIds && data.evidenceIds.length > 0 && {
+            evidences: {
+              create: data.evidenceIds.map(id => ({ evidenceId: id }))
+            }
+          })
+        }
+      });
+
+      if (data.status === 'PAID') {
+        const order = await tx.order.findUnique({ where: { orderId: data.orderId }, select: { orderStatus: true, paymentStatus: true } });
+        if (data.approvedBy) {
+          await reservationRepository.reserveOrderStock(tx, data.orderId, data.approvedBy);
+        }
+        const promote = order?.orderStatus === 'NEW';
+        const isTerminal = order?.orderStatus === 'COMPLETED' || order?.orderStatus === 'CANCELLED';
+        const shouldUpdatePaymentStatus = order?.paymentStatus === 'UNPAID' && !isTerminal;
+
+        if (shouldUpdatePaymentStatus || promote) {
+          await tx.order.update({
+            where: { orderId: data.orderId },
+            data: {
+              ...(shouldUpdatePaymentStatus ? { paymentStatus: 'DEPOSITED' } : {}),
+              ...(promote ? { orderStatus: 'CONFIRMED', confirmedAt: data.approvedAt || new Date() } : {})
+            }
+          });
+        }
       }
+
+      return deposit;
     });
   },
 

@@ -654,6 +654,9 @@ async function updateTransactionStatus(transactionId: string, body: UpdateSuppli
     if (newStatus !== 'COMPLETED') {
       throw AppError.badRequest('Giao dịch Đã nhận chỉ có thể chuyển sang Hoàn thành');
     }
+    if (newStatus === 'COMPLETED' && existingTx.paymentStatus !== 'PAID') {
+      throw AppError.badRequest('Đơn chưa thanh toán đủ không thể hoàn thành');
+    }
   } else {
     throw AppError.badRequest(`Không thể thay đổi trạng thái khi giao dịch đã ${currentStatus === 'COMPLETED' ? 'Hoàn thành' : 'Hủy'}`);
   }

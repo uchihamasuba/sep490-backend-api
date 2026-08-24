@@ -533,9 +533,9 @@ async function main(): Promise<void> {
     })),
   });
   const policies = await prisma.businessPolicy.findMany();
-  const depositPolicy = policies.find((p) => p.policyCode === 'DEP-30')!;
-  const compensationPolicy = policies.find((p) => p.policyCode === 'COM-100')!;
-  const feePolicy = policies.find((p) => p.policyCode === 'FEE-OT')!;
+  const depositPolicy = policies.find((p: any) => p.policyCode === 'DEP-30')!;
+  const compensationPolicy = policies.find((p: any) => p.policyCode === 'COM-100')!;
+  const feePolicy = policies.find((p: any) => p.policyCode === 'FEE-OT')!;
 
   // ==========================================================================
   // 3. CATALOG — Category > Type > Item > ItemComponent (BOM)
@@ -609,7 +609,7 @@ async function main(): Promise<void> {
     })),
   });
   const customerRows = await prisma.customer.findMany();
-  const customers: CreatedParty[] = customerRows.map((c) => ({ id: c.customerId, code: c.customerCode, name: c.customerName }));
+  const customers: CreatedParty[] = customerRows.map((c: any) => ({ id: c.customerId, code: c.customerCode, name: c.customerName }));
 
   await prisma.supplier.createMany({
     data: SUPPLIERS_SEED.map((s) => ({
@@ -625,7 +625,7 @@ async function main(): Promise<void> {
     })),
   });
   const supplierRows = await prisma.supplier.findMany();
-  const suppliers: CreatedParty[] = supplierRows.map((s) => ({ id: s.supplierId, code: s.supplierCode, name: s.supplierName }));
+  const suppliers: CreatedParty[] = supplierRows.map((s: any) => ({ id: s.supplierId, code: s.supplierCode, name: s.supplierName }));
   
   const supplierItemsData: { supplierId: string; itemId: string; rentalPrice: number; purchasePrice: number; isActive: boolean; minQuantity: number | null; supplierItemCode: string | null }[] = [];
   for (const supplier of suppliers) {
