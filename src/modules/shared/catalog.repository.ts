@@ -17,6 +17,13 @@ export interface CatalogItemListParams extends CatalogItemListFilter {
 const detailInclude = {
   type: { include: { category: true } },
   inventory: true,
+  components: {
+    include: {
+      child: {
+        include: { inventory: true },
+      },
+    },
+  },
   _count: { select: { components: true } },
 } satisfies Prisma.ItemInclude;
 

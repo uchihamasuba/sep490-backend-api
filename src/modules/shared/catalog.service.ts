@@ -42,6 +42,15 @@ export interface CatalogItemDTO {
     quantityAvailable: number;
   } | null;
   isCombo: boolean;
+  components?: {
+    componentId: string;
+    childItemId: string;
+    childItemName: string;
+    childItemCode: string;
+    unit: string;
+    quantity: number;
+    quantityAvailable: number | null;
+  }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -81,6 +90,17 @@ function mapItem(row: CatalogItemWithType): CatalogItemDTO {
         }
       : null,
     isCombo: (row._count?.components ?? 0) > 0,
+    components: row.components?.map((c) => ({
+      componentId: c.id,
+      childItemId: c.childId,
+      childItemName: c.child.itemName,
+      childItemCode: c.child.itemCode,
+      unit: c.child.unit,
+      quantity: c.quantity,
+      quantityAvailable: c.child.inventory
+        ? c.child.inventory.quantityTotal - c.child.inventory.quantityDamaged
+        : null,
+    })),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
