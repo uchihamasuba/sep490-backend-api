@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { PrismaClient } from '@prisma/client';
 import type {
   UserRole,
@@ -137,10 +138,7 @@ interface UserSeed {
 
 const USERS_SEED: UserSeed[] = [
   { username: 'admin', fullName: 'Nguyễn Văn An', role: 'ADMIN', phone: '0901111001', email: 'admin@bnwevents.vn' },
-  { username: 'admin2', fullName: 'Trần Thị Bích Ngọc', role: 'ADMIN', phone: '0901111002', email: 'admin2@bnwevents.vn' },
   { username: 'manager', fullName: 'Lê Hoàng Nam', role: 'MANAGER', jobTitle: 'Trưởng phòng Kinh doanh', phone: '0902222001', email: 'manager@bnwevents.vn' },
-  { username: 'manager2', fullName: 'Phạm Thị Hồng Nhung', role: 'MANAGER', jobTitle: 'Trưởng phòng Vận hành', phone: '0902222002', email: 'manager2@bnwevents.vn' },
-  { username: 'manager3', fullName: 'Đỗ Minh Tuấn', role: 'MANAGER', jobTitle: 'Quản lý Tài chính', phone: '0902222003', email: 'manager3@bnwevents.vn' },
   { username: 'staff1', fullName: 'Vũ Đức Thắng', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0903333001', email: 'staff1@bnwevents.vn' },
   { username: 'staff2', fullName: 'Hoàng Văn Long', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0903333002', email: 'staff2@bnwevents.vn' },
   { username: 'staff3', fullName: 'Ngô Thị Lan', role: 'STAFF', jobTitle: 'Nhân viên sự kiện', phone: '0903333003', email: 'staff3@bnwevents.vn' },
@@ -176,13 +174,11 @@ interface CategorySeed {
 }
 
 const CATEGORIES_SEED: CategorySeed[] = [
-  { code: 'CAT-AUDIO', name: 'Âm thanh' },
-  { code: 'CAT-LIGHT', name: 'Ánh sáng' },
-  { code: 'CAT-LED', name: 'Màn hình LED' },
-  { code: 'CAT-STAGE', name: 'Sân khấu' },
-  { code: 'CAT-FURN', name: 'Bàn ghế' },
-  { code: 'CAT-DECOR', name: 'Trang trí' },
-  { code: 'CAT-MEDIA', name: 'Trình chiếu & Ghi hình' },
+  { code: 'CAT-FURNITURE', name: 'Bàn ghế & Phụ kiện' },
+  { code: 'CAT-TENT', name: 'Khung nhà rạp & Bạt che' },
+  { code: 'CAT-DECOR', name: 'Trang trí & Phông bạt' },
+  { code: 'CAT-COOLING', name: 'Thiết bị làm mát' },
+  { code: 'CAT-AV', name: 'Âm thanh & Ánh sáng' },
 ];
 
 interface TypeSeed {
@@ -192,35 +188,26 @@ interface TypeSeed {
 }
 
 const TYPES_SEED: TypeSeed[] = [
-  { code: 'TYPE-SPK', name: 'Loa', categoryCode: 'CAT-AUDIO' },
-  { code: 'TYPE-MIC', name: 'Micro', categoryCode: 'CAT-AUDIO' },
-  { code: 'TYPE-AMP', name: 'Amply & Vang số', categoryCode: 'CAT-AUDIO' },
-  { code: 'TYPE-MIX', name: 'Bàn trộn âm thanh', categoryCode: 'CAT-AUDIO' },
-  { code: 'TYPE-AUDACC', name: 'Phụ kiện âm thanh', categoryCode: 'CAT-AUDIO' },
-  { code: 'TYPE-AUDPKG', name: 'Gói âm thanh trọn gói', categoryCode: 'CAT-AUDIO' },
-  { code: 'TYPE-PAR', name: 'Đèn Par LED', categoryCode: 'CAT-LIGHT' },
-  { code: 'TYPE-BEAM', name: 'Đèn Beam', categoryCode: 'CAT-LIGHT' },
-  { code: 'TYPE-MOVE', name: 'Đèn Moving Head', categoryCode: 'CAT-LIGHT' },
-  { code: 'TYPE-STRLGT', name: 'Đèn trang trí dây', categoryCode: 'CAT-LIGHT' },
-  { code: 'TYPE-LGTPKG', name: 'Gói ánh sáng trọn gói', categoryCode: 'CAT-LIGHT' },
-  { code: 'TYPE-LEDOUT', name: 'Màn hình LED ngoài trời', categoryCode: 'CAT-LED' },
-  { code: 'TYPE-LEDIN', name: 'Màn hình LED trong nhà', categoryCode: 'CAT-LED' },
-  { code: 'TYPE-DISPLAY', name: 'Màn hình trình chiếu', categoryCode: 'CAT-LED' },
-  { code: 'TYPE-FRAME', name: 'Khung sân khấu', categoryCode: 'CAT-STAGE' },
-  { code: 'TYPE-CARPET', name: 'Thảm sân khấu', categoryCode: 'CAT-STAGE' },
-  { code: 'TYPE-BACKDROP', name: 'Backdrop', categoryCode: 'CAT-STAGE' },
-  { code: 'TYPE-TRUSS', name: 'Truss trang trí', categoryCode: 'CAT-STAGE' },
-  { code: 'TYPE-RNDTBL', name: 'Bàn tròn', categoryCode: 'CAT-FURN' },
-  { code: 'TYPE-RECTBL', name: 'Bàn chữ nhật', categoryCode: 'CAT-FURN' },
-  { code: 'TYPE-CHAIR', name: 'Ghế sự kiện', categoryCode: 'CAT-FURN' },
-  { code: 'TYPE-LINEN', name: 'Khăn trải bàn', categoryCode: 'CAT-FURN' },
-  { code: 'TYPE-GATE', name: 'Cổng hoa', categoryCode: 'CAT-DECOR' },
-  { code: 'TYPE-FLOWER', name: 'Hoa trang trí', categoryCode: 'CAT-DECOR' },
-  { code: 'TYPE-REDCARPET', name: 'Thảm đỏ', categoryCode: 'CAT-DECOR' },
-  { code: 'TYPE-PODIUM', name: 'Bục phát biểu', categoryCode: 'CAT-DECOR' },
-  { code: 'TYPE-PROJ', name: 'Máy chiếu', categoryCode: 'CAT-MEDIA' },
-  { code: 'TYPE-CAM', name: 'Máy quay & Flycam', categoryCode: 'CAT-MEDIA' },
-  { code: 'TYPE-GEN', name: 'Máy phát điện', categoryCode: 'CAT-MEDIA' },
+  // Bàn ghế & Phụ kiện
+  { code: 'TYPE-TABLE', name: 'Bàn', categoryCode: 'CAT-FURNITURE' },
+  { code: 'TYPE-CHAIR', name: 'Ghế', categoryCode: 'CAT-FURNITURE' },
+  { code: 'TYPE-LINEN', name: 'Khăn & Phụ kiện ghế', categoryCode: 'CAT-FURNITURE' },
+  { code: 'TYPE-UTENSIL', name: 'Dụng cụ ăn uống', categoryCode: 'CAT-FURNITURE' },
+  // Khung nhà rạp & Bạt che
+  { code: 'TYPE-FRAME', name: 'Khung sắt', categoryCode: 'CAT-TENT' },
+  { code: 'TYPE-JOINT', name: 'Khớp nối', categoryCode: 'CAT-TENT' },
+  { code: 'TYPE-TARPAULIN', name: 'Bạt che', categoryCode: 'CAT-TENT' },
+  // Trang trí & Phông bạt
+  { code: 'TYPE-CURTAIN', name: 'Rạp & Trần', categoryCode: 'CAT-DECOR' },
+  { code: 'TYPE-ARCH', name: 'Cổng hoa', categoryCode: 'CAT-DECOR' },
+  { code: 'TYPE-FLOWER', name: 'Hoa lụa', categoryCode: 'CAT-DECOR' },
+  { code: 'TYPE-GALLERY', name: 'Phụ kiện Gallery', categoryCode: 'CAT-DECOR' },
+  { code: 'TYPE-BACKDROP', name: 'Phông cưới hỏi', categoryCode: 'CAT-DECOR' },
+  // Thiết bị làm mát
+  { code: 'TYPE-FAN', name: 'Quạt', categoryCode: 'CAT-COOLING' },
+  // Âm thanh & Ánh sáng
+  { code: 'TYPE-LIGHT', name: 'Đèn trang trí & Sân khấu', categoryCode: 'CAT-AV' },
+  { code: 'TYPE-AUDIO', name: 'Âm thanh', categoryCode: 'CAT-AV' },
 ];
 
 interface ItemSeed {
@@ -235,92 +222,99 @@ interface ItemSeed {
 }
 
 const ITEMS_SEED: ItemSeed[] = [
-  // Loa
-  { code: 'SPK-JBL715', name: 'Loa JBL EON715 (500W)', typeCode: 'TYPE-SPK', unit: 'Cái', rentalPrice: 500000, purchasePrice: 15000000 },
-  { code: 'SPK-RCFLA', name: 'Loa Line Array RCF TTL55A', typeCode: 'TYPE-SPK', unit: 'Cái', rentalPrice: 1200000, purchasePrice: 45000000 },
-  { code: 'SPK-SUB18', name: 'Loa Sub JBL SRX828S 18inch', typeCode: 'TYPE-SPK', unit: 'Cái', rentalPrice: 700000, purchasePrice: 22000000 },
-  { code: 'SPK-BOSEL1', name: 'Loa kéo di động Bose L1 Pro', typeCode: 'TYPE-SPK', unit: 'Cái', rentalPrice: 400000, purchasePrice: 12000000 },
-  // Micro
-  { code: 'MIC-SM58', name: 'Micro không dây Shure SM58', typeCode: 'TYPE-MIC', unit: 'Cái', rentalPrice: 150000, purchasePrice: 3500000 },
-  { code: 'MIC-EW112', name: 'Micro cài áo Sennheiser EW112P', typeCode: 'TYPE-MIC', unit: 'Cái', rentalPrice: 200000, purchasePrice: 5000000 },
-  { code: 'MIC-MX418', name: 'Micro cổ ngỗng hội nghị Shure MX418', typeCode: 'TYPE-MIC', unit: 'Cái', rentalPrice: 180000, purchasePrice: 4000000 },
-  // Amply & vang số
-  { code: 'AMP-CROWN', name: 'Amply công suất Crown XLS2502', typeCode: 'TYPE-AMP', unit: 'Cái', rentalPrice: 300000, purchasePrice: 9000000 },
-  { code: 'AMP-DBX', name: 'Vang số DBX DriveRack PA2', typeCode: 'TYPE-AMP', unit: 'Cái', rentalPrice: 250000, purchasePrice: 7500000 },
-  // Bàn mixer
-  { code: 'MIX-YAMAHA', name: 'Bàn mixer Yamaha MG16XU', typeCode: 'TYPE-MIX', unit: 'Cái', rentalPrice: 350000, purchasePrice: 11000000 },
-  { code: 'MIX-SOUNDCRAFT', name: 'Bàn mixer Soundcraft Signature 12', typeCode: 'TYPE-MIX', unit: 'Cái', rentalPrice: 320000, purchasePrice: 10000000 },
-  // Phụ kiện âm thanh
-  { code: 'ACC-CABLE', name: 'Dây cáp tín hiệu Canon (bộ 20m)', typeCode: 'TYPE-AUDACC', unit: 'Bộ', rentalPrice: 30000, purchasePrice: 500000 },
-  { code: 'ACC-SPKWIRE', name: 'Dây loa (cuộn 50m)', typeCode: 'TYPE-AUDACC', unit: 'Cuộn', rentalPrice: 50000, purchasePrice: 800000 },
-  // Gói âm thanh trọn gói (combo BOM)
-  { code: 'PKG-AUDHALL', name: 'Gói Âm Thanh Hội Trường (100-300 khách)', typeCode: 'TYPE-AUDPKG', unit: 'Gói', rentalPrice: 8000000, purchasePrice: 0 },
-  { code: 'PKG-AUDOUT', name: 'Gói Âm Thanh Ngoài Trời (500-1000 khách)', typeCode: 'TYPE-AUDPKG', unit: 'Gói', rentalPrice: 18000000, purchasePrice: 0 },
-  // Đèn Par LED
-  { code: 'PAR-54X3', name: 'Đèn Par LED 54x3W', typeCode: 'TYPE-PAR', unit: 'Cái', rentalPrice: 120000, purchasePrice: 2500000 },
-  { code: 'PAR-COB200', name: 'Đèn Par LED COB RGBW 200W', typeCode: 'TYPE-PAR', unit: 'Cái', rentalPrice: 180000, purchasePrice: 4000000 },
-  // Đèn Beam
-  { code: 'BEAM-7R', name: 'Đèn Beam 230 7R', typeCode: 'TYPE-BEAM', unit: 'Cái', rentalPrice: 350000, purchasePrice: 9500000 },
-  { code: 'BEAM-5R', name: 'Đèn Beam Sharpy 5R', typeCode: 'TYPE-BEAM', unit: 'Cái', rentalPrice: 300000, purchasePrice: 8000000 },
-  // Moving Head
-  { code: 'MOVE-WASH', name: 'Đèn Moving Head Wash 19x15W', typeCode: 'TYPE-MOVE', unit: 'Cái', rentalPrice: 400000, purchasePrice: 11000000 },
-  { code: 'MOVE-SPOT', name: 'Đèn Moving Head Spot 230W', typeCode: 'TYPE-MOVE', unit: 'Cái', rentalPrice: 380000, purchasePrice: 10500000 },
-  // Đèn trang trí dây
-  { code: 'STR-LED10M', name: 'Đèn dây LED trang trí (cuộn 10m)', typeCode: 'TYPE-STRLGT', unit: 'Cuộn', rentalPrice: 60000, purchasePrice: 400000 },
-  { code: 'STR-BLINK', name: 'Đèn nháy trang trí ngoài trời (bộ)', typeCode: 'TYPE-STRLGT', unit: 'Bộ', rentalPrice: 80000, purchasePrice: 600000 },
-  // Gói ánh sáng trọn gói (combo BOM)
-  { code: 'PKG-LIGHTSTD', name: 'Gói Ánh Sáng Sân Khấu Tiêu Chuẩn', typeCode: 'TYPE-LGTPKG', unit: 'Gói', rentalPrice: 10000000, purchasePrice: 0 },
-  // Màn hình LED ngoài trời
-  { code: 'LED-OUTP3', name: 'Màn hình LED Outdoor P3 (module 500x500)', typeCode: 'TYPE-LEDOUT', unit: 'M2', rentalPrice: 1500000, purchasePrice: 12000000 },
-  { code: 'LED-OUTP4', name: 'Màn hình LED Outdoor P4 (module 500x500)', typeCode: 'TYPE-LEDOUT', unit: 'M2', rentalPrice: 1200000, purchasePrice: 9500000 },
-  // Màn hình LED trong nhà
-  { code: 'LED-INP25', name: 'Màn hình LED Indoor P2.5 (module 500x500)', typeCode: 'TYPE-LEDIN', unit: 'M2', rentalPrice: 1800000, purchasePrice: 15000000 },
-  // Màn hình trình chiếu
-  { code: 'DISP-TV65', name: 'TV màn hình Samsung 65 inch', typeCode: 'TYPE-DISPLAY', unit: 'Cái', rentalPrice: 600000, purchasePrice: 18000000 },
-  { code: 'DISP-SCREEN', name: 'Màn chiếu Projector Screen 3x4m', typeCode: 'TYPE-DISPLAY', unit: 'Cái', rentalPrice: 300000, purchasePrice: 6000000 },
-  // Khung sân khấu
-  { code: 'FRM-6X4', name: 'Khung sân khấu lắp ghép 6x4m', typeCode: 'TYPE-FRAME', unit: 'Bộ', rentalPrice: 3500000, purchasePrice: 40000000 },
-  { code: 'FRM-4X3', name: 'Khung sân khấu di động 4x3m', typeCode: 'TYPE-FRAME', unit: 'Bộ', rentalPrice: 2500000, purchasePrice: 28000000 },
-  // Thảm sân khấu
-  { code: 'CAR-RED', name: 'Thảm sân khấu màu đỏ (khổ 2m)', typeCode: 'TYPE-CARPET', unit: 'M2', rentalPrice: 25000, purchasePrice: 200000, bulk: true },
-  { code: 'CAR-BLUE', name: 'Thảm sân khấu màu xanh (khổ 2m)', typeCode: 'TYPE-CARPET', unit: 'M2', rentalPrice: 25000, purchasePrice: 200000, bulk: true },
-  // Backdrop
-  { code: 'BACK-UFRAME', name: 'Backdrop khung chữ U 3x4m', typeCode: 'TYPE-BACKDROP', unit: 'Bộ', rentalPrice: 800000, purchasePrice: 5000000 },
-  { code: 'BACK-HIFLEX', name: 'Backdrop in bạt Hiflex (theo m2)', typeCode: 'TYPE-BACKDROP', unit: 'M2', rentalPrice: 150000, purchasePrice: 400000 },
-  // Truss
-  { code: 'TRS-SQ290', name: 'Truss vuông 290 (cây 2m)', typeCode: 'TYPE-TRUSS', unit: 'Cây', rentalPrice: 200000, purchasePrice: 3000000 },
-  { code: 'TRS-TRI200', name: 'Truss tam giác 200 (cây 2m)', typeCode: 'TYPE-TRUSS', unit: 'Cây', rentalPrice: 180000, purchasePrice: 2700000 },
-  // Bàn tròn
-  { code: 'TBL-RND15', name: 'Bàn tiệc tròn 1m5', typeCode: 'TYPE-RNDTBL', unit: 'Cái', rentalPrice: 100000, purchasePrice: 1800000, bulk: true },
-  { code: 'TBL-RND18', name: 'Bàn tiệc tròn 1m8', typeCode: 'TYPE-RNDTBL', unit: 'Cái', rentalPrice: 120000, purchasePrice: 2200000, bulk: true },
-  // Bàn chữ nhật
-  { code: 'TBL-RECT12', name: 'Bàn hội nghị chữ nhật 1m2', typeCode: 'TYPE-RECTBL', unit: 'Cái', rentalPrice: 90000, purchasePrice: 1500000, bulk: true },
-  { code: 'TBL-RECT18', name: 'Bàn hội nghị chữ nhật 1m8', typeCode: 'TYPE-RECTBL', unit: 'Cái', rentalPrice: 110000, purchasePrice: 1900000, bulk: true },
+  // Bàn
+  { code: 'ITEM-TBL-L', name: 'Bàn tiệc tròn loại to (1m5)', typeCode: 'TYPE-TABLE', unit: 'Cái', rentalPrice: 100000, purchasePrice: 1800000, bulk: true },
+  { code: 'ITEM-TBL-S', name: 'Bàn tiệc tròn loại nhỏ (1m2)', typeCode: 'TYPE-TABLE', unit: 'Cái', rentalPrice: 80000, purchasePrice: 1500000, bulk: true },
   // Ghế
-  { code: 'CHR-PLASTIC', name: 'Ghế nhựa Đài Loan', typeCode: 'TYPE-CHAIR', unit: 'Cái', rentalPrice: 15000, purchasePrice: 150000, bulk: true },
-  { code: 'CHR-TIFFANY', name: 'Ghế tiffany mạ vàng', typeCode: 'TYPE-CHAIR', unit: 'Cái', rentalPrice: 35000, purchasePrice: 450000, bulk: true },
-  { code: 'CHR-SOFA', name: 'Ghế sofa sự kiện', typeCode: 'TYPE-CHAIR', unit: 'Cái', rentalPrice: 80000, purchasePrice: 1500000, bulk: true },
-  // Khăn trải bàn
-  { code: 'LIN-WHITE', name: 'Khăn trải bàn trắng', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
-  { code: 'LIN-RED', name: 'Khăn trải bàn đỏ đô', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-CHR-STL', name: 'Ghế đẩu', typeCode: 'TYPE-CHAIR', unit: 'Cái', rentalPrice: 10000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-CHR-INOX', name: 'Ghế inox', typeCode: 'TYPE-CHAIR', unit: 'Cái', rentalPrice: 15000, purchasePrice: 150000, bulk: true },
+  { code: 'ITEM-CHR-CHIA', name: 'Ghế chiavari', typeCode: 'TYPE-CHAIR', unit: 'Cái', rentalPrice: 35000, purchasePrice: 450000, bulk: true },
+  // Khăn & Phụ kiện ghế
+  { code: 'ITEM-LIN-RED', name: 'Khăn bàn đỏ', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-LIN-YEL', name: 'Khăn bàn vàng', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-LIN-WHI', name: 'Khăn bàn trắng', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-LIN-BLU', name: 'Khăn bàn xanh dương', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-LIN-GRN', name: 'Khăn bàn rêu', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-LIN-RUN', name: 'Runner (dải vải trải dọc giữa bàn)', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 15000, purchasePrice: 80000, bulk: true },
+  { code: 'ITEM-LIN-CHR', name: 'Áo ghế', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 10000, purchasePrice: 50000, bulk: true },
+  { code: 'ITEM-LIN-BOW', name: 'Nơ ghế', typeCode: 'TYPE-LINEN', unit: 'Cái', rentalPrice: 5000, purchasePrice: 20000, bulk: true },
+  // Dụng cụ ăn uống
+  { code: 'ITEM-UTE-CUP', name: 'Cốc thủy tinh', typeCode: 'TYPE-UTENSIL', unit: 'Cái', rentalPrice: 2000, purchasePrice: 15000, bulk: true },
+  { code: 'ITEM-UTE-BOWL', name: 'Chén sứ', typeCode: 'TYPE-UTENSIL', unit: 'Cái', rentalPrice: 2000, purchasePrice: 15000, bulk: true },
+  { code: 'ITEM-UTE-POT', name: 'Ấm nước', typeCode: 'TYPE-UTENSIL', unit: 'Cái', rentalPrice: 10000, purchasePrice: 80000, bulk: true },
+  // Khung sắt
+  { code: 'ITEM-FRM-25', name: 'Thanh sắt 2.5m', typeCode: 'TYPE-FRAME', unit: 'Thanh', rentalPrice: 20000, purchasePrice: 150000, bulk: true },
+  { code: 'ITEM-FRM-3M', name: 'Thanh sắt 3m', typeCode: 'TYPE-FRAME', unit: 'Thanh', rentalPrice: 25000, purchasePrice: 180000, bulk: true },
+  { code: 'ITEM-FRM-4M', name: 'Thanh sắt 4m', typeCode: 'TYPE-FRAME', unit: 'Thanh', rentalPrice: 30000, purchasePrice: 220000, bulk: true },
+  { code: 'ITEM-FRM-COL', name: 'Cột chống', typeCode: 'TYPE-FRAME', unit: 'Cột', rentalPrice: 35000, purchasePrice: 250000, bulk: true },
+  { code: 'ITEM-FRM-RAF', name: 'Kèo', typeCode: 'TYPE-FRAME', unit: 'Cây', rentalPrice: 40000, purchasePrice: 300000, bulk: true },
+  { code: 'ITEM-FRM-ROOF', name: 'Thanh sắt lắp nóc', typeCode: 'TYPE-FRAME', unit: 'Thanh', rentalPrice: 25000, purchasePrice: 180000, bulk: true },
+  // Khớp nối
+  { code: 'ITEM-JNT-ANG', name: 'Mẩu nối góc', typeCode: 'TYPE-JOINT', unit: 'Cái', rentalPrice: 5000, purchasePrice: 50000, bulk: true },
+  { code: 'ITEM-JNT-CRS', name: 'Mẩu dấu +', typeCode: 'TYPE-JOINT', unit: 'Cái', rentalPrice: 5000, purchasePrice: 50000, bulk: true },
+  { code: 'ITEM-JNT-STR', name: 'Mẩu nối 2 thanh sắt', typeCode: 'TYPE-JOINT', unit: 'Cái', rentalPrice: 5000, purchasePrice: 50000, bulk: true },
+  { code: 'ITEM-JNT-TOP', name: 'Mẩu nối thanh xà trên', typeCode: 'TYPE-JOINT', unit: 'Cái', rentalPrice: 5000, purchasePrice: 50000, bulk: true },
+  { code: 'ITEM-JNT-ROOF', name: 'Mẩu lắp nóc', typeCode: 'TYPE-JOINT', unit: 'Cái', rentalPrice: 5000, purchasePrice: 50000, bulk: true },
+  { code: 'ITEM-JNT-RAF', name: 'Mẩu lắp kèo', typeCode: 'TYPE-JOINT', unit: 'Cái', rentalPrice: 5000, purchasePrice: 50000, bulk: true },
+  // Bạt che
+  { code: 'ITEM-TARP-6X7', name: 'Bạt trắng 6x7', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 150000, purchasePrice: 800000, bulk: true },
+  { code: 'ITEM-TARP-6X9', name: 'Bạt trắng 6x9', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 200000, purchasePrice: 1000000, bulk: true },
+  { code: 'ITEM-TARP-3X4', name: 'Bạt trắng 3x4', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 50000, purchasePrice: 300000, bulk: true },
+  { code: 'ITEM-TARP-4X5', name: 'Bạt trắng 4x5', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 80000, purchasePrice: 400000, bulk: true },
+  { code: 'ITEM-TARP-4X3', name: 'Bạt trắng 4x3', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 50000, purchasePrice: 300000, bulk: true },
+  { code: 'ITEM-TARP-4X4', name: 'Bạt trắng 4x4', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 70000, purchasePrice: 350000, bulk: true },
+  { code: 'ITEM-TARP-6X3', name: 'Bạt trắng 6x3', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 80000, purchasePrice: 400000, bulk: true },
+  { code: 'ITEM-TARP-6X4', name: 'Bạt trắng 6x4', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 100000, purchasePrice: 500000, bulk: true },
+  { code: 'ITEM-TARP-6X5', name: 'Bạt trắng 6x5', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 120000, purchasePrice: 600000, bulk: true },
+  { code: 'ITEM-TARP-8X3', name: 'Bạt trắng 8x3', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 100000, purchasePrice: 500000, bulk: true },
+  { code: 'ITEM-TARP-8X4', name: 'Bạt trắng 8x4', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 130000, purchasePrice: 700000, bulk: true },
+  { code: 'ITEM-TARP-8X5', name: 'Bạt trắng 8x5', typeCode: 'TYPE-TARPAULIN', unit: 'Tấm', rentalPrice: 160000, purchasePrice: 850000, bulk: true },
+  // Rạp & Trần
+  { code: 'ITEM-CUR-SUR', name: 'Rèm quây xung quanh (các màu)', typeCode: 'TYPE-CURTAIN', unit: 'M2', rentalPrice: 10000, purchasePrice: 50000, bulk: true },
+  { code: 'ITEM-CUR-WAV', name: 'Rèm tạo sóng', typeCode: 'TYPE-CURTAIN', unit: 'M2', rentalPrice: 15000, purchasePrice: 70000, bulk: true },
+  { code: 'ITEM-CUR-ROOF', name: 'Quây trần nhà', typeCode: 'TYPE-CURTAIN', unit: 'M2', rentalPrice: 15000, purchasePrice: 70000, bulk: true },
+  { code: 'ITEM-CAR-GRASS', name: 'Thảm cỏ', typeCode: 'TYPE-CURTAIN', unit: 'M2', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-CAR-RED', name: 'Thảm đỏ', typeCode: 'TYPE-CURTAIN', unit: 'M2', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
   // Cổng hoa
-  { code: 'GATE-OPENING', name: 'Cổng hoa khai trương', typeCode: 'TYPE-GATE', unit: 'Bộ', rentalPrice: 1500000, purchasePrice: 8000000 },
-  { code: 'GATE-WEDDING', name: 'Cổng hoa cưới', typeCode: 'TYPE-GATE', unit: 'Bộ', rentalPrice: 2000000, purchasePrice: 10000000 },
-  // Hoa trang trí
-  { code: 'FLW-VASE', name: 'Bình hoa lụa trang trí bàn', typeCode: 'TYPE-FLOWER', unit: 'Cái', rentalPrice: 80000, purchasePrice: 500000, bulk: true },
-  { code: 'FLW-STAGE', name: 'Lẵng hoa trang trí sân khấu', typeCode: 'TYPE-FLOWER', unit: 'Cái', rentalPrice: 350000, purchasePrice: 1500000 },
-  // Thảm đỏ
-  { code: 'RCARPET-12', name: 'Thảm đỏ trải lối đi (khổ 1m2)', typeCode: 'TYPE-REDCARPET', unit: 'M2', rentalPrice: 30000, purchasePrice: 300000, bulk: true },
-  // Bục phát biểu
-  { code: 'PODIUM-WOOD', name: 'Bục phát biểu gỗ veneer', typeCode: 'TYPE-PODIUM', unit: 'Cái', rentalPrice: 250000, purchasePrice: 4000000 },
-  // Máy chiếu
-  { code: 'PROJ-PANA6000', name: 'Máy chiếu Panasonic 6000 Lumens', typeCode: 'TYPE-PROJ', unit: 'Cái', rentalPrice: 800000, purchasePrice: 25000000 },
-  // Máy quay & Flycam
-  { code: 'CAM-SONYFX6', name: 'Máy quay sự kiện Sony FX6', typeCode: 'TYPE-CAM', unit: 'Cái', rentalPrice: 2500000, purchasePrice: 150000000 },
-  { code: 'CAM-DJIMAVIC3', name: 'Flycam DJI Mavic 3', typeCode: 'TYPE-CAM', unit: 'Cái', rentalPrice: 3000000, purchasePrice: 45000000 },
-  // Máy phát điện
-  { code: 'GEN-10KVA', name: 'Máy phát điện Cummins 10KVA', typeCode: 'TYPE-GEN', unit: 'Cái', rentalPrice: 1500000, purchasePrice: 60000000 },
-  { code: 'GEN-30KVA', name: 'Máy phát điện Cummins 30KVA', typeCode: 'TYPE-GEN', unit: 'Cái', rentalPrice: 3000000, purchasePrice: 150000000 },
+  { code: 'ITEM-ARC-CIR', name: 'Cổng hoa khung tròn', typeCode: 'TYPE-ARCH', unit: 'Cái', rentalPrice: 800000, purchasePrice: 3500000, bulk: true },
+  { code: 'ITEM-ARC-SQU', name: 'Cổng hoa khung vuông', typeCode: 'TYPE-ARCH', unit: 'Cái', rentalPrice: 800000, purchasePrice: 3500000, bulk: true },
+  { code: 'ITEM-ARC-HEX', name: 'Cổng hoa hình lục giác', typeCode: 'TYPE-ARCH', unit: 'Cái', rentalPrice: 900000, purchasePrice: 4000000, bulk: true },
+  { code: 'ITEM-ARC-DOM', name: 'Cổng vòm sắt/nhựa', typeCode: 'TYPE-ARCH', unit: 'Cái', rentalPrice: 700000, purchasePrice: 3000000, bulk: true },
+  // Hoa lụa
+  { code: 'ITEM-FLW-WHI', name: 'Hoa giả tone trắng', typeCode: 'TYPE-FLOWER', unit: 'Cụm', rentalPrice: 50000, purchasePrice: 200000, bulk: true },
+  { code: 'ITEM-FLW-PNK', name: 'Hoa giả tone hồng', typeCode: 'TYPE-FLOWER', unit: 'Cụm', rentalPrice: 50000, purchasePrice: 200000, bulk: true },
+  { code: 'ITEM-FLW-RED', name: 'Hoa giả tone đỏ', typeCode: 'TYPE-FLOWER', unit: 'Cụm', rentalPrice: 50000, purchasePrice: 200000, bulk: true },
+  { code: 'ITEM-FLW-PAS', name: 'Hoa giả tone pastel', typeCode: 'TYPE-FLOWER', unit: 'Cụm', rentalPrice: 50000, purchasePrice: 200000, bulk: true },
+  { code: 'ITEM-FLW-SUC', name: 'Hoa giả tone sen đá', typeCode: 'TYPE-FLOWER', unit: 'Cụm', rentalPrice: 60000, purchasePrice: 250000, bulk: true },
+  // Phụ kiện Gallery
+  { code: 'ITEM-GAL-FRM', name: 'Khung ảnh trang trí', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 20000, purchasePrice: 100000, bulk: true },
+  { code: 'ITEM-GAL-HOU', name: 'Hòm tiền mừng (Hình ngôi nhà)', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 150000, purchasePrice: 600000, bulk: true },
+  { code: 'ITEM-GAL-BOX', name: 'Hòm tiền mừng (Hòm thư)', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 150000, purchasePrice: 600000, bulk: true },
+  { code: 'ITEM-GAL-MIC', name: 'Hòm tiền mừng (Mica trong suốt)', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 200000, purchasePrice: 800000, bulk: true },
+  { code: 'ITEM-GAL-VAS', name: 'Bình hoa thủy tinh', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 30000, purchasePrice: 150000, bulk: true },
+  { code: 'ITEM-GAL-TR3', name: 'Khay 3 tầng', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 50000, purchasePrice: 250000, bulk: true },
+  { code: 'ITEM-GAL-TRW', name: 'Khay gỗ', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 30000, purchasePrice: 150000, bulk: true },
+  { code: 'ITEM-GAL-TR2', name: 'Khay 2 tầng sứ', typeCode: 'TYPE-GALLERY', unit: 'Cái', rentalPrice: 60000, purchasePrice: 300000, bulk: true },
+  // Phông cưới hỏi
+  { code: 'ITEM-BKG-TXT', name: 'Chữ trên phông', typeCode: 'TYPE-BACKDROP', unit: 'Bộ', rentalPrice: 150000, purchasePrice: 500000, bulk: true },
+  { code: 'ITEM-BKG-LGT', name: 'Đèn sân khấu (Phông)', typeCode: 'TYPE-BACKDROP', unit: 'Cái', rentalPrice: 100000, purchasePrice: 400000, bulk: true },
+  { code: 'ITEM-BKG-TRP', name: 'Tráp ăn hỏi', typeCode: 'TYPE-BACKDROP', unit: 'Cái', rentalPrice: 100000, purchasePrice: 500000, bulk: true },
+  { code: 'ITEM-BKG-CUR', name: 'Phông quây', typeCode: 'TYPE-BACKDROP', unit: 'M2', rentalPrice: 15000, purchasePrice: 70000, bulk: true },
+  // Quạt
+  { code: 'ITEM-FAN-IND', name: 'Quạt công nghiệp', typeCode: 'TYPE-FAN', unit: 'Cái', rentalPrice: 100000, purchasePrice: 800000, bulk: true },
+  { code: 'ITEM-FAN-WAT', name: 'Quạt hơi nước', typeCode: 'TYPE-FAN', unit: 'Cái', rentalPrice: 250000, purchasePrice: 3500000, bulk: true },
+  // Đèn
+  { code: 'ITEM-LGT-BLK', name: 'Đèn nhấp nháy', typeCode: 'TYPE-LIGHT', unit: 'Dây', rentalPrice: 20000, purchasePrice: 80000, bulk: true },
+  { code: 'ITEM-LGT-CHA', name: 'Đèn chùm', typeCode: 'TYPE-LIGHT', unit: 'Cái', rentalPrice: 200000, purchasePrice: 1500000, bulk: true },
+  { code: 'ITEM-LGT-20M', name: 'Đèn chạy dọc 20m', typeCode: 'TYPE-LIGHT', unit: 'Dây', rentalPrice: 100000, purchasePrice: 500000, bulk: true },
+  { code: 'ITEM-LGT-BRD', name: 'Đèn chim', typeCode: 'TYPE-LIGHT', unit: 'Cái', rentalPrice: 50000, purchasePrice: 200000, bulk: true },
+  { code: 'ITEM-LGT-STG', name: 'Đèn Par LED sân khấu', typeCode: 'TYPE-LIGHT', unit: 'Cái', rentalPrice: 120000, purchasePrice: 2500000, bulk: true },
+  // Âm thanh
+  { code: 'ITEM-AUD-SYS', name: 'Hệ thống loa đài cơ bản', typeCode: 'TYPE-AUDIO', unit: 'Bộ', rentalPrice: 1500000, purchasePrice: 25000000, bulk: true },
+
+  // Các Gói Combo (Packages)
+  { code: 'PKG-TENT-6X9', name: 'Gói Nhà Rạp 6x9m Cơ Bản', typeCode: 'TYPE-TARPAULIN', unit: 'Gói', rentalPrice: 2000000, purchasePrice: 0, bulk: true },
+  { code: 'PKG-GALLERY', name: 'Gói Trang trí Bàn Gallery', typeCode: 'TYPE-GALLERY', unit: 'Gói', rentalPrice: 1500000, purchasePrice: 0, bulk: true },
 ];
 
 interface ComponentSeed {
@@ -331,21 +325,18 @@ interface ComponentSeed {
 
 // Cấu trúc BOM cho các item dạng "Gói trọn gói" — parent là item combo, child là thiết bị lẻ cấu thành.
 const ITEM_COMPONENTS_SEED: ComponentSeed[] = [
-  { parentCode: 'PKG-AUDHALL', childCode: 'SPK-JBL715', quantity: 4 },
-  { parentCode: 'PKG-AUDHALL', childCode: 'AMP-CROWN', quantity: 1 },
-  { parentCode: 'PKG-AUDHALL', childCode: 'MIX-YAMAHA', quantity: 1 },
-  { parentCode: 'PKG-AUDHALL', childCode: 'MIC-SM58', quantity: 2 },
-  { parentCode: 'PKG-AUDHALL', childCode: 'ACC-CABLE', quantity: 2 },
-  { parentCode: 'PKG-AUDOUT', childCode: 'SPK-RCFLA', quantity: 2 },
-  { parentCode: 'PKG-AUDOUT', childCode: 'SPK-SUB18', quantity: 2 },
-  { parentCode: 'PKG-AUDOUT', childCode: 'AMP-DBX', quantity: 1 },
-  { parentCode: 'PKG-AUDOUT', childCode: 'MIX-SOUNDCRAFT', quantity: 1 },
-  { parentCode: 'PKG-AUDOUT', childCode: 'MIC-SM58', quantity: 4 },
-  { parentCode: 'PKG-AUDOUT', childCode: 'ACC-CABLE', quantity: 4 },
-  { parentCode: 'PKG-LIGHTSTD', childCode: 'PAR-54X3', quantity: 8 },
-  { parentCode: 'PKG-LIGHTSTD', childCode: 'MOVE-WASH', quantity: 4 },
-  { parentCode: 'PKG-LIGHTSTD', childCode: 'BEAM-7R', quantity: 2 },
-  { parentCode: 'PKG-LIGHTSTD', childCode: 'TRS-SQ290', quantity: 4 },
+  { parentCode: 'PKG-TENT-6X9', childCode: 'ITEM-FRM-3M', quantity: 12 },
+  { parentCode: 'PKG-TENT-6X9', childCode: 'ITEM-FRM-COL', quantity: 6 },
+  { parentCode: 'PKG-TENT-6X9', childCode: 'ITEM-TARP-6X9', quantity: 1 },
+  { parentCode: 'PKG-TENT-6X9', childCode: 'ITEM-CUR-ROOF', quantity: 54 },
+  { parentCode: 'PKG-TENT-6X9', childCode: 'ITEM-FAN-IND', quantity: 4 },
+  { parentCode: 'PKG-TENT-6X9', childCode: 'ITEM-LGT-BLK', quantity: 10 },
+  
+  { parentCode: 'PKG-GALLERY', childCode: 'ITEM-LIN-WHI', quantity: 2 },
+  { parentCode: 'PKG-GALLERY', childCode: 'ITEM-GAL-HOU', quantity: 1 },
+  { parentCode: 'PKG-GALLERY', childCode: 'ITEM-GAL-TR3', quantity: 1 },
+  { parentCode: 'PKG-GALLERY', childCode: 'ITEM-GAL-VAS', quantity: 2 },
+  { parentCode: 'PKG-GALLERY', childCode: 'ITEM-GAL-FRM', quantity: 4 },
 ];
 
 interface PartySeed {
@@ -357,27 +348,6 @@ interface PartySeed {
   status?: ActiveStatus;
 }
 
-const CUSTOMERS_SEED: PartySeed[] = [
-  { code: 'CUS-001', name: 'Công ty TNHH Sự kiện Việt Phát', phone: '0911111001', email: 'contact@vietphat.vn', address: '12 Nguyễn Huệ, Q.1, TP.HCM' },
-  { code: 'CUS-002', name: 'Công ty CP Truyền thông ABC Media', phone: '0911111002', email: 'contact@abcmedia.vn', address: '45 Lê Lợi, Q.1, TP.HCM' },
-  { code: 'CUS-003', name: 'Tập đoàn Giáo dục EduGroup', phone: '0911111003', email: 'info@edugroup.edu.vn', address: '88 Trần Duy Hưng, Cầu Giấy, Hà Nội' },
-  { code: 'CUS-004', name: 'Công ty TNHH Xây dựng Hòa Bình', phone: '0911111004', email: 'hoabinh.jsc@gmail.com', address: '234 Nguyễn Trãi, Thanh Xuân, Hà Nội' },
-  { code: 'CUS-005', name: 'Ngân hàng TMCP Phương Đông - CN Q.3', phone: '0911111005', email: 'pgd.q3@ocb.com.vn', address: '67 Cách Mạng Tháng 8, Q.3, TP.HCM' },
-  { code: 'CUS-006', name: 'Công ty CP Bất động sản Sun Land', phone: '0911111006', email: 'sunland@realestate.vn', address: '156 Điện Biên Phủ, Bình Thạnh, TP.HCM' },
-  { code: 'CUS-007', name: 'Trường Đại học Công nghệ HUTECH', phone: '0911111007', email: 'events@hutech.edu.vn', address: '475A Điện Biên Phủ, Bình Thạnh, TP.HCM' },
-  { code: 'CUS-008', name: 'Công ty TNHH Thương mại Minh Phát', phone: '0911111008', email: 'minhphat.trading@gmail.com', address: '23 Lý Thường Kiệt, Hải Châu, Đà Nẵng' },
-  { code: 'CUS-009', name: 'Công ty CP Dược phẩm Sao Việt', phone: '0911111009', email: 'saoviet.pharma@gmail.com', address: '89 Nguyễn Văn Linh, Q.7, TP.HCM' },
-  { code: 'CUS-010', name: 'Khách sạn Rex Sài Gòn', phone: '0911111010', email: 'events@rexhotel.vn', address: '141 Nguyễn Huệ, Q.1, TP.HCM' },
-  { code: 'CUS-011', name: 'Anh Nguyễn Văn Bảo', phone: '0912222001', email: 'baonguyen88@gmail.com', address: '34 Phan Xích Long, Phú Nhuận, TP.HCM' },
-  { code: 'CUS-012', name: 'Chị Trần Thị Cẩm Tú', phone: '0912222002', email: 'camtu.tran@gmail.com', address: '12 Hoàng Diệu, Hải Châu, Đà Nẵng' },
-  { code: 'CUS-013', name: 'Anh Lê Quốc Việt', phone: '0912222003', email: 'levietq@gmail.com', address: '56 Kim Mã, Ba Đình, Hà Nội' },
-  { code: 'CUS-014', name: 'Chị Phạm Thu Hà', phone: '0912222004', email: 'thuha.pham@gmail.com', address: '78 Trần Phú, Nha Trang' },
-  { code: 'CUS-015', name: 'Anh Hoàng Anh Dũng', phone: '0912222005', email: 'dunghoang@gmail.com', address: '90 Nguyễn Thị Minh Khai, Q.3, TP.HCM' },
-  { code: 'CUS-016', name: 'Chị Đỗ Ngọc Diệp', phone: '0912222006', email: 'ngocdiep.do@gmail.com', address: '15 Bà Triệu, Hai Bà Trưng, Hà Nội' },
-  { code: 'CUS-017', name: 'Anh Vũ Thành Trung', phone: '0912222007', email: 'trungvu@gmail.com', address: '22 Nguyễn Văn Cừ, Long Biên, Hà Nội', status: 'INACTIVE' },
-  { code: 'CUS-018', name: 'Chị Ngô Bích Ngọc', phone: '0912222008', email: 'ngocngo.bich@gmail.com', address: '40 Trường Sa, Phú Nhuận, TP.HCM', status: 'INACTIVE' },
-];
-
 interface SupplierSeed extends PartySeed {
   serviceType: string;
   contactPerson: string;
@@ -385,12 +355,12 @@ interface SupplierSeed extends PartySeed {
 }
 
 const SUPPLIERS_SEED: SupplierSeed[] = [
-  { code: 'SUP-001', name: 'Công ty TNHH Thiết bị Sân khấu Ánh Dương', serviceType: 'Cho thuê sân khấu, truss, backdrop', contactPerson: 'Nguyễn Văn Hải', phone: '0933333001', email: 'contact@anhduongstage.vn', address: '12 Quang Trung, Hà Đông, Hà Nội', rating: 4.5 },
-  { code: 'SUP-002', name: 'Công ty CP Cho thuê Bàn Ghế Thành Công', serviceType: 'Cho thuê bàn ghế sự kiện', contactPerson: 'Trần Văn Đạt', phone: '0933333002', email: 'thanhcongfurniture@gmail.com', address: '34 Lê Văn Việt, Q.9, TP.HCM', rating: 4.2 },
-  { code: 'SUP-003', name: 'Công ty TNHH Kỹ thuật Điện Toàn Phát', serviceType: 'Cho thuê máy phát điện', contactPerson: 'Lê Thị Hạnh', phone: '0933333003', email: 'toanphat.genset@gmail.com', address: '56 Phạm Văn Đồng, Thủ Đức, TP.HCM', rating: 4.7 },
-  { code: 'SUP-004', name: 'Công ty CP Hoa Tươi Sự Kiện Lan Anh', serviceType: 'Trang trí hoa tươi sự kiện', contactPerson: 'Nguyễn Thị Lan Anh', phone: '0933333004', email: 'lananhflower@gmail.com', address: '78 Hoàng Hoa Thám, Ba Đình, Hà Nội', rating: 4.9 },
-  { code: 'SUP-005', name: 'Công ty TNHH Truss & Rigging Việt', serviceType: 'Cho thuê truss, giàn treo kỹ thuật', contactPerson: 'Phạm Văn Sơn', phone: '0933333005', email: 'vietrigging@gmail.com', address: '90 Nguyễn Xí, Bình Thạnh, TP.HCM', rating: 4.3 },
-  { code: 'SUP-006', name: 'Studio Ánh Sáng Sự Kiện Nam Việt', serviceType: 'Quay phim, chụp ảnh, flycam sự kiện', contactPerson: 'Đặng Thị Thu', phone: '0933333006', email: 'namvietstudio@gmail.com', address: '23 Trần Não, Q.2, TP.HCM', rating: 4.6 },
+  { code: 'SUP-001', name: 'Xưởng Cơ Khí & Bạt Sự Kiện Hùng Phát', serviceType: 'Khung nhà rạp, khớp nối, bạt che', contactPerson: 'Nguyễn Văn Hải', phone: '0933333001', email: 'hungphat@gmail.com', address: '12 Quang Trung, Hà Nội', rating: 4.5 },
+  { code: 'SUP-002', name: 'Kho Bàn Ghế & Phụ Kiện Thành Công', serviceType: 'Bàn ghế tiệc, khăn, áo ghế, dụng cụ ăn uống', contactPerson: 'Trần Văn Đạt', phone: '0933333002', email: 'thanhcong@gmail.com', address: '34 Lê Văn Việt, TP.HCM', rating: 4.2 },
+  { code: 'SUP-003', name: 'Vựa Hoa & Trang Trí Lan Anh', serviceType: 'Cổng hoa, hoa lụa, phụ kiện gallery, phông cưới', contactPerson: 'Nguyễn Thị Lan Anh', phone: '0933333004', email: 'lananhflower@gmail.com', address: '78 Hoàng Hoa Thám, Hà Nội', rating: 4.9 },
+  { code: 'SUP-004', name: 'Xưởng Điện Nước Toàn Phát', serviceType: 'Quạt công nghiệp, quạt hơi nước', contactPerson: 'Lê Thị Hạnh', phone: '0933333003', email: 'toanphat@gmail.com', address: '56 Phạm Văn Đồng, TP.HCM', rating: 4.7 },
+  { code: 'SUP-005', name: 'Âm Thanh Ánh Sáng Nam Việt', serviceType: 'Đèn trang trí, hệ thống loa đài', contactPerson: 'Phạm Văn Sơn', phone: '0933333005', email: 'namviet@gmail.com', address: '90 Nguyễn Xí, TP.HCM', rating: 4.6 },
+  { code: 'SUP-006', name: 'Đơn Vị In Ấn Thiệp & Phông', serviceType: 'Chữ trên phông, in ấn', contactPerson: 'Đặng Thị Thu', phone: '0933333006', email: 'inanthiep@gmail.com', address: '23 Trần Não, Q.2, TP.HCM', rating: 4.6 },
   { code: 'SUP-007', name: 'Công ty CP Vận Tải Sự Kiện Nhanh', serviceType: 'Vận chuyển thiết bị sự kiện', contactPerson: 'Bùi Văn Khoa', phone: '0933333007', email: 'nhanhtransport@gmail.com', address: '45 Giải Phóng, Hoàng Mai, Hà Nội', rating: 4.0 },
 ];
 
@@ -411,9 +381,13 @@ const EVENT_TYPES = [
   'Hội thảo chuyên đề',
   'Gala Dinner',
   'Lễ tốt nghiệp',
+  'Đám cưới (Nhà trai)',
+  'Đám cưới (Nhà gái)',
+  'Lễ ăn hỏi (Nhà trai)',
+  'Lễ ăn hỏi (Nhà gái)',
 ];
 
-const COMPLEX_EVENT_TYPES = new Set(['Hội nghị doanh nghiệp', 'Hội thảo chuyên đề', 'Gala Dinner', 'Lễ ra mắt sản phẩm']);
+const COMPLEX_EVENT_TYPES = new Set(['Hội nghị doanh nghiệp', 'Hội thảo chuyên đề', 'Gala Dinner', 'Lễ ra mắt sản phẩm', 'Đám cưới (Nhà trai)', 'Đám cưới (Nhà gái)']);
 
 const VENUES = [
   { name: 'Trung tâm Hội nghị Quốc gia, Hà Nội', lat: 21.0069, lng: 105.7869 },
@@ -597,20 +571,6 @@ async function main(): Promise<void> {
   // ==========================================================================
   // 4. CUSTOMERS & SUPPLIERS
   // ==========================================================================
-  await prisma.customer.createMany({
-    data: CUSTOMERS_SEED.map((c) => ({
-      customerId: genId(),
-      customerCode: c.code,
-      customerName: c.name,
-      phone: c.phone,
-      email: c.email,
-      address: c.address,
-      status: c.status ?? 'ACTIVE',
-    })),
-  });
-  const customerRows = await prisma.customer.findMany();
-  const customers: CreatedParty[] = customerRows.map((c: any) => ({ id: c.customerId, code: c.customerCode, name: c.customerName }));
-
   await prisma.supplier.createMany({
     data: SUPPLIERS_SEED.map((s) => ({
       supplierId: genId(),
@@ -626,7 +586,7 @@ async function main(): Promise<void> {
   });
   const supplierRows = await prisma.supplier.findMany();
   const suppliers: CreatedParty[] = supplierRows.map((s: any) => ({ id: s.supplierId, code: s.supplierCode, name: s.supplierName }));
-  
+
   const supplierItemsData: { supplierId: string; itemId: string; rentalPrice: number; purchasePrice: number; isActive: boolean; minQuantity: number | null; supplierItemCode: string | null }[] = [];
   for (const supplier of suppliers) {
     // Pick 3-8 random items for each supplier to simulate many-to-many relationship
@@ -656,221 +616,7 @@ async function main(): Promise<void> {
     skipDuplicates: true, // Just in case
   });
 
-  console.log(`  - ${customers.length} customers, ${suppliers.length} suppliers, ${supplierItemsData.length} supplier items`);
-
-  // ==========================================================================
-  // 5. EVIDENCE POOL (dùng chung cho schedule/attendance/survey/deposit/settlement)
-  // ==========================================================================
-  const evidenceIds: string[] = Array.from({ length: 15 }, () => genId());
-  await prisma.evidence.createMany({
-    data: evidenceIds.map((id, i) => ({
-      evidenceId: id,
-      fileUrl: `https://storage.bnwevents.vn/evidences/${id}.jpg`,
-      description: EVIDENCE_DESCRIPTIONS[i % EVIDENCE_DESCRIPTIONS.length],
-      uploadedBy: randomChoice(operationalPool).userId,
-    })),
-  });
-  const randomEvidence = (chance: number): string | undefined => (Math.random() < chance ? randomChoice(evidenceIds) : undefined);
-
-  // ==========================================================================
-  // 6. QUOTATIONS (28) — DRAFT / APPROVED / REJECTED
-  // ==========================================================================
-  const quotationStatuses: QuotationStatus[] = shuffle([
-    ...Array(14).fill('APPROVED'),
-    ...Array(8).fill('DRAFT'),
-    ...Array(6).fill('REJECTED'),
-  ]);
-
-  interface ApprovedQuotation {
-    quotationId: string;
-    customerId: string;
-    items: OrderItemPick[];
-    totalAmount: number;
-  }
-  const approvedQuotations: ApprovedQuotation[] = [];
-
-  for (let i = 0; i < quotationStatuses.length; i++) {
-    const status = quotationStatuses[i];
-    const customer = randomChoice(customers);
-    const creator = randomChoice([...managers, ...operationalPool]);
-    const isManagerViewed = ['MANAGER', 'ADMIN'].includes(creator.role);
-    const chosenItems = sample(items, randomInt(2, 5));
-
-    const lines = chosenItems.map((it) => {
-      const quantity = it.bulk ? randomInt(20, 150) : randomInt(1, 10);
-      const price = it.rentalPrice;
-      const discount = Math.random() < 0.3 ? round2(quantity * price * 0.05) : 0;
-      const lineTotal = round2(quantity * price - discount);
-      return { itemId: it.itemId, itemName: it.name, quantity, price, discount, lineTotal };
-    });
-
-    const subtotal = round2(lines.reduce((s, l) => s + l.quantity * l.price, 0));
-    const discountTotal = round2(lines.reduce((s, l) => s + l.discount, 0));
-    const totalAmount = round2(subtotal - discountTotal);
-    const quotationId = genId();
-
-    await prisma.quotation.create({
-      data: {
-        quotationId,
-        quotationCode: `QUO-${pad(i + 1, 3)}`,
-        customerId: customer.id,
-        version: 'v1',
-        subtotal,
-        discountTotal,
-        totalAmount,
-        status,
-        notes: `Báo giá dịch vụ tổ chức sự kiện cho ${customer.name}.`,
-        createdBy: creator.userId,
-        isManagerViewed,
-        items: {
-          create: lines.map((l) => ({
-            itemId: l.itemId,
-            itemName: l.itemName,
-            quantity: l.quantity,
-            price: l.price,
-            discount: l.discount,
-            lineTotal: l.lineTotal,
-          })),
-        },
-      },
-    });
-
-    if (status === 'APPROVED') {
-      approvedQuotations.push({
-        quotationId,
-        customerId: customer.id,
-        items: lines.map((l) => ({ itemId: l.itemId, itemName: l.itemName, quantity: l.quantity, unitPrice: l.price, subtotal: round2(l.quantity * l.price) })),
-        totalAmount,
-      });
-    }
-  }
-  console.log(`  - ${quotationStatuses.length} quotations (${approvedQuotations.length} approved)`);
-
-  // ==========================================================================
-  // 7. ORDERS — sinh từ Quotation APPROVED, trải đều 5 trạng thái
-  // ==========================================================================
-  const targetOrderStatuses: OrderStatus[] = shuffle(
-    (['NEW', 'NEW', 'NEW', 'CONFIRMED', 'CONFIRMED', 'CONFIRMED', 'IN_PROGRESS', 'IN_PROGRESS', 'IN_PROGRESS', 'COMPLETED', 'COMPLETED', 'COMPLETED', 'CANCELLED', 'CANCELLED'] as OrderStatus[]).slice(0, approvedQuotations.length),
-  );
-
-  function eventDateForStatus(status: OrderStatus): Date {
-    switch (status) {
-      case 'COMPLETED':
-        return addDays(TODAY, -randomInt(10, 90));
-      case 'CANCELLED':
-        return addDays(TODAY, randomInt(-60, 60));
-      case 'IN_PROGRESS':
-        return addDays(TODAY, randomInt(-2, 5));
-      case 'CONFIRMED':
-        return addDays(TODAY, randomInt(5, 45));
-      case 'NEW':
-      default:
-        return addDays(TODAY, randomInt(10, 90));
-    }
-  }
-
-  function paymentStatusForOrder(status: OrderStatus): PaymentStatus {
-    switch (status) {
-      case 'COMPLETED':
-        return 'PAID';
-      case 'IN_PROGRESS':
-        return Math.random() < 0.7 ? 'DEPOSITED' : 'PAID';
-      case 'CONFIRMED':
-        return Math.random() < 0.6 ? 'DEPOSITED' : 'UNPAID';
-      case 'CANCELLED':
-        return Math.random() < 0.5 ? 'DEPOSITED' : 'UNPAID';
-      case 'NEW':
-      default:
-        return 'UNPAID';
-    }
-  }
-
-  const createdOrders: CreatedOrder[] = [];
-
-  for (let i = 0; i < approvedQuotations.length; i++) {
-    const q = approvedQuotations[i];
-    const status = targetOrderStatuses[i];
-    const eventType = randomChoice(EVENT_TYPES);
-    const eventDate = eventDateForStatus(status);
-    const guestCount = COMPLEX_EVENT_TYPES.has(eventType) ? randomInt(200, 800) : randomInt(30, 300);
-    const creator = randomChoice(managers);
-    const leader = randomChoice(operationalPool);
-    const orderId = genId();
-    const orderCode = `ORD-${pad(i + 1, 3)}`;
-    const totalAmount = round2(q.items.reduce((s, it) => s + it.subtotal, 0));
-    const isCompleted = status === 'COMPLETED';
-    const isPickedUp = status === 'IN_PROGRESS' || status === 'COMPLETED';
-    const closer = isCompleted ? randomChoice(managers) : null;
-    const pickedUpByUser = isPickedUp ? leader : null;
-        const venue = randomChoice(VENUES);
-
-    const planConfigs = planConfigsForStatus(status);
-    let minStartTime = new Date(8640000000000000);
-    let maxEndTime = new Date(-8640000000000000);
-
-    for (const cfg of planConfigs) {
-      const startTime = addHours(addDays(eventDate, cfg.offsetDays), cfg.hourOffset - eventDate.getUTCHours());
-      const endTime = addHours(startTime, cfg.durationHours);
-      if (startTime < minStartTime) minStartTime = startTime;
-      if (endTime > maxEndTime) maxEndTime = endTime;
-    }
-
-    await prisma.order.create({
-      data: {
-        orderId,
-        orderCode,
-        customerId: q.customerId,
-        quotationId: q.quotationId,
-        policyId: depositPolicy.policyId,
-        eventType,
-        eventName: `${eventType} - ${orderCode}`,
-        eventDate: minStartTime,
-        endDate: maxEndTime,
-        location: venue.name,
-        latitude: venue.lat,
-        longitude: venue.lng,
-        guestCount,
-        totalAmount,
-        paymentStatus: paymentStatusForOrder(status),
-        orderStatus: status,
-        cancelReason: status === 'CANCELLED' ? randomChoice(['Khách hàng đổi lịch tổ chức', 'Khách hàng huỷ do thay đổi ngân sách', 'Trùng lịch với nhà cung cấp địa điểm']) : null,
-        notes: `Đơn hàng chuyển đổi từ báo giá đã duyệt.`,
-        createdBy: creator.userId,
-        confirmedAt: (status !== 'NEW' && status !== 'CANCELLED') ? TODAY : null,
-        closedAt: isCompleted ? addHours(eventDate, randomInt(6, 30)) : null,
-        closedBy: closer ? closer.userId : null,
-        pickedUpAt: isPickedUp ? addHours(eventDate, -randomInt(2, 10)) : null,
-        pickedUpBy: pickedUpByUser ? pickedUpByUser.userId : null,
-        orderItems: {
-          create: q.items.map((it) => ({
-            itemId: it.itemId,
-            quantity: it.quantity,
-            unitPrice: it.unitPrice,
-            subtotal: it.subtotal,
-            source: 'INTERNAL',
-            preparedQty: status === 'NEW' ? 0 : it.quantity,
-          })),
-        },
-      },
-    });
-
-    createdOrders.push({
-      orderId,
-      orderCode,
-      customerId: q.customerId,
-      status,
-      eventType,
-      eventDate: minStartTime,
-      totalAmount,
-      items: q.items,
-      leaderId: leader.userId,
-      technicalIds: sample(
-        operationalPool.filter((u) => u.userId !== leader.userId),
-        randomInt(1, 3),
-      ).map((t) => t.userId),
-    });
-  }
-  console.log(`  - ${createdOrders.length} orders`);
+  console.log(`  - ${suppliers.length} suppliers, ${supplierItemsData.length} supplier items`);
 
   // ==========================================================================
   // 8. WORK TASKS
@@ -883,381 +629,16 @@ async function main(): Promise<void> {
       return { taskId: id, taskCode: t.code, taskName: t.name };
     }),
   });
-
-  interface PlanConfig {
-    taskCode: string;
-    offsetDays: number;
-    hourOffset: number;
-    durationHours: number;
-    planStatus: ScheduleStatus;
-  }
-
-  function planConfigsForStatus(status: OrderStatus): PlanConfig[] {
-    switch (status) {
-      case 'CANCELLED':
-        return [{ taskCode: 'SURVEY', offsetDays: -14, hourOffset: 9, durationHours: 2, planStatus: 'CANCELLED' }];
-      case 'NEW':
-        return [{ taskCode: 'SURVEY', offsetDays: -10, hourOffset: 9, durationHours: 2, planStatus: 'PENDING' }];
-      case 'CONFIRMED':
-        return [
-          { taskCode: 'SURVEY', offsetDays: -14, hourOffset: 9, durationHours: 2, planStatus: 'COMPLETED' },
-          { taskCode: 'SETUP', offsetDays: -1, hourOffset: 14, durationHours: 5, planStatus: 'CONFIRMED' },
-        ];
-      case 'IN_PROGRESS':
-        return [
-          { taskCode: 'SURVEY', offsetDays: -14, hourOffset: 9, durationHours: 2, planStatus: 'COMPLETED' },
-          { taskCode: 'SETUP', offsetDays: -1, hourOffset: 14, durationHours: 5, planStatus: 'IN_PROGRESS' },
-        ];
-      case 'COMPLETED':
-      default:
-        return [
-          { taskCode: 'SURVEY', offsetDays: -14, hourOffset: 9, durationHours: 2, planStatus: 'COMPLETED' },
-          { taskCode: 'SETUP', offsetDays: -1, hourOffset: 14, durationHours: 5, planStatus: 'COMPLETED' },
-          { taskCode: 'COLLECT', offsetDays: 1, hourOffset: 9, durationHours: 2, planStatus: 'COMPLETED' },
-        ];
-    }
-  }
-
-  // Tổng hợp dữ liệu dùng cho các bước sau: Inventory, InventoryMovement, CollectedEquipmentReport.
-  const reservedByItem = new Map<string, number>();
-  const damagedByItem = new Map<string, number>();
-  const inventoryMovements: {
-    itemId: string;
-    orderId: string | null;
-    reportId: string | null;
-    movementType: 'OUTBOUND' | 'INBOUND' | 'ADJUSTMENT';
-    quantity: number;
-    performedBy: string;
-    notes: string;
-  }[] = [];
-
-  for (const order of createdOrders) {
-    if (order.status === 'NEW' || order.status === 'CONFIRMED' || order.status === 'IN_PROGRESS') {
-      for (const it of order.items) {
-        reservedByItem.set(it.itemId, (reservedByItem.get(it.itemId) ?? 0) + it.quantity);
-      }
-    }
-
-    // --- SchedulePlan + Assignees + Attendance ---
-    const planConfigs = planConfigsForStatus(order.status);
-    let surveyPlanId: string | null = null;
-    let surveyPlanStatus: ScheduleStatus | null = null;
-
-    for (let p = 0; p < planConfigs.length; p++) {
-      const cfg = planConfigs[p];
-      const startTime = addHours(addDays(order.eventDate, cfg.offsetDays), cfg.hourOffset - order.eventDate.getUTCHours());
-      const endTime = addHours(startTime, cfg.durationHours);
-      const planId = genId();
-      const assigneeRows: { assigneeId: string; userId: string; role: 'LEAD' | 'TECHNICAL' }[] = [
-        { assigneeId: genId(), userId: order.leaderId, role: 'LEAD' },
-        ...order.technicalIds.map((tid) => ({ assigneeId: genId(), userId: tid, role: 'TECHNICAL' as const })),
-      ];
-
-      await prisma.schedulePlan.create({
-        data: {
-          planId,
-          planCode: `PLN-${order.orderCode.replace('ORD-', '')}-${pad(p + 1, 2)}`,
-          orderId: order.orderId,
-          taskId: taskIdByCode.get(cfg.taskCode)!,
-          startTime,
-          endTime,
-          location: randomChoice(VENUES).name,
-          latitude: 10.762622 + (Math.random() - 0.5) * 0.1,
-          longitude: 106.660172 + (Math.random() - 0.5) * 0.1,
-          status: cfg.planStatus,
-          evidences: (() => {
-            if (cfg.planStatus !== 'COMPLETED') return undefined;
-            const ev = randomEvidence(0.5);
-            return ev ? { create: [{ evidenceId: ev }] } : undefined;
-          })(),
-          createdBy: randomChoice(managers).userId,
-          assignees: {
-            create: assigneeRows.map((a) => ({
-              assigneeId: a.assigneeId,
-              userId: a.userId,
-              role: a.role,
-              attendance:
-                cfg.planStatus === 'IN_PROGRESS' || cfg.planStatus === 'COMPLETED'
-                  ? {
-                      create: {
-                        checkInAt: new Date(startTime.getTime() - randomInt(5, 20) * 60000),
-                        checkInEvidenceId: randomEvidence(0.5) ?? null,
-                        latitude: 10.762622 + (Math.random() - 0.5) * 0.01, // Around HCMC
-                        longitude: 106.660172 + (Math.random() - 0.5) * 0.01,
-                        checkOutAt: cfg.planStatus === 'COMPLETED' ? endTime : null,
-                      },
-                    }
-                  : undefined,
-            })),
-          },
-        },
-      });
-
-      if (cfg.taskCode === 'SURVEY') {
-        surveyPlanId = planId;
-        surveyPlanStatus = cfg.planStatus;
-      }
-    }
-
-    // --- SurveyReport cho các sự kiện phức tạp ---
-    if (surveyPlanId && order.status !== 'CANCELLED' && COMPLEX_EVENT_TYPES.has(order.eventType)) {
-      const surveyStatus: SurveyStatus = surveyPlanStatus === 'COMPLETED' ? 'CONFIRMED' : order.status === 'NEW' ? 'DRAFT' : 'SUBMITTED';
-      await prisma.surveyReport.create({
-        data: {
-          surveyId: genId(),
-          reportCode: `SUR-${order.orderCode.replace('ORD-', '')}`,
-          orderId: order.orderId,
-          planId: surveyPlanId,
-          evidences: (() => {
-            const ev = randomEvidence(0.7);
-            return ev ? { create: [{ evidenceId: ev }] } : undefined;
-          })(),
-          surveyDate: addDays(order.eventDate, -14),
-          location: randomChoice(VENUES).name,
-          area: randomInt(150, 600),
-          length: randomInt(15, 40),
-          width: randomInt(8, 20),
-          entrance: 'Cửa chính rộng, xe tải nhỏ ra vào thuận tiện',
-          siteConstraints: 'Trần nhà giới hạn độ cao lắp truss; cần bố trí thêm nguồn điện dự phòng',
-          additionalRequests: 'Khách yêu cầu bổ sung màn hình LED phụ khu vực sảnh',
-          proposedItems: order.items.map((it) => `${it.itemName} x${it.quantity}`).join(', '),
-          notes: 'Đã khảo sát thực địa, chờ xác nhận phương án bố trí cuối cùng',
-          status: surveyStatus,
-          reportedBy: order.leaderId,
-          confirmedBy: surveyStatus === 'CONFIRMED' ? randomChoice(managers).userId : null,
-          confirmedAt: surveyStatus === 'CONFIRMED' ? addDays(order.eventDate, -13) : null,
-        },
-      });
-    }
-
-    // --- ChangeRequest (ngẫu nhiên ~35% cho CONFIRMED/IN_PROGRESS/COMPLETED) ---
-    if (order.status !== 'NEW' && order.status !== 'CANCELLED' && Math.random() < 0.35) {
-      const type: ChangeRequestType = randomChoice(['add', 'remove'] as ChangeRequestType[]);
-      const crStatus: ChangeRequestStatus = order.status === 'CONFIRMED' ? 'pending' : 'approved';
-      const targetItem = randomChoice(items);
-      await prisma.changeRequest.create({
-        data: {
-          changeRequestId: genId(),
-          orderId: order.orderId,
-          type,
-          status: crStatus,
-          items: {
-            create: [{ catalogItemId: targetItem.itemId, quantity: randomInt(1, 5), action: type === 'add' ? 'add' : 'remove' }],
-          },
-        },
-      });
-    }
-
-    // --- SupplierTransaction (ngẫu nhiên ~40% cho CONFIRMED/IN_PROGRESS/COMPLETED) ---
-    if (order.status !== 'NEW' && order.status !== 'CANCELLED' && Math.random() < 0.4) {
-      const supplier = randomChoice(suppliers);
-      const transactionType: SupplierTransactionType = Math.random() < 0.7 ? 'RENTAL' : 'PURCHASE';
-      const useCustomItem = Math.random() < 0.4;
-      const refItem = randomChoice(items);
-      const qty = randomInt(1, 6);
-      const unitCost = refItem.purchasePrice > 0 ? Math.round(refItem.rentalPrice * 1.2) : 500000;
-      const subtotalCost = round2(qty * unitCost);
-      const txStatus: SupplierTransactionStatus = order.status === 'CONFIRMED' ? 'APPROVED' : order.status === 'IN_PROGRESS' ? 'RECEIVED' : 'COMPLETED';
-      const txPaymentStatus: PaymentStatus = txStatus === 'COMPLETED' ? 'PAID' : 'DEPOSITED';
-      const updater = Math.random() < 0.5 ? randomChoice(admins) : randomChoice(managers);
-      await prisma.supplierTransaction.create({
-        data: {
-          transactionId: genId(),
-          transactionCode: `STX-${order.orderCode.replace('ORD-', '')}`,
-          supplierId: supplier.id,
-          orderId: order.orderId,
-          transactionType,
-          serviceTitle: `Thuê ngoài bổ sung cho ${order.eventType}`,
-          estimatedCost: subtotalCost,
-          depositAmount: round2(subtotalCost * 0.3),
-          paymentStatus: txPaymentStatus,
-          status: txStatus,
-          updatedBy: updater?.userId,
-          items: {
-            create: [
-              {
-                itemId: useCustomItem ? null : refItem.itemId,
-                itemName: useCustomItem ? 'Dịch vụ thuê ngoài theo yêu cầu' : refItem.name,
-                quantity: qty,
-                unitCost,
-                subtotal: subtotalCost,
-                receivedQuantity: txStatus === 'COMPLETED' ? qty : 0,
-              },
-            ],
-          },
-        },
-      });
-    }
-
-    // --- Deposit (CONFIRMED/IN_PROGRESS/COMPLETED bắt buộc; CANCELLED một phần) ---
-    const needsDeposit = order.status === 'CONFIRMED' || order.status === 'IN_PROGRESS' || order.status === 'COMPLETED' || (order.status === 'CANCELLED' && Math.random() < 0.5);
-    if (needsDeposit) {
-      const depositAmount = round2(order.totalAmount * 0.3);
-      let depositStatus: DepositStatus;
-      if (order.status === 'CANCELLED') depositStatus = 'CANCELLED';
-      else if (order.status === 'CONFIRMED') depositStatus = Math.random() < 0.7 ? 'PAID' : 'UNPAID';
-      else depositStatus = 'PAID';
-      const paymentDate = depositStatus === 'PAID' ? addDays(order.eventDate, -randomInt(5, 20)) : null;
-      const requester = randomChoice(managers);
-      await prisma.deposit.create({
-        data: {
-          depositId: genId(),
-          depositCode: `DEP-${order.orderCode.replace('ORD-', '')}`,
-          orderId: order.orderId,
-          amount: depositAmount,
-          dueDate: addDays(order.eventDate, -25),
-          paymentDate,
-          paymentMethod: paymentDate ? randomChoice(['Chuyển khoản ngân hàng', 'Ví MoMo', 'Tiền mặt']) : null,
-          qrCodeUrl: paymentDate ? `https://payments.bnwevents.vn/qr/${genId()}.png` : null,
-          status: depositStatus,
-          evidences: (() => {
-            if (depositStatus !== 'PAID') return undefined;
-            const ev = randomEvidence(0.7);
-            return ev ? { create: [{ evidenceId: ev }] } : undefined;
-          })(),
-          requestedBy: requester.userId,
-          approvedBy: depositStatus === 'PAID' ? randomChoice(managers).userId : null,
-          approvedAt: paymentDate,
-          notes: `Đặt cọc theo chính sách ${depositPolicy.policyName}.`,
-        },
-      });
-    }
-
-    // --- Kho vận: OUTBOUND lúc lắp đặt cho IN_PROGRESS/COMPLETED ---
-    if (order.status === 'IN_PROGRESS' || order.status === 'COMPLETED') {
-      for (const it of order.items) {
-        inventoryMovements.push({
-          itemId: it.itemId,
-          orderId: order.orderId,
-          reportId: null,
-          movementType: 'OUTBOUND',
-          quantity: it.quantity,
-          performedBy: order.leaderId,
-          notes: `Xuất kho lắp đặt cho sự kiện ${order.orderCode}`,
-        });
-      }
-    }
-
-    // --- CollectedEquipmentReport + INBOUND cho COMPLETED ---
-    if (order.status === 'COMPLETED') {
-      const reportItems = order.items.map((it) => {
-        const damaged = Math.random() < 0.15 ? randomInt(1, 2) : 0;
-        const lost = Math.random() < 0.05 ? 1 : 0;
-        const good = Math.max(0, it.quantity - damaged - lost);
-        return { itemId: it.itemId, itemName: it.itemName, good, damaged, lost };
-      });
-      const anyIssue = reportItems.some((r) => r.damaged > 0 || r.lost > 0);
-      const reportId = genId();
-      const reportStatus: CollectedEquipmentReportStatus = Math.random() < 0.85 ? 'CONFIRMED' : 'SUBMITTED';
-      await prisma.collectedEquipmentReport.create({
-        data: {
-          reportId,
-          orderId: order.orderId,
-          reportType: 'INTERNAL',
-          status: reportStatus,
-          reportedBy: order.leaderId,
-          confirmedBy: reportStatus === 'CONFIRMED' ? randomChoice(managers).userId : null,
-          confirmedAt: reportStatus === 'CONFIRMED' ? addDays(order.eventDate, 2) : null,
-          notes: anyIssue ? `Thu hồi thiết bị sau sự kiện ${order.orderCode} — ghi nhận một số thiết bị hư hỏng/thất lạc.` : `Thu hồi thiết bị sau sự kiện ${order.orderCode} — đầy đủ, không phát sinh hư hỏng.`,
-          items: {
-            create: reportItems.map((r) => ({
-              cerItemId: genId(),
-              itemId: r.itemId,
-              goodQuantity: r.good,
-              damagedQuantity: r.damaged,
-              lostQuantity: r.lost,
-            })),
-          },
-        },
-      });
-
-      for (const r of reportItems) {
-        if (r.damaged > 0) {
-          damagedByItem.set(r.itemId, (damagedByItem.get(r.itemId) ?? 0) + r.damaged);
-        }
-        const returnedQty = r.good + r.damaged;
-        if (returnedQty > 0) {
-          inventoryMovements.push({
-            itemId: r.itemId,
-            orderId: order.orderId,
-            reportId,
-            movementType: 'INBOUND',
-            quantity: returnedQty,
-            performedBy: order.leaderId,
-            notes: `Nhập kho thu hồi sau sự kiện ${order.orderCode}`,
-          });
-        }
-      }
-
-      // --- Settlement (bắt buộc cho COMPLETED) ---
-      const compensation = anyIssue
-        ? round2(
-            reportItems.reduce((s, r) => {
-              const item = items.find((x) => x.itemId === r.itemId);
-              const unitReplacementCost = item ? item.purchasePrice : 0;
-              return s + (r.damaged + r.lost) * unitReplacementCost * (compensationPolicy.policyValue.toNumber() / 100);
-            }, 0),
-          )
-        : 0;
-      const additionalFee = Math.random() < 0.3 ? round2(feePolicy.policyValue.toNumber() * randomInt(1, 3)) : 0;
-      const discount = Math.random() < 0.2 ? randomInt(1, 3) * 100000 : 0;
-      const finalAmount = round2(order.totalAmount + additionalFee - discount + compensation);
-      const requester = randomChoice(managers);
-      const confirmer = randomChoice(managers);
-      await prisma.settlement.create({
-        data: {
-          settlementId: genId(),
-          orderId: order.orderId,
-          additionalFee,
-          compensation,
-          discount,
-          finalAmount,
-          paymentMethod: 'Chuyển khoản ngân hàng',
-          qrCodeUrl: `https://payments.bnwevents.vn/qr/${genId()}.png`,
-          paidAt: addDays(order.eventDate, 3),
-          evidences: (() => {
-            const ev = randomEvidence(0.7);
-            return ev ? { create: [{ evidenceId: ev }] } : undefined;
-          })(),
-          status: 'PAID',
-          requestedBy: requester.userId,
-          requestedAt: addDays(order.eventDate, 1),
-          confirmedBy: confirmer.userId,
-          confirmedAt: addDays(order.eventDate, 3),
-          notes: anyIssue ? `Có phát sinh đền bù theo chính sách ${compensationPolicy.policyName}.` : 'Quyết toán không phát sinh thêm chi phí.',
-        },
-      });
-    } else if (order.status === 'IN_PROGRESS') {
-      // --- Settlement nháp (bắt buộc cho IN_PROGRESS, chưa quyết toán cuối) ---
-      await prisma.settlement.create({
-        data: {
-          settlementId: genId(),
-          orderId: order.orderId,
-          additionalFee: 0,
-          compensation: 0,
-          discount: 0,
-          finalAmount: order.totalAmount,
-          status: 'UNPAID',
-          notes: 'Sự kiện đang diễn ra, chưa quyết toán cuối cùng.',
-        },
-      });
-    }
-  }
-  console.log(`  - Đã sinh Schedule/Survey/ChangeRequest/SupplierTransaction/Deposit/Settlement/CollectedEquipmentReport cho ${createdOrders.length} orders`);
-
-  // ==========================================================================
   // 9. INVENTORY — 1 dòng cho TOÀN BỘ items (available + reserved + damaged = total)
   // ==========================================================================
   await prisma.inventory.createMany({
     data: items.map((it) => {
-      const reserved = reservedByItem.get(it.itemId) ?? 0;
-      const damaged = damagedByItem.get(it.itemId) ?? 0;
-      const available = it.bulk ? randomInt(20, 80) : randomInt(5, 30);
+      const quantityTotal = it.bulk ? randomInt(50, 200) : randomInt(10, 30);
       return {
         inventoryId: genId(),
         itemId: it.itemId,
-        quantityTotal: reserved + damaged + available,
-        quantityDamaged: damaged,
+        quantityTotal,
+        quantityDamaged: 0,
       };
     }),
   });
@@ -1265,6 +646,7 @@ async function main(): Promise<void> {
   // ==========================================================================
   // 10. INVENTORY MOVEMENTS — OUTBOUND/INBOUND thu thập ở bước 8, cộng thêm vài ADJUSTMENT
   // ==========================================================================
+  const inventoryMovements: any[] = [];
   for (const extra of sample(items, 6)) {
     inventoryMovements.push({
       itemId: extra.itemId,
@@ -1290,232 +672,6 @@ async function main(): Promise<void> {
     })),
   });
   console.log(`  - Inventory cho ${items.length} items, ${inventoryMovements.length} inventory movements`);
-
-  // ==========================================================================
-  // 12. RESERVATIONS + KỊCH BẢN NGOÀI LUỒNG (mô hình rental — Phase 1-3)
-  //     Chạy sau §9/§10 nên inventory & movements đã có; đọc/ép quantityTotal thật để kiểm chứng.
-  // ==========================================================================
-  const SETUP_BUFFER_H = 24; // khớp reservation.repository.ts
-  const TURNAROUND_D = 1;
-  const managerId = managers[0].userId;
-  const dayOf = (n: number): Date => addDays(TODAY, n);
-  const winStart = (start: Date): Date => addHours(start, -SETUP_BUFFER_H);
-  const winEnd = (end: Date): Date => addDays(end, TURNAROUND_D);
-
-  // (a) Reservation cho CÁC ĐƠN HIỆN CÓ — re-query để lấy endDate + orderItems thật.
-  //     CONFIRMED/IN_PROGRESS → CONFIRMED · COMPLETED → CONSUMED · CANCELLED → RELEASED · NEW → bỏ qua.
-  const existingOrders = await prisma.order.findMany({
-    select: {
-      orderId: true,
-      orderStatus: true,
-      eventDate: true,
-      endDate: true,
-      orderItems: { where: { source: 'INTERNAL' }, select: { itemId: true, quantity: true } },
-    },
-  });
-  const resvData: {
-    reservationId: string;
-    itemId: string;
-    orderId: string;
-    quantity: number;
-    startAt: Date;
-    endAt: Date;
-    status: ReservationStatus;
-    createdBy: string;
-  }[] = [];
-  for (const o of existingOrders) {
-    const rs: ReservationStatus | null =
-      o.orderStatus === 'CONFIRMED' || o.orderStatus === 'IN_PROGRESS'
-        ? 'CONFIRMED'
-        : o.orderStatus === 'COMPLETED'
-          ? 'CONSUMED'
-          : o.orderStatus === 'CANCELLED'
-            ? 'RELEASED'
-            : null;
-    if (!rs) continue;
-    const startAt = winStart(o.eventDate);
-    const endAt = winEnd(o.endDate ?? o.eventDate);
-    const need = new Map<string, number>();
-    for (const oi of o.orderItems) need.set(oi.itemId, (need.get(oi.itemId) ?? 0) + oi.quantity);
-    for (const [itemId, quantity] of need) {
-      resvData.push({ reservationId: genId(), itemId, orderId: o.orderId, quantity, startAt, endAt, status: rs, createdBy: managerId });
-    }
-  }
-  if (resvData.length) await prisma.inventoryReservation.createMany({ data: resvData });
-
-  // (b) KỊCH BẢN NGOÀI LUỒNG — cửa sổ đặt xa (D+200..) để không bị pollution bởi reservation ở (a).
-  const edgeItemId = itemIdByCode.get('SPK-JBL715') ?? items[0].itemId;
-  const edgeItem = items.find((i) => i.itemId === edgeItemId) ?? items[0];
-  const item2 = items.find((i) => i.itemId !== edgeItemId) ?? items[0];
-  const item3 = items.find((i) => i.itemId !== edgeItemId && i.itemId !== item2.itemId) ?? items[0];
-  const custA = customers[0];
-  const custB = customers[1] ?? customers[0];
-
-  // Ép tồn về số nhỏ, dễ kiểm chứng bằng mắt.
-  await prisma.inventory.update({ where: { itemId: edgeItemId }, data: { quantityTotal: 5, quantityDamaged: 0 } });
-  await prisma.inventory.update({ where: { itemId: item2.itemId }, data: { quantityTotal: 5, quantityDamaged: 0 } });
-  await prisma.inventory.update({ where: { itemId: item3.itemId }, data: { quantityTotal: 10, quantityDamaged: 0 } });
-
-  const makeEdgeOrder = async (
-    code: string,
-    customerId: string,
-    status: OrderStatus,
-    eventDate: Date,
-    endDate: Date,
-    lines: { itemId: string; qty: number; price: number; source?: OrderItemSource }[],
-  ): Promise<string> => {
-    const orderId = genId();
-    await prisma.order.create({
-      data: {
-        orderId,
-        orderCode: code,
-        customerId,
-        policyId: depositPolicy.policyId,
-        eventType: 'Hội nghị doanh nghiệp',
-        eventName: `Kịch bản ${code}`,
-        eventDate,
-        endDate,
-        location: 'Trung tâm Hội nghị Quốc gia, Hà Nội',
-        latitude: 21.0037,
-        longitude: 105.7873,
-        guestCount: 150,
-        totalAmount: round2(lines.reduce((s, l) => s + l.qty * l.price, 0)),
-        paymentStatus: status === 'NEW' ? 'UNPAID' : 'DEPOSITED',
-        orderStatus: status,
-        confirmedAt: status === 'NEW' ? null : TODAY,
-        createdBy: managerId,
-        orderItems: {
-          create: lines.map((l) => ({
-            itemId: l.itemId,
-            quantity: l.qty,
-            unitPrice: l.price,
-            subtotal: round2(l.qty * l.price),
-            source: l.source ?? 'INTERNAL',
-            preparedQty: 0,
-          })),
-        },
-      },
-    });
-    return orderId;
-  };
-
-  const pushResv = (itemId: string, orderId: string, quantity: number, start: Date, end: Date, status: ReservationStatus = 'CONFIRMED') =>
-    prisma.inventoryReservation.create({
-      data: { reservationId: genId(), itemId, orderId, quantity, startAt: winStart(start), endAt: winEnd(end), status, createdBy: managerId },
-    });
-
-  // E1 — OVERBOOKING: A giữ hết 5 cho [D+200,D+202]; B (NEW, cần 1 cho D+201) có cọc UNPAID.
-  //      Tester bấm "xác nhận cọc" cho B ⇒ kỳ vọng 409 (available=0).
-  const aStart = dayOf(200);
-  const aEnd = dayOf(202);
-  const ordA = await makeEdgeOrder('ORD-101', custA.id, 'CONFIRMED', aStart, aEnd, [{ itemId: edgeItemId, qty: 5, price: edgeItem.rentalPrice }]);
-  await pushResv(edgeItemId, ordA, 5, aStart, aEnd);
-
-  const bDate = dayOf(201);
-  const ordB = await makeEdgeOrder('ORD-102', custB.id, 'NEW', bDate, bDate, [{ itemId: edgeItemId, qty: 1, price: edgeItem.rentalPrice }]);
-  await prisma.deposit.create({
-    data: {
-      depositId: genId(),
-      depositCode: 'DEP-102',
-      orderId: ordB,
-      amount: round2(edgeItem.rentalPrice * 0.3),
-      dueDate: bDate,
-      status: 'UNPAID',
-      requestedBy: managerId,
-      notes: 'Cọc chờ xác nhận — dùng để test CHẶN overbooking (ORD-101 đã giữ hết tồn item này).',
-    },
-  });
-
-  // E4 — TURNAROUND: C giữ cùng item cho [D+205,D+206] (KHÔNG chồng A) → cả hai hợp lệ.
-  const cStart = dayOf(205);
-  const cEnd = dayOf(206);
-  const ordC = await makeEdgeOrder('ORD-103', custA.id, 'CONFIRMED', cStart, cEnd, [{ itemId: edgeItemId, qty: 5, price: edgeItem.rentalPrice }]);
-  await pushResv(edgeItemId, ordC, 5, cStart, cEnd);
-
-  // E2 — NCC GÁNH THIẾU: cần 8 (item2 tồn 5) → 5 INTERNAL + 3 SUPPLIER; reservation chỉ 5 (không âm).
-  const dStart = dayOf(210);
-  const dEnd = dayOf(211);
-  const ordD = await makeEdgeOrder('ORD-104', custB.id, 'CONFIRMED', dStart, dEnd, [
-    { itemId: item2.itemId, qty: 5, price: item2.rentalPrice, source: 'INTERNAL' },
-    { itemId: item2.itemId, qty: 3, price: item2.rentalPrice, source: 'SUPPLIER' },
-  ]);
-  await pushResv(item2.itemId, ordD, 5, dStart, dEnd);
-  await prisma.supplierTransaction.create({
-    data: {
-      transactionId: genId(),
-      transactionCode: 'STX-104',
-      supplierId: suppliers[0].id,
-      orderId: ordD,
-      transactionType: 'RENTAL',
-      serviceTitle: 'Thuê ngoài phần thiếu (kho nội bộ chỉ đủ 5/8)',
-      estimatedCost: round2(3 * item2.rentalPrice * 1.2),
-      depositAmount: 0,
-      paymentStatus: 'DEPOSITED',
-      status: 'APPROVED',
-      updatedBy: managerId,
-      items: {
-        create: [{ itemId: item2.itemId, itemName: item2.name, quantity: 3, unitCost: round2(item2.rentalPrice * 1.2), subtotal: round2(3 * item2.rentalPrice * 1.2), receivedQuantity: 0 }],
-      },
-    },
-  });
-
-  // E3 — HỎNG/MẤT KHI THU HỒI: đơn IN_PROGRESS đã xuất 4; biên bản SUBMITTED (2 tốt,1 hỏng,1 mất).
-  //      Tester xác nhận biên bản ⇒ item3 total −=1 (=9), damaged +=1.
-  const eStart = dayOf(215);
-  const eEnd = dayOf(216);
-  const ordE = await makeEdgeOrder('ORD-105', custA.id, 'IN_PROGRESS', eStart, eEnd, [{ itemId: item3.itemId, qty: 4, price: item3.rentalPrice }]);
-  await pushResv(item3.itemId, ordE, 4, eStart, eEnd);
-  await prisma.inventoryMovement.create({
-    data: { movementId: genId(), itemId: item3.itemId, orderId: ordE, reportId: null, movementType: 'OUTBOUND', quantity: 4, performedBy: managerId, notes: 'Xuất kho hiện trường cho ORD-105' },
-  });
-  await prisma.collectedEquipmentReport.create({
-    data: {
-      reportId: genId(),
-      orderId: ordE,
-      reportType: 'INTERNAL',
-      status: 'SUBMITTED',
-      reportedBy: managerId,
-      notes: 'Thu hồi ORD-105: 2 tốt, 1 hỏng, 1 mất — chờ Manager xác nhận để áp dụng tồn kho.',
-      items: { create: [{ cerItemId: genId(), itemId: item3.itemId, goodQuantity: 2, damagedQuantity: 1, lostQuantity: 1 }] },
-    },
-  });
-
-  console.log(`  - ${resvData.length} reservations (đơn hiện có) + 5 kịch bản ngoài luồng (ORD-101..105 (E1..E5))`);
-
-  // ==========================================================================
-  // 11. NOTIFICATIONS
-  // ==========================================================================
-  interface NotificationSeed {
-    userId: string;
-    title: string;
-    content: string;
-    notificationType: 'SYSTEM' | 'ORDER' | 'TASK';
-    refType?: string;
-    refId?: string;
-  }
-
-  const notificationTargets = sample(createdOrders, Math.min(10, createdOrders.length));
-  const notificationsData: NotificationSeed[] = notificationTargets.flatMap((order) => [
-    { userId: randomChoice(managers).userId, title: 'Cập nhật đơn hàng', content: `Đơn hàng ${order.orderCode} vừa được cập nhật trạng thái ${order.status}.`, notificationType: 'ORDER', refType: 'ORDER', refId: order.orderId },
-    { userId: order.leaderId, title: 'Phân công công việc', content: `Bạn được phân công phụ trách sự kiện ${order.orderCode}.`, notificationType: 'TASK', refType: 'ORDER', refId: order.orderId },
-  ]);
-  notificationsData.push({
-    userId: randomChoice(managers).userId,
-    title: 'Thông báo hệ thống',
-    content: 'Dữ liệu mẫu đã được khởi tạo thành công.',
-    notificationType: 'SYSTEM',
-  });
-  await prisma.notification.createMany({
-    data: notificationsData.map((n) => ({
-      userId: n.userId,
-      title: n.title,
-      content: n.content,
-      notificationType: n.notificationType,
-      refType: n.refType,
-      refId: n.refId,
-    })),
-  });
-  console.log(`  - ${notificationsData.length} notifications`);
 
   console.log('Seed data generated successfully.');
 }
