@@ -67,6 +67,46 @@ function toNumber(value: unknown): number | null {
 }
 
 function mapItem(row: CatalogItemWithType): CatalogItemDTO {
+  const isCombo = (row._count?.components ?? 0) > 0;
+  
+  const components = row.components?.map((c) => {
+    const childTotal = c.child.inventory ? c.child.inventory.quantityTotal : 0;
+    const childAvailable = c.child.inventory ? (c.child.inventory.quantityTotal - c.child.inventory.quantityDamaged) : 0;
+    return {
+      componentId: c.id,
+      childItemId: c.childId,
+      childItemName: c.child.itemName,
+      childItemCode: c.child.itemCode,
+      unit: c.child.unit,
+      quantity: c.quantity,
+      quantityAvailable: childAvailable,
+      _rawChildTotal: childTotal, // Internal use
+    };
+  });
+
+  let inventory = null;
+  if (isCombo && components && components.length > 0) {
+    let maxTotal = Infinity;
+    let maxAvailable = Infinity;
+    
+    for (const c of components) {
+      if (c.quantity <= 0) continue;
+      const possibleTotal = Math.floor(c._rawChildTotal / c.quantity);
+      const possibleAvailable = Math.floor(c.quantityAvailable / c.quantity);
+      if (possibleTotal < maxTotal) maxTotal = possibleTotal;
+      if (possibleAvailable < maxAvailable) maxAvailable = possibleAvailable;
+    }
+    inventory = {
+      quantityTotal: maxTotal === Infinity ? 0 : maxTotal,
+      quantityAvailable: maxAvailable === Infinity ? 0 : maxAvailable,
+    };
+  } else if (!isCombo && row.inventory) {
+    inventory = {
+      quantityTotal: row.inventory.quantityTotal,
+      quantityAvailable: row.inventory.quantityTotal - row.inventory.quantityDamaged,
+    };
+  }
+
   return {
     itemId: row.itemId,
     itemCode: row.itemCode,
@@ -83,24 +123,12 @@ function mapItem(row: CatalogItemWithType): CatalogItemDTO {
     priceValidTo: row.priceValidTo ? row.priceValidTo.toISOString() : null,
     imageUrl: row.imageUrl,
     status: row.status,
-    inventory: row.inventory
-      ? {
-          quantityTotal: row.inventory.quantityTotal,
-          quantityAvailable: row.inventory.quantityTotal - row.inventory.quantityDamaged,
-        }
-      : null,
-    isCombo: (row._count?.components ?? 0) > 0,
-    components: row.components?.map((c) => ({
-      componentId: c.id,
-      childItemId: c.childId,
-      childItemName: c.child.itemName,
-      childItemCode: c.child.itemCode,
-      unit: c.child.unit,
-      quantity: c.quantity,
-      quantityAvailable: c.child.inventory
-        ? c.child.inventory.quantityTotal - c.child.inventory.quantityDamaged
-        : null,
-    })),
+    inventory,
+    isCombo,
+    components: components?.map(c => {
+      const { _rawChildTotal, ...rest } = c;
+      return rest;
+    }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
