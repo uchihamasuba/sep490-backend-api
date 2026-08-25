@@ -241,6 +241,14 @@ function mapDetail(row: OrderWithDetails): OrderDetailDTO {
       source: item.source,
       preparedQty: item.preparedQty,
       notes: item.notes,
+      isCombo: (item.item._count?.components ?? 0) > 0,
+      components: item.item.components?.map(c => ({
+        childItemId: c.childId,
+        childItemName: c.child?.itemName,
+        childItemCode: c.child?.itemCode,
+        unit: c.child?.unit,
+        quantity: c.quantity,
+      })),
     })),
   };
 }
