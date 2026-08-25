@@ -148,6 +148,14 @@ function mapDetail(row: QuotationWithDetails, linkedOrderId: string | null): Quo
       price: toNumber(item.price),
       discount: toNumber(item.discount),
       lineTotal: toNumber(item.lineTotal),
+      isCombo: (item.item.components?.length ?? 0) > 0,
+      components: item.item.components?.map(c => ({
+        childItemId: c.childId,
+        childItemCode: c.child.itemCode,
+        childItemName: c.child.itemName,
+        unit: c.child.unit,
+        quantity: c.quantity,
+      })),
     })),
   };
 }

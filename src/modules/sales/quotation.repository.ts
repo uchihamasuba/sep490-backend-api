@@ -39,7 +39,7 @@ export interface QuotationListParams extends QuotationListFilter {
 const detailInclude = {
   customer: { select: { customerName: true, phone: true, email: true, address: true } },
   creator: { select: { userId: true, fullName: true, role: true } },
-  items: { include: { item: { include: { type: { include: { category: true } } } } } },
+  items: { include: { item: { include: { type: { include: { category: true } }, components: { include: { child: true } } } } } },
 } satisfies Prisma.QuotationInclude;
 
 export type QuotationWithDetails = Prisma.QuotationGetPayload<{ include: typeof detailInclude }>;

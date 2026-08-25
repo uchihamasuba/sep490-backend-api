@@ -51,14 +51,21 @@ const detailInclude = {
   customer: { select: { customerName: true, phone: true, email: true, address: true } },
   creator: { select: { userId: true, fullName: true, role: true } },
   closer: { select: { userId: true, fullName: true } },
-  orderItems: { include: { item: { select: { itemName: true, unit: true } } } },
+  orderItems: { include: { item: { select: { itemName: true, unit: true, components: { select: { childId: true, quantity: true } } } } } },
 } satisfies Prisma.OrderInclude;
 
 export type OrderWithDetails = Prisma.OrderGetPayload<{ include: typeof detailInclude }>;
 
 const picklistInclude = {
   customer: { select: { customerName: true } },
-  orderItems: { select: { itemId: true, quantity: true, preparedQty: true } },
+  orderItems: {
+    select: {
+      itemId: true,
+      quantity: true,
+      preparedQty: true,
+      item: { select: { components: { select: { childId: true, quantity: true } } } },
+    },
+  },
   pickedUpByUser: { select: { fullName: true } },
 } satisfies Prisma.OrderInclude;
 

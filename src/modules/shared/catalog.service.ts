@@ -135,14 +135,13 @@ async function createItem(body: CreateCatalogItemBody): Promise<CatalogItemDTO> 
     components: body.components,
   });
 
-  const isCombo = body.components && body.components.length > 0;
-  if (!isCombo) {
-    await inventoryService.createInventory({
-      itemId: created.itemId,
-      quantityTotal: 0,
-      quantityDamaged: 0,
-    });
-  }
+  // Luôn luôn tạo một dòng Inventory cho mọi item, kể cả Combo (với quantityTotal = 0).
+  // Điều này đảm bảo Combo sẽ hiển thị trong `inventoryRepository.findMany` khi tạo báo giá.
+  await inventoryService.createInventory({
+    itemId: created.itemId,
+    quantityTotal: 0,
+    quantityDamaged: 0,
+  });
 
   return mapItem(created);
 }

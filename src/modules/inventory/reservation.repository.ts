@@ -259,14 +259,31 @@ async function reserveOrderStock(
     select: {
       eventDate: true,
       endDate: true,
-      orderItems: { where: { source: 'INTERNAL' }, select: { itemId: true, quantity: true } },
+      orderItems: { 
+        where: { source: 'INTERNAL' }, 
+        select: { 
+          itemId: true, 
+          quantity: true,
+          item: {
+            select: {
+              components: { select: { childId: true, quantity: true } }
+            }
+          }
+        } 
+      },
     },
   });
   if (!order) throw AppError.notFound('Không tìm thấy đơn hàng khi giữ chỗ thiết bị');
 
   const needByItem = new Map<string, number>();
   for (const oi of order.orderItems) {
-    needByItem.set(oi.itemId, (needByItem.get(oi.itemId) ?? 0) + oi.quantity);
+    if (oi.item.components && oi.item.components.length > 0) {
+      for (const comp of oi.item.components) {
+        needByItem.set(comp.childId, (needByItem.get(comp.childId) ?? 0) + oi.quantity * comp.quantity);
+      }
+    } else {
+      needByItem.set(oi.itemId, (needByItem.get(oi.itemId) ?? 0) + oi.quantity);
+    }
   }
   if (needByItem.size === 0) return; // đơn không có thiết bị nội bộ → không giữ chỗ
 

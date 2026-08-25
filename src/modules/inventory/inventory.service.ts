@@ -182,18 +182,61 @@ async function listInventory(query: ListInventoryQuery): Promise<{ data: Invento
   const queryStart = query.date ? new Date(query.date) : new Date();
   const queryEnd = new Date(queryStart.getTime() + 24 * 60 * 60 * 1000);
 
-  // Gộp N+1: thay vì 2 query/dòng (reserved + outstanding), dùng 2 query GROUP BY cho cả trang.
   const itemIds = rows.map((row) => row.itemId);
+  
+  const childItemIds = new Set<string>();
+  for (const row of rows) {
+    if (row.item.components && row.item.components.length > 0) {
+      for (const comp of row.item.components) {
+        childItemIds.add(comp.childId);
+      }
+    }
+  }
+  
+  const childInventories = await inventoryRepository.findManyByItemIds([...childItemIds]);
+  const childTotalMap = new Map(childInventories.map(i => [i.itemId, i.quantityTotal]));
+  const childDamagedMap = new Map(childInventories.map(i => [i.itemId, i.quantityDamaged]));
+
+  const allItemIds = [...new Set([...itemIds, ...childItemIds])];
+
   const [reservedMap, outstandingMap] = await Promise.all([
-    // excludeOrderId: khi trang chi tiết 1 đơn hỏi khả dụng "cho đơn này", loại trừ chính reservation của
-    // đơn đó để không tự trừ phần mình đã giữ (tránh cảnh báo "cần thuê" ảo sau khi CONFIRMED).
-    reservationRepository.getReservedForRangeBatch(itemIds, queryStart, queryEnd, { excludeOrderId: query.excludeOrderId }),
-    reservationRepository.getOutstandingOutBatch(itemIds),
+    reservationRepository.getReservedForRangeBatch(allItemIds, queryStart, queryEnd, { excludeOrderId: query.excludeOrderId }),
+    reservationRepository.getOutstandingOutBatch(allItemIds),
   ]);
+
   const data = rows.map((row) => {
-    const reservedQty = reservedMap.get(row.itemId) ?? 0;
-    const onHand = row.quantityTotal - row.quantityDamaged - (outstandingMap.get(row.itemId) ?? 0);
-    return mapInventory(row, reservedQty, onHand);
+    if (row.item.components && row.item.components.length > 0) {
+      let maxTotal = Infinity;
+      let maxAvailable = Infinity;
+      let maxOnHand = Infinity;
+      
+      for (const comp of row.item.components) {
+        if (comp.quantity <= 0) continue;
+        const total = childTotalMap.get(comp.childId) ?? 0;
+        const damaged = childDamagedMap.get(comp.childId) ?? 0;
+        const reserved = reservedMap.get(comp.childId) ?? 0;
+        const out = outstandingMap.get(comp.childId) ?? 0;
+        
+        const available = Math.max(0, total - damaged - reserved);
+        const onHand = Math.max(0, total - damaged - out);
+        
+        maxTotal = Math.min(maxTotal, Math.floor(total / comp.quantity));
+        maxAvailable = Math.min(maxAvailable, Math.floor(available / comp.quantity));
+        maxOnHand = Math.min(maxOnHand, Math.floor(onHand / comp.quantity));
+      }
+      
+      if (maxTotal === Infinity) maxTotal = 0;
+      if (maxAvailable === Infinity) maxAvailable = 0;
+      if (maxOnHand === Infinity) maxOnHand = 0;
+      
+      row.quantityTotal = maxTotal;
+      row.quantityDamaged = Math.max(0, maxTotal - maxAvailable);
+      return mapInventory(row, 0, maxOnHand);
+    } else {
+      const reservedQty = reservedMap.get(row.itemId) ?? 0;
+      const onHand = row.quantityTotal - row.quantityDamaged - (outstandingMap.get(row.itemId) ?? 0);
+      return mapInventory(row, reservedQty, onHand);
+    }
   });
 
   return { data, meta: toMeta(query.page, query.limit, totalItems) };
@@ -202,7 +245,48 @@ async function listInventory(query: ListInventoryQuery): Promise<{ data: Invento
 async function getInventoryByItemId(itemId: string): Promise<InventoryDTO> {
   const row = await findInventoryOrThrow(itemId);
   const now = new Date();
-  const reservedQty = await reservationRepository.getReservedForRange(itemId, now, new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  const queryEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  if (row.item.components && row.item.components.length > 0) {
+    const childItemIds = row.item.components.map(c => c.childId);
+    const childInventories = await inventoryRepository.findManyByItemIds(childItemIds);
+    const childTotalMap = new Map(childInventories.map(i => [i.itemId, i.quantityTotal]));
+    const childDamagedMap = new Map(childInventories.map(i => [i.itemId, i.quantityDamaged]));
+    
+    const [reservedMap, outstandingMap] = await Promise.all([
+      reservationRepository.getReservedForRangeBatch(childItemIds, now, queryEnd),
+      reservationRepository.getOutstandingOutBatch(childItemIds),
+    ]);
+
+    let maxTotal = Infinity;
+    let maxAvailable = Infinity;
+    let maxOnHand = Infinity;
+    
+    for (const comp of row.item.components) {
+      if (comp.quantity <= 0) continue;
+      const total = childTotalMap.get(comp.childId) ?? 0;
+      const damaged = childDamagedMap.get(comp.childId) ?? 0;
+      const reserved = reservedMap.get(comp.childId) ?? 0;
+      const out = outstandingMap.get(comp.childId) ?? 0;
+      
+      const available = Math.max(0, total - damaged - reserved);
+      const onHand = Math.max(0, total - damaged - out);
+      
+      maxTotal = Math.min(maxTotal, Math.floor(total / comp.quantity));
+      maxAvailable = Math.min(maxAvailable, Math.floor(available / comp.quantity));
+      maxOnHand = Math.min(maxOnHand, Math.floor(onHand / comp.quantity));
+    }
+    
+    if (maxTotal === Infinity) maxTotal = 0;
+    if (maxAvailable === Infinity) maxAvailable = 0;
+    if (maxOnHand === Infinity) maxOnHand = 0;
+    
+    row.quantityTotal = maxTotal;
+    row.quantityDamaged = Math.max(0, maxTotal - maxAvailable);
+    return mapInventory(row, 0, maxOnHand);
+  }
+
+  const reservedQty = await reservationRepository.getReservedForRange(itemId, now, queryEnd);
   const onHand = row.quantityTotal - row.quantityDamaged - (await reservationRepository.getOutstandingOut(itemId));
   return mapInventory(row, reservedQty, onHand);
 }

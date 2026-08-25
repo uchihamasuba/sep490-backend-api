@@ -63,6 +63,7 @@ const mockedResv = reservationRepository as jest.Mocked<typeof reservationReposi
 beforeEach(() => {
   // Mặc định "không có hàng đang ngoài kho" → quantityOnHand = total − damaged trong các test hiển thị.
   mockedResv.getOutstandingOut.mockResolvedValue(0);
+  mockedRepo.findManyByItemIds = jest.fn().mockResolvedValue([]);
   // listInventory dùng bản BATCH (chống N+1) — uỷ quyền về scalar mock để các test cũ set getReservedForRange/
   // getOutstandingOut vẫn có hiệu lực mà không phải sửa từng test.
   mockedResv.getReservedForRangeBatch.mockImplementation(async (itemIds: string[]) => {

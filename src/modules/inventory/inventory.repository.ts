@@ -16,6 +16,8 @@ const inventoryItemInclude = {
       unit: true,
       rentalPrice: true,
       purchasePrice: true,
+
+      components: { select: { childId: true, quantity: true } },
       type: { select: { typeName: true, category: { select: { categoryName: true } } } },
     },
   },
