@@ -309,24 +309,73 @@ async function getPicklist(orderId: string): Promise<PicklistItemDTO[]> {
   // Số đã thuê NCC theo item — để app hiện "cần chuẩn bị nội bộ" = quantityOrdered − quantityRented.
   const rentedByItem = await reservationRepository.getRentedByItemForOrder(orderId);
 
-  return Promise.all(rows.map(async (row) => {
+  const explodedItems = new Map<string, {
+    itemId: string;
+    itemName: string;
+    unit: string;
+    rentalPrice: number;
+    purchasePrice: number | null;
+    source: string;
+    quantityOrdered: number;
+  }>();
+
+  for (const row of rows) {
+    const isCombo = (row.item._count?.components ?? 0) > 0;
+    if (isCombo && row.item.components && row.item.components.length > 0) {
+      for (const comp of row.item.components) {
+        if (!comp.child) continue;
+        const physicalItemId = comp.childId;
+        const qty = row.quantity * comp.quantity;
+        const existing = explodedItems.get(physicalItemId);
+        if (existing) {
+          existing.quantityOrdered += qty;
+        } else {
+          explodedItems.set(physicalItemId, {
+            itemId: physicalItemId,
+            itemName: comp.child.itemName,
+            unit: comp.child.unit,
+            rentalPrice: Number(comp.child.rentalPrice),
+            purchasePrice: comp.child.purchasePrice === null ? null : Number(comp.child.purchasePrice),
+            source: row.source,
+            quantityOrdered: qty,
+          });
+        }
+      }
+    } else {
+      const existing = explodedItems.get(row.itemId);
+      if (existing) {
+        existing.quantityOrdered += row.quantity;
+      } else {
+        explodedItems.set(row.itemId, {
+          itemId: row.itemId,
+          itemName: row.item.itemName,
+          unit: row.item.unit,
+          rentalPrice: Number(row.item.rentalPrice),
+          purchasePrice: row.item.purchasePrice === null ? null : Number(row.item.purchasePrice),
+          source: row.source,
+          quantityOrdered: row.quantity,
+        });
+      }
+    }
+  }
+
+  return Promise.all(Array.from(explodedItems.values()).map(async (row) => {
     let quantityAvailable = null;
     let quantityExported = 0;
-    if (row.item.inventory) {
-      // Picklist quan tâm "hàng còn thật trong kho để lấy hôm nay" = on-hand (mô hình rental Phase 2/4).
-      quantityAvailable = await reservationRepository.getOnHandNow(row.itemId);
-    }
+    
+    // Picklist quan tâm "hàng còn thật trong kho để lấy hôm nay" = on-hand (mô hình rental Phase 2/4).
+    quantityAvailable = await reservationRepository.getOnHandNow(row.itemId);
     quantityExported = await inventoryRepository.getExportedQuantity(orderId, row.itemId);
 
     return {
-      orderItemId: row.orderItemId,
+      orderItemId: row.itemId, // Tái sử dụng field này thành itemId vì orderItemId không còn ý nghĩa 1-1
       itemId: row.itemId,
-      itemName: row.item.itemName,
-      unit: row.item.unit,
-      rentalPrice: Number(row.item.rentalPrice),
-      purchasePrice: row.item.purchasePrice === null ? null : Number(row.item.purchasePrice),
+      itemName: row.itemName,
+      unit: row.unit,
+      rentalPrice: row.rentalPrice,
+      purchasePrice: row.purchasePrice,
       source: row.source,
-      quantityOrdered: row.quantity,
+      quantityOrdered: row.quantityOrdered,
       quantityRented: rentedByItem.get(row.itemId) ?? 0,
       quantityAvailable,
       quantityExported,

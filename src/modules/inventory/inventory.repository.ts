@@ -300,6 +300,20 @@ export const inventoryRepository = {
             rentalPrice: true,
             purchasePrice: true,
             inventory: { select: { quantityTotal: true, quantityDamaged: true } },
+            _count: { select: { components: true } },
+            components: {
+              include: {
+                child: {
+                  select: {
+                    itemName: true,
+                    unit: true,
+                    purchasePrice: true,
+                    rentalPrice: true,
+                    inventory: { select: { quantityTotal: true, quantityDamaged: true } },
+                  }
+                }
+              }
+            }
           },
         },
       },
