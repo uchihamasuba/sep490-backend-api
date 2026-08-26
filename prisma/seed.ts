@@ -861,12 +861,12 @@ async function main(): Promise<void> {
         createdBy: randomChoice(managers).userId,
       });
       const surveyStaffs = sample(operationalPool, 2);
-      surveyStaffs.forEach(st => {
+      surveyStaffs.forEach((st, idx) => {
         scheduleAssigneesData.push({
           assigneeId: genId(),
           planId: surveyPlanId,
           userId: st.userId,
-          role: 'TECHNICAL',
+          role: idx === 0 ? 'LEAD' : 'TECHNICAL',
         });
       });
 
@@ -883,12 +883,12 @@ async function main(): Promise<void> {
         createdBy: randomChoice(managers).userId,
       });
       const setupStaffs = sample(operationalPool, 3);
-      setupStaffs.forEach(st => {
+      setupStaffs.forEach((st, idx) => {
         scheduleAssigneesData.push({
           assigneeId: genId(),
           planId: setupPlanId,
           userId: st.userId,
-          role: 'TECHNICAL',
+          role: idx === 0 ? 'LEAD' : 'TECHNICAL',
         });
       });
 
@@ -905,12 +905,12 @@ async function main(): Promise<void> {
         createdBy: randomChoice(managers).userId,
       });
       const collectStaffs = sample(operationalPool, 3);
-      collectStaffs.forEach(st => {
+      collectStaffs.forEach((st, idx) => {
         scheduleAssigneesData.push({
           assigneeId: genId(),
           planId: collectPlanId,
           userId: st.userId,
-          role: 'TECHNICAL',
+          role: idx === 0 ? 'LEAD' : 'TECHNICAL',
         });
       });
 
