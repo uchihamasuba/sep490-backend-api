@@ -699,10 +699,10 @@ async function main(): Promise<void> {
     { code: 'CUS-005', type: 'Tiệc cưới', side: 'Nhà trai', status: 'COMPLETED', offset: -60 },
     { code: 'CUS-006', type: 'Tiệc cưới', side: 'Nhà gái', status: 'COMPLETED', offset: -90 },
     { code: 'CUS-007', type: 'Tiệc sinh nhật', side: null, status: 'COMPLETED', offset: -45 },
-    { code: 'CUS-008', type: 'Lễ ăn hỏi', side: 'Nhà trai', status: 'COMPLETED', offset: -50 },
+    { code: 'CUS-008', type: 'Lễ ăn hỏi', side: 'Nhà gái', status: 'COMPLETED', offset: -50 },
     { code: 'CUS-009', type: 'Tiệc cưới', side: 'Nhà trai', status: 'CONFIRMED', offset: 7 },
     { code: 'CUS-010', type: 'Đám cưới', side: 'Nhà gái', status: 'CONFIRMED', offset: 14 },
-    { code: 'CUS-011', type: 'Lễ ăn hỏi', side: 'Nhà trai', status: 'CANCELLED', offset: -5 },
+    { code: 'CUS-011', type: 'Lễ ăn hỏi', side: 'Nhà gái', status: 'CANCELLED', offset: -5 },
     { code: 'CUS-012', type: 'Tiệc sinh nhật', side: null, status: 'CANCELLED', offset: -2 },
   ];
 
