@@ -22,6 +22,11 @@ const reportStatusEnum = z.enum(['SUBMITTED', 'CONFIRMED'], {
   message: 'status không hợp lệ, chỉ chấp nhận SUBMITTED hoặc CONFIRMED',
 });
 
+export const inventoryDetailQuerySchema = z.object({
+  date: z.coerce.date().optional(),
+});
+export type InventoryDetailQuery = z.infer<typeof inventoryDetailQuerySchema>;
+
 export const listInventoryQuerySchema = z.object({
   itemId: z.string().trim().min(1).optional(),
   search: z.string().trim().min(1).optional(),

@@ -8,6 +8,7 @@ import {
   confirmReportBodySchema,
   createInventoryBodySchema,
   createReportBodySchema,
+  inventoryDetailQuerySchema,
   itemIdParamSchema,
   listInventoryQuerySchema,
   listMovementsQuerySchema,
@@ -156,6 +157,11 @@ router.get(
 
 // Route tham số 1 đoạn (`/:itemId`) đăng ký SAU CÙNG trong nhóm GET để không "nuốt" các path tĩnh ở trên
 // (Express khớp theo thứ tự đăng ký, không theo độ cụ thể).
-router.get('/:itemId', validate(itemIdParamSchema, 'params'), asyncHandler(inventoryController.getByItemId));
+router.get(
+  '/:itemId',
+  validate(itemIdParamSchema, 'params'),
+  validate(inventoryDetailQuerySchema, 'query'),
+  asyncHandler(inventoryController.getByItemId),
+);
 
 export default router;

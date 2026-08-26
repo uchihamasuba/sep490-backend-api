@@ -242,9 +242,9 @@ async function listInventory(query: ListInventoryQuery): Promise<{ data: Invento
   return { data, meta: toMeta(query.page, query.limit, totalItems) };
 }
 
-async function getInventoryByItemId(itemId: string): Promise<InventoryDTO> {
+async function getInventoryByItemId(itemId: string, queryDate?: Date): Promise<InventoryDTO> {
   const row = await findInventoryOrThrow(itemId);
-  const now = new Date();
+  const now = queryDate ? new Date(queryDate) : new Date();
   const queryEnd = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
   if (row.item.components && row.item.components.length > 0) {

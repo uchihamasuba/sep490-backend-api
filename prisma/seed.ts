@@ -1035,9 +1035,7 @@ async function main(): Promise<void> {
         }
       }
 
-      let resCount = 0;
       for (const [itemId, qty] of reservedItems.entries()) {
-        if (resCount >= 3) break; // Lấy 3 item đại diện để demo
         inventoryReservationsData.push({
           reservationId: genId(),
           itemId: itemId,
@@ -1049,7 +1047,6 @@ async function main(): Promise<void> {
           status: resStatus,
           createdBy: randomChoice(managers).userId,
         });
-        resCount++;
       }
 
       // 8. Survey Reports (Báo cáo khảo sát)

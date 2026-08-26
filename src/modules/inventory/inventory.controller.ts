@@ -8,6 +8,7 @@ import type {
   CreateInventoryBody,
   CreateReportBody,
   ItemIdParam,
+  InventoryDetailQuery,
   ListInventoryQuery,
   ListMovementsQuery,
   ListReportsQuery,
@@ -32,7 +33,8 @@ async function list(req: Request, res: Response) {
 
 async function getByItemId(req: Request, res: Response) {
   const { itemId } = req.params as unknown as ItemIdParam;
-  const inventory = await inventoryService.getInventoryByItemId(itemId);
+  const { date } = req.query as unknown as InventoryDetailQuery;
+  const inventory = await inventoryService.getInventoryByItemId(itemId, date);
   ok(res, inventory);
 }
 
