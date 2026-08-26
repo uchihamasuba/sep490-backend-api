@@ -51,7 +51,7 @@ const detailInclude = {
   customer: { select: { customerName: true, phone: true, email: true, address: true } },
   creator: { select: { userId: true, fullName: true, role: true } },
   closer: { select: { userId: true, fullName: true } },
-  orderItems: { include: { item: { select: { itemName: true, unit: true, _count: { select: { components: true } }, components: { include: { child: { select: { itemName: true, itemCode: true, unit: true } } } } } } } },
+  orderItems: { include: { item: { select: { itemName: true, unit: true, purchasePrice: true, _count: { select: { components: true } }, components: { include: { child: { select: { itemName: true, itemCode: true, unit: true } } } } } } } },
 } satisfies Prisma.OrderInclude;
 
 export type OrderWithDetails = Prisma.OrderGetPayload<{ include: typeof detailInclude }>;

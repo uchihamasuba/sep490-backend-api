@@ -237,6 +237,7 @@ function mapDetail(row: OrderWithDetails): OrderDetailDTO {
       unit: item.item.unit,
       quantity: item.quantity,
       unitPrice: toNumber(item.unitPrice),
+      purchasePrice: toNumber(item.item.purchasePrice),
       subtotal: toNumber(item.subtotal),
       source: item.source,
       preparedQty: item.preparedQty,
