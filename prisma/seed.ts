@@ -723,6 +723,21 @@ async function main(): Promise<void> {
   const surveyReportsData: any[] = [];
   const surveyReportEvidencesData: any[] = [];
 
+  // 9. INVENTORY — 1 dòng cho TOÀN BỘ items (available + reserved + damaged = total)
+  // Thực hiện TRƯỚC khi tạo đơn hàng để reservation có thể cap theo quantityTotal
+  const inventoryData: any[] = [];
+  const inventoryTotalMap = new Map<string, number>();
+  for (const it of items) {
+    const quantityTotal = it.bulk ? randomInt(50, 200) : randomInt(10, 30);
+    inventoryTotalMap.set(it.itemId, quantityTotal);
+    inventoryData.push({
+      inventoryId: genId(),
+      itemId: it.itemId,
+      quantityTotal,
+      quantityDamaged: 0,
+    });
+  }
+
   let orderSeq = 1;
   let planSeq = 1;
   let depositSeq = 1;
@@ -1036,14 +1051,16 @@ async function main(): Promise<void> {
       }
 
       for (const [itemId, qty] of reservedItems.entries()) {
+        const total = inventoryTotalMap.get(itemId) || 0;
+        const finalQty = Math.min(qty, total);
         inventoryReservationsData.push({
           reservationId: genId(),
           itemId: itemId,
           orderId: orderId,
           quotationId: quotationId,
-          quantity: qty,
+          quantity: finalQty,
           startAt: addDays(eventDate, -1),
-          endAt: addDays(eventDate, 2),
+          endAt: new Date(addDays(eventDate, 0).getTime() + 28 * 60 * 60 * 1000), // eventDate + 28h
           status: resStatus,
           createdBy: randomChoice(managers).userId,
         });
@@ -1115,18 +1132,10 @@ async function main(): Promise<void> {
   console.log(`  - Created ${ordersData.length} orders, ${schedulePlansData.length} schedule plans, ${depositsData.length} deposits, ${settlementsData.length} settlements, ${supplierTransactionsData.length} supplier transactions, ${inventoryReservationsData.length} inventory reservations, ${surveyReportsData.length} survey reports`);
 
 
-  // 9. INVENTORY — 1 dòng cho TOÀN BỘ items (available + reserved + damaged = total)
+  // 9. INVENTORY (Data đã được chuẩn bị trước vòng lặp orders để dùng cho reservation)
   // ==========================================================================
   await prisma.inventory.createMany({
-    data: items.map((it) => {
-      const quantityTotal = it.bulk ? randomInt(50, 200) : randomInt(10, 30);
-      return {
-        inventoryId: genId(),
-        itemId: it.itemId,
-        quantityTotal,
-        quantityDamaged: 0,
-      };
-    }),
+    data: inventoryData,
   });
 
   // ==========================================================================
