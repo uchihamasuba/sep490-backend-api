@@ -748,10 +748,10 @@ async function main(): Promise<void> {
     if (!customer) continue;
 
     const quotationId = genId();
-    const quotationCode = `QT-${TODAY.getFullYear()}${pad(TODAY.getMonth() + 1, 2)}-${pad(orderSeq, 3)}`;
+    const quotationCode = `QT-${pad(orderSeq, 3)}`;
     const orderId = genId();
     const eventDate = addDays(TODAY, config.offset);
-    const orderCode = `ORD-${TODAY.getFullYear()}${pad(TODAY.getMonth() + 1, 2)}-${pad(orderSeq++, 3)}`;
+    const orderCode = `ORD-${pad(orderSeq++, 3)}`;
 
     const selectedItemCodes: { code: string, qty: number }[] = [];
     if (['Đám cưới', 'Tiệc cưới', 'Lễ ăn hỏi'].includes(config.type)) {
